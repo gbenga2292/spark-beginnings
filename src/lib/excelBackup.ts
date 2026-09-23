@@ -122,6 +122,8 @@ export const exportFullAppToExcel = async (appStateData: any, appVersion: string
   appendArraySheet('ledgerBeneficiaryBanks', 'LedgerBenBanks');
   appendArraySheet('ledgerEntries', 'LedgerEntries');
   appendArraySheet('companyExpenses', 'CompanyExpenses');
+  appendArraySheet('vendorInvoices', 'VendorInvoices');
+  appendArraySheet('vendorInvoicePayments', 'VendorInvPayments');
 
   /* ---- HR & Tasks ---- */
   appendArraySheet('disciplinaryRecords', 'Disciplinary');
@@ -277,6 +279,8 @@ export const restoreFullAppFromExcel = (file: File): Promise<any> => {
         getArray('ledgerBeneficiaryBanks', 'LedgerBenBanks');
         getArray('ledgerEntries', 'LedgerEntries');
         getArray('companyExpenses', 'CompanyExpenses');
+        getArray('vendorInvoices', 'VendorInvoices');
+        getArray('vendorInvoicePayments', 'VendorInvPayments');
 
         getArray('disciplinaryRecords', 'Disciplinary');
         getArray('evaluations', 'Evaluations');

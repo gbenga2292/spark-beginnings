@@ -1365,9 +1365,9 @@ function SitePoolCard({
             <span className="text-muted-foreground/70 font-mono text-[10px]">({invDetail.totalContractedDays}d)</span>
           </button>
         ))}
-        {siteItem.hasMultipleConcurrent && (
+        {siteItem.concurrentCount > 1 && (
           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 ml-auto">
-            {siteItem.concurrentCount} Concurrent Invoices
+            {siteItem.invoiceRelationLabel || `${siteItem.concurrentCount} Invoices`}
           </span>
         )}
       </div>

@@ -1,54 +1,97 @@
 import React, { useState, useEffect, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  CheckCircle2, Flame, ArrowRight, X, Calendar, Hourglass, ExternalLink, ChevronRight
+import {
+  CheckCircle2, Flame, ArrowRight, X, Calendar, Hourglass, ExternalLink, AlertCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
-import { format, isPast, isToday, isTomorrow, differenceInDays } from 'date-fns';
+import { format, isPast, isToday, isTomorrow, differenceInDays, differenceInHours } from 'date-fns';
 import type { SubTask, MainTask, TaskUrgency } from '@/src/types/tasks';
 
-// ── Urgency Rank & Minimalist Config ─────────────────────────────────────────
-const URGENCY_RANK: Record<string, number> = {
-  critical: 1,
-  high: 2,
-  medium: 3,
-  low: 4,
-};
+// ── Urgency rank ───────────────────────────────────────────────────────────────
+const URGENCY_RANK: Record<string, number> = { critical: 1, high: 2, medium: 3, low: 4 };
 
-export const URGENCY_CONFIG: Record<TaskUrgency, { label: string; badgeCls: string; dotCls: string; borderCls: string }> = {
+// ── Visual config per urgency (matches target design) ─────────────────────────
+export const URGENCY_CONFIG: Record<TaskUrgency, {
+  label: string;
+  badgeCls: string;
+  dotCls: string;
+  leftBarCls: string;
+  cardBg: string;
+  cardBorder: string;
+  btnCls: string;
+  isUrgent: boolean;
+}> = {
   critical: {
-    label: 'Critical',
-    badgeCls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-200/60 dark:border-rose-900/40',
+    label: 'HIGH PRIORITY',
+    badgeCls: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/60',
     dotCls: 'bg-rose-500 animate-pulse',
-    borderCls: 'border-rose-400 dark:border-rose-700',
+    leftBarCls: 'bg-rose-500',
+    cardBg: 'bg-rose-50/50 dark:bg-rose-950/10',
+    cardBorder: 'border-rose-200 dark:border-rose-900/60',
+    btnCls: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm',
+    isUrgent: true,
   },
   high: {
-    label: 'High',
-    badgeCls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/60 dark:border-amber-900/40',
-    dotCls: 'bg-amber-500',
-    borderCls: 'border-amber-300 dark:border-amber-800',
+    label: 'HIGH PRIORITY',
+    badgeCls: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/60',
+    dotCls: 'bg-rose-500 animate-pulse',
+    leftBarCls: 'bg-rose-500',
+    cardBg: 'bg-rose-50/50 dark:bg-rose-950/10',
+    cardBorder: 'border-rose-200 dark:border-rose-900/60',
+    btnCls: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm',
+    isUrgent: true,
   },
   medium: {
-    label: 'Medium',
-    badgeCls: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-800',
-    dotCls: 'bg-slate-400',
-    borderCls: 'border-slate-300 dark:border-slate-800',
+    label: 'MEDIUM',
+    badgeCls: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60',
+    dotCls: 'bg-amber-500',
+    leftBarCls: 'bg-amber-400',
+    cardBg: 'bg-white dark:bg-zinc-900/40',
+    cardBorder: 'border-zinc-200 dark:border-zinc-800',
+    btnCls: 'border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+    isUrgent: false,
   },
   low: {
-    label: 'Low',
-    badgeCls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-900/40',
-    dotCls: 'bg-emerald-500',
-    borderCls: 'border-emerald-300 dark:border-emerald-800',
+    label: 'ROUTINE',
+    badgeCls: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/60',
+    dotCls: 'bg-blue-500',
+    leftBarCls: 'bg-blue-500',
+    cardBg: 'bg-white dark:bg-zinc-900/40',
+    cardBorder: 'border-zinc-200 dark:border-zinc-800',
+    btnCls: 'border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+    isUrgent: false,
   },
 };
 
-/**
- * Filter out tasks that are deleted, archived, completed, or obsolete/stale.
- */
+// ── Progress bar ───────────────────────────────────────────────────────────────
+function PriorityProgressBar({ high, medium, low }: { high: number; medium: number; low: number }) {
+  const total = high + medium + low;
+  if (total === 0) return null;
+  const highPct  = (high   / total) * 100;
+  const medPct   = (medium / total) * 100;
+  const lowPct   = (low    / total) * 100;
+
+  return (
+    <div className="mt-3">
+      <div className="flex h-2 rounded-full overflow-hidden gap-px bg-zinc-100 dark:bg-zinc-800">
+        {high   > 0 && <div className="bg-rose-500 transition-all"  style={{ width: `${highPct}%` }} />}
+        {medium > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${medPct}%` }} />}
+        {low    > 0 && <div className="bg-blue-500 transition-all"  style={{ width: `${lowPct}%` }} />}
+      </div>
+      <div className="flex items-center gap-4 mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
+        {high   > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500  shrink-0" />{high} Urgent / High</span>}
+        {medium > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />{medium} Medium</span>}
+        {low    > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500  shrink-0" />{low} Low / Routine</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Task validity ──────────────────────────────────────────────────────────────
 function isTaskActiveAndValid(sub: SubTask, parentMap: Map<string, MainTask>): boolean {
   if ((sub as any).isDeleted || (sub as any).is_deleted || (sub as any).deleted_at) return false;
   if ((sub.status as string) === 'archived' || (sub as any).is_archived) return false;
@@ -59,471 +102,346 @@ function isTaskActiveAndValid(sub: SubTask, parentMap: Map<string, MainTask>): b
     const parent = parentMap.get(parentId);
     if (parent) {
       if (parent.isDeleted || (parent as any).is_deleted || (parent as any).deleted_at) return false;
-      const pStatus = (parent as any).status;
-      if (pStatus === 'completed' || pStatus === 'done' || (parent as any).is_completed) return false;
-      if (pStatus === 'archived' || (parent as any).is_archived) return false;
+      const ps = (parent as any).status;
+      if (ps === 'completed' || ps === 'done' || (parent as any).is_completed) return false;
+      if (ps === 'archived' || (parent as any).is_archived) return false;
     }
   }
 
-  // Exclude stale abandoned tasks (overdue > 30 days or no deadline created > 60 days)
   if (sub.deadline) {
     const d = new Date(sub.deadline);
-    if (!isNaN(d.getTime()) && isPast(d) && !isToday(d)) {
-      if (differenceInDays(new Date(), d) > 30) return false;
-    }
+    if (!isNaN(d.getTime()) && isPast(d) && !isToday(d) && differenceInDays(new Date(), d) > 30) return false;
   } else if (sub.createdAt || (sub as any).created_at) {
     const c = new Date(sub.createdAt || (sub as any).created_at);
     if (!isNaN(c.getTime()) && differenceInDays(new Date(), c) > 60) return false;
   }
-
   return true;
 }
 
+// ── Main component ─────────────────────────────────────────────────────────────
 export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
-  const { user } = useAuth();
-  const currentUser = useUserStore(s => s.getCurrentUser());
+  const { user }       = useAuth();
+  const currentUser    = useUserStore(s => s.getCurrentUser());
   const { subtasks, mainTasks, users } = useAppData();
-  const { isDark } = useTheme();
-  const navigate = useNavigate();
+  const { isDark }     = useTheme();
+  const navigate       = useNavigate();
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [hasEvaluated, setHasEvaluated] = useState(false);
+  const [isOpen,        setIsOpen]        = useState(false);
+  const [hasEvaluated,  setHasEvaluated]  = useState(false);
 
-  // ── High Performance O(1) Index Maps ───────────────────────────────────────
+  // ── O(1) index maps ─────────────────────────────────────────────────────────
   const mainTasksById = useMemo(() => {
-    const map = new Map<string, MainTask>();
-    if (mainTasks) {
-      for (let i = 0; i < mainTasks.length; i++) {
-        map.set(mainTasks[i].id, mainTasks[i]);
-      }
-    }
-    return map;
+    const m = new Map<string, MainTask>();
+    if (mainTasks) for (let i = 0; i < mainTasks.length; i++) m.set(mainTasks[i].id, mainTasks[i]);
+    return m;
   }, [mainTasks]);
 
   const usersById = useMemo(() => {
-    const map = new Map<string, string>();
+    const m = new Map<string, string>();
     if (users) {
       for (let i = 0; i < users.length; i++) {
         const u = users[i];
-        const firstName = u.name ? u.name.split(' ')[0] : 'Team';
-        map.set(u.id, firstName);
-        if (u.email) map.set(u.email.toLowerCase(), firstName);
+        const first = u.name ? u.name.split(' ')[0] : 'Team';
+        m.set(u.id, first);
+        if (u.email) m.set(u.email.toLowerCase(), first);
       }
     }
-    return map;
+    return m;
   }, [users]);
 
-  // ── 1. Pending Approvals (strictly active, non-deleted, awaiting approval) ───
+  // ── Pending approvals ────────────────────────────────────────────────────────
   const pendingApprovals = useMemo(() => {
     if (!user?.id || !subtasks) return [];
-    const userId = user.id;
-
+    const uid = user.id;
     return subtasks.filter(sub => {
       if (sub.status !== 'pending_approval') return false;
       if ((sub as any).isDeleted || (sub as any).is_deleted || (sub as any).deleted_at) return false;
       if ((sub.status as string) === 'archived' || (sub as any).is_archived) return false;
-
-      const parentId = sub.mainTaskId || (sub as any).main_task_id;
-      if (parentId) {
-        const parent = mainTasksById.get(parentId);
-        if (parent && (parent.isDeleted || (parent as any).is_deleted || (parent as any).status === 'completed' || (parent as any).status === 'archived')) {
-          return false;
-        }
+      const pid = sub.mainTaskId || (sub as any).main_task_id;
+      if (pid) {
+        const p = mainTasksById.get(pid);
+        if (p && (p.isDeleted || (p as any).is_deleted || (p as any).status === 'completed' || (p as any).status === 'archived')) return false;
       }
-
-      const isApprover = sub.approverId === userId;
-      const isCreator = sub.createdBy === userId || (sub as any).created_by === userId;
-      const isAdmin = (user as any)?.role === 'admin' || (user as any)?.role === 'co-admin' || currentUser?.role === 'admin';
+      const isApprover  = sub.approverId === uid;
+      const isCreator   = sub.createdBy  === uid || (sub as any).created_by === uid;
+      const isAdmin     = (user as any)?.role === 'admin' || (user as any)?.role === 'co-admin' || currentUser?.role === 'admin';
       return isApprover || (isAdmin && !sub.approverId) || isCreator;
     });
   }, [subtasks, mainTasksById, user, currentUser]);
 
-  // ── 2. Active Incomplete Tasks: strictly assigned to me OR created by me & assigned to others ─
+  // ── Active urgent tasks ──────────────────────────────────────────────────────
   const myUrgentTasks = useMemo(() => {
     if (!user?.id || !subtasks) return [];
-    const userId = user.id.toLowerCase();
-    const currentName = currentUser?.name?.toLowerCase();
-    const userEmail = user?.email?.toLowerCase();
+    const uid  = user.id.toLowerCase();
+    const name = currentUser?.name?.toLowerCase();
+    const mail = user?.email?.toLowerCase();
 
     const active = subtasks.filter(sub => {
       if (!isTaskActiveAndValid(sub, mainTasksById)) return false;
-
-      const assignedStr = (sub.assignedTo || (sub as any).assigned_to || '').trim();
-      const assigned = assignedStr ? assignedStr.split(',').map((s: string) => s.trim().toLowerCase()) : [];
-
-      const isAssignedToMe = assigned.includes(userId) || 
-        (currentName && assigned.includes(currentName)) ||
-        (userEmail && assigned.includes(userEmail));
-
-      const isCreatedByMe = sub.createdBy === user.id || (sub as any).created_by === user.id;
-      const parentId = sub.mainTaskId || (sub as any).main_task_id;
-      const parent = parentId ? mainTasksById.get(parentId) : null;
-      const isParentCreatedByMe = parent && (parent.createdBy === user.id || (parent as any).created_by === user.id);
-
-      // Condition 1: Assigned to me
-      if (isAssignedToMe) return true;
-
-      // Condition 2: Created by me and assigned to people (so I can stay abreast)
-      if ((isCreatedByMe || isParentCreatedByMe) && assigned.length > 0) return true;
-
+      const str      = (sub.assignedTo || (sub as any).assigned_to || '').trim();
+      const assigned = str ? str.split(',').map((s: string) => s.trim().toLowerCase()) : [];
+      const mine = assigned.includes(uid) || (name && assigned.includes(name)) || (mail && assigned.includes(mail));
+      const isCBM   = sub.createdBy === user.id || (sub as any).created_by === user.id;
+      const pid     = sub.mainTaskId || (sub as any).main_task_id;
+      const parent  = pid ? mainTasksById.get(pid) : null;
+      const isPCBM  = parent && (parent.createdBy === user.id || (parent as any).created_by === user.id);
+      if (mine) return true;
+      if ((isCBM || isPCBM) && assigned.length > 0) return true;
       return false;
     });
 
-    // Sort by Urgency (Critical > High > Medium > Low), then by deadline date
     return active.sort((a, b) => {
-      const aUrgRank = a.urgency ? (URGENCY_RANK[a.urgency] ?? 5) : 5;
-      const bUrgRank = b.urgency ? (URGENCY_RANK[b.urgency] ?? 5) : 5;
-      if (aUrgRank !== bUrgRank) {
-        return aUrgRank - bUrgRank;
-      }
-      const aDate = a.deadline ? new Date(a.deadline).getTime() : 9999999999999;
-      const bDate = b.deadline ? new Date(b.deadline).getTime() : 9999999999999;
-      return aDate - bDate;
+      const ar = a.urgency ? (URGENCY_RANK[a.urgency] ?? 5) : 5;
+      const br = b.urgency ? (URGENCY_RANK[b.urgency] ?? 5) : 5;
+      if (ar !== br) return ar - br;
+      const ad = a.deadline ? new Date(a.deadline).getTime() : 9999999999999;
+      const bd = b.deadline ? new Date(b.deadline).getTime() : 9999999999999;
+      return ad - bd;
     });
   }, [subtasks, mainTasksById, user, currentUser]);
 
-  // ── 3. Urgency Analytics Breakdown ─────────────────────────────────────────
+  // ── Analytics ────────────────────────────────────────────────────────────────
   const urgencyAnalytics = useMemo(() => {
-    const groups: Record<TaskUrgency, { count: number; earliestDeadline: Date | null }> = {
-      critical: { count: 0, earliestDeadline: null },
-      high: { count: 0, earliestDeadline: null },
-      medium: { count: 0, earliestDeadline: null },
-      low: { count: 0, earliestDeadline: null },
+    const g: Record<TaskUrgency, { count: number; earliest: Date | null }> = {
+      critical: { count: 0, earliest: null },
+      high:     { count: 0, earliest: null },
+      medium:   { count: 0, earliest: null },
+      low:      { count: 0, earliest: null },
     };
-
-    let overdueCount = 0;
-
-    for (let i = 0; i < myUrgentTasks.length; i++) {
-      const task = myUrgentTasks[i];
-      const urg = (task.urgency || 'medium') as TaskUrgency;
-      if (groups[urg]) {
-        groups[urg].count += 1;
-        if (task.deadline) {
-          const d = new Date(task.deadline);
-          if (!isNaN(d.getTime())) {
-            if (!groups[urg].earliestDeadline || d < groups[urg].earliestDeadline) {
-              groups[urg].earliestDeadline = d;
-            }
-            if (isPast(d) && !isToday(d)) {
-              overdueCount += 1;
-            }
-          }
+    for (const t of myUrgentTasks) {
+      const u = (t.urgency || 'medium') as TaskUrgency;
+      if (g[u]) {
+        g[u].count++;
+        if (t.deadline) {
+          const d = new Date(t.deadline);
+          if (!isNaN(d.getTime()) && (!g[u].earliest || d < g[u].earliest!)) g[u].earliest = d;
         }
       }
     }
-
-    return { groups, overdueCount };
+    return g;
   }, [myUrgentTasks]);
 
-  const formatNearestDate = (d: Date | null) => {
-    if (!d) return 'No due date';
-    if (isToday(d)) return 'Due today';
-    if (isTomorrow(d)) return 'Due tomorrow';
-    if (isPast(d)) return `Overdue (${format(d, 'MMM d')})`;
-    return `Due ${format(d, 'MMM d')}`;
-  };
-
-  // Build natural summary phrase
-  const summaryNarrative = useMemo(() => {
-    const parts: string[] = [];
-    if (pendingApprovals.length > 0) {
-      parts.push(`${pendingApprovals.length} pending ${pendingApprovals.length === 1 ? 'approval' : 'approvals'}`);
-    }
-    if (urgencyAnalytics.groups.critical.count > 0) {
-      const d = urgencyAnalytics.groups.critical.earliestDeadline;
-      const count = urgencyAnalytics.groups.critical.count;
-      parts.push(`${count} critical ${count === 1 ? 'task' : 'tasks'}${d ? ` (${formatNearestDate(d)})` : ''}`);
-    }
-    if (urgencyAnalytics.groups.high.count > 0) {
-      const d = urgencyAnalytics.groups.high.earliestDeadline;
-      const count = urgencyAnalytics.groups.high.count;
-      parts.push(`${count} high priority ${count === 1 ? 'task' : 'tasks'}${d ? ` (${formatNearestDate(d)})` : ''}`);
-    }
-    if (urgencyAnalytics.groups.medium.count > 0) {
-      const count = urgencyAnalytics.groups.medium.count;
-      parts.push(`${count} medium task${count === 1 ? '' : 's'}`);
-    }
-
-    if (parts.length === 0) return 'All active tasks and approvals are up to date.';
-    if (parts.length === 1) return `You have ${parts[0]} requiring attention today.`;
-    if (parts.length === 2) return `You have ${parts[0]} and ${parts[1]} requiring attention today.`;
-    return `You have ${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]} requiring attention today.`;
-  }, [pendingApprovals.length, urgencyAnalytics]);
-
-  // ── 4. Pre-Enriched Task Rows (Zero computation during render) ─────────────
+  // ── Enriched tasks ───────────────────────────────────────────────────────────
   const enrichedUrgentTasks = useMemo(() => {
-    const now = new Date();
-    const userId = user?.id?.toLowerCase();
-    const currentName = currentUser?.name?.toLowerCase();
-    const userEmail = user?.email?.toLowerCase();
+    const now  = new Date();
+    const uid  = user?.id?.toLowerCase();
+    const name = currentUser?.name?.toLowerCase();
+    const mail = user?.email?.toLowerCase();
 
     return myUrgentTasks.map(sub => {
-      const parentTask = mainTasksById.get(sub.mainTaskId || (sub as any).main_task_id);
-      const urgency = sub.urgency || 'medium';
+      const parent  = mainTasksById.get(sub.mainTaskId || (sub as any).main_task_id);
+      const urgency = (sub.urgency || 'medium') as TaskUrgency;
       const urgConf = URGENCY_CONFIG[urgency] || URGENCY_CONFIG.medium;
 
-      let deadlineLabel = 'No deadline';
-      let deadlineCls = 'text-muted-foreground';
+      let deadlineLabel = 'No strict deadline';
+      let deadlineCls   = 'text-zinc-400 dark:text-zinc-500';
+      let isOverdue     = false;
+
       if (sub.deadline) {
         const d = new Date(sub.deadline);
         if (isPast(d) && !isToday(d)) {
-          deadlineLabel = `Overdue (${format(d, 'MMM d')})`;
-          deadlineCls = 'text-rose-600 font-semibold';
+          const hrs = differenceInHours(now, d);
+          deadlineLabel = hrs < 48 ? `Action Required · ${hrs}h overdue` : `Overdue (${format(d, 'MMM d')})`;
+          deadlineCls   = 'text-rose-600 dark:text-rose-400 font-semibold';
+          isOverdue     = true;
         } else if (isToday(d)) {
-          deadlineLabel = 'Due today';
-          deadlineCls = 'text-amber-600 font-semibold';
+          deadlineLabel = `Due today at ${format(d, 'h:mm a')}`;
+          deadlineCls   = 'text-amber-600 dark:text-amber-400 font-semibold';
         } else if (isTomorrow(d)) {
-          deadlineLabel = 'Due tomorrow';
-          deadlineCls = 'text-amber-600';
+          deadlineLabel = `Due tomorrow, ${format(d, 'h:mm a')}`;
+          deadlineCls   = 'text-amber-600 dark:text-amber-400';
         } else {
-          const days = differenceInDays(d, now);
-          deadlineLabel = `Due in ${days}d (${format(d, 'MMM d')})`;
-          deadlineCls = 'text-muted-foreground';
+          deadlineLabel = `Due in ${differenceInDays(d, now)}d (${format(d, 'MMM d')})`;
+          deadlineCls   = 'text-zinc-500 dark:text-zinc-400';
         }
       }
 
-      const assignedStr = (sub.assignedTo || (sub as any).assigned_to || '').trim();
-      const assignedList = assignedStr ? assignedStr.split(',').map(s => s.trim()) : [];
-      const isAssignedToMe = assignedList.some(a => {
+      const str      = (sub.assignedTo || (sub as any).assigned_to || '').trim();
+      const list     = str ? str.split(',').map((s: string) => s.trim()) : [];
+      const mine     = list.some(a => {
         const al = a.toLowerCase();
-        return al === userId || (currentName && al === currentName) || (userEmail && al === userEmail);
+        return al === uid || (name && al === name) || (mail && al === mail);
       });
-      const assigneeNames = assignedList.map(aId => usersById.get(aId) || aId).join(', ');
+      const names = list.map(id => usersById.get(id) || id).join(', ');
 
-      return {
-        sub,
-        parentTitle: parentTask?.title,
-        urgConf,
-        deadlineLabel,
-        deadlineCls,
-        isAssignedToMe,
-        assigneeNames,
-      };
+      return { sub, parentTitle: parent?.title, urgConf, urgency, deadlineLabel, deadlineCls, isOverdue, isAssignedToMe: mine, assigneeNames: names };
     });
   }, [myUrgentTasks, mainTasksById, usersById, user, currentUser]);
 
-  const enrichedApprovals = useMemo(() => {
-    return pendingApprovals.map(sub => {
-      const parentTask = mainTasksById.get(sub.mainTaskId || (sub as any).main_task_id);
-      const creatorName = usersById.get(sub.createdBy || (sub as any).created_by) || 'Team';
-      return {
-        sub,
-        parentTitle: parentTask?.title,
-        creatorName,
-      };
-    });
-  }, [pendingApprovals, mainTasksById, usersById]);
+  const enrichedApprovals = useMemo(() =>
+    pendingApprovals.map(sub => ({
+      sub,
+      parentTitle: mainTasksById.get(sub.mainTaskId || (sub as any).main_task_id)?.title,
+      creatorName: usersById.get(sub.createdBy || (sub as any).created_by) || 'Team',
+    })),
+  [pendingApprovals, mainTasksById, usersById]);
 
-  // ── 5. Trigger Briefing Modal on Startup (session-based) ────────────────────
+  // ── Session trigger ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.id || hasEvaluated) return;
-
-    // Wait 1s for hydration
-    const timer = setTimeout(() => {
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
-      const sessionKey = `dcel_briefing_session_shown_${user.id}_${todayStr}`;
-      const shownThisSession = sessionStorage.getItem(sessionKey);
-
-      if (!shownThisSession) {
-        setIsOpen(true);
-        sessionStorage.setItem(sessionKey, 'true');
-      }
+    const t = setTimeout(() => {
+      const key = `dcel_briefing_session_shown_${user.id}_${format(new Date(), 'yyyy-MM-dd')}`;
+      if (!sessionStorage.getItem(key)) { setIsOpen(true); sessionStorage.setItem(key, 'true'); }
       setHasEvaluated(true);
     }, 1000);
-
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [user?.id, hasEvaluated]);
 
-  // ── 6. Listen for custom event to manually open ──────────────────────────────
   useEffect(() => {
-    const handleManualOpen = () => setIsOpen(true);
-    window.addEventListener('open-daily-briefing', handleManualOpen);
-    return () => window.removeEventListener('open-daily-briefing', handleManualOpen);
+    const open = () => setIsOpen(true);
+    window.addEventListener('open-daily-briefing', open);
+    return () => window.removeEventListener('open-daily-briefing', open);
   }, []);
 
   const markDismissed = () => {
-    if (user?.id) {
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
-      sessionStorage.setItem(`dcel_briefing_session_shown_${user.id}_${todayStr}`, 'true');
-    }
+    if (user?.id) sessionStorage.setItem(`dcel_briefing_session_shown_${user.id}_${format(new Date(), 'yyyy-MM-dd')}`, 'true');
   };
-
-  const handleDismiss = () => {
-    markDismissed();
-    setIsOpen(false);
-  };
-
+  const handleDismiss        = () => { markDismissed(); setIsOpen(false); };
   const handleNavigateToTask = (sub: SubTask) => {
-    markDismissed();
-    setIsOpen(false);
-    const mainId = sub.mainTaskId || (sub as any).main_task_id;
-    if (mainId) {
-      navigate(`/tasks?openTask=${mainId}&open=${sub.id}`);
-    } else {
-      navigate(`/tasks?open=${sub.id}`);
-    }
+    markDismissed(); setIsOpen(false);
+    const mid = sub.mainTaskId || (sub as any).main_task_id;
+    navigate(mid ? `/tasks?openTask=${mid}&open=${sub.id}` : `/tasks?open=${sub.id}`);
   };
 
   if (!isOpen) return null;
 
   const totalCount = pendingApprovals.length + myUrgentTasks.length;
+  const highTotal  = urgencyAnalytics.critical.count + urgencyAnalytics.high.count;
+  const medCount   = urgencyAnalytics.medium.count;
+  const lowCount   = urgencyAnalytics.low.count;
+
+  // Build coloured narrative parts
+  const narrativeParts: Array<{ text: string; cls: string }> = [];
+  if (highTotal > 0) narrativeParts.push({ text: `${highTotal} urgent`, cls: 'text-rose-600 dark:text-rose-400 font-semibold' });
+  if (medCount  > 0) narrativeParts.push({ text: `${medCount} medium`,  cls: 'text-amber-600 dark:text-amber-400 font-semibold' });
+  if (lowCount  > 0) narrativeParts.push({ text: `${lowCount} low`,     cls: 'text-blue-600 dark:text-blue-400 font-semibold' });
 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-        {/* Minimalist Frosted Backdrop */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        {/* Backdrop */}
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity"
+          className="fixed inset-0 bg-slate-950/50 backdrop-blur-sm"
           onClick={handleDismiss}
         />
 
-        {/* Elegant Minimalist Dialog */}
+        {/* Dialog */}
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 16 }}
-          transition={{ type: "spring", stiffness: 340, damping: 30 }}
-          className={`relative w-full max-w-xl max-h-[88vh] flex flex-col rounded-2xl shadow-2xl border overflow-hidden ${
-            isDark 
-              ? 'bg-zinc-950 border-zinc-800 text-zinc-100 shadow-black/70' 
-              : 'bg-white border-zinc-200/90 text-zinc-900 shadow-slate-300/40'
+          transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+          className={`relative w-full max-w-[560px] max-h-[90vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden ${
+            isDark ? 'bg-zinc-950 border border-zinc-800 text-zinc-100' : 'bg-white border border-zinc-200 text-zinc-900'
           }`}
           onClick={e => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className={`px-6 py-5 border-b flex items-start justify-between shrink-0 ${
-            isDark ? 'border-zinc-800/80 bg-zinc-900/40' : 'border-zinc-100 bg-zinc-50/70'
+          {/* ── Header ── */}
+          <div className={`px-6 pt-5 pb-4 border-b flex items-start justify-between shrink-0 ${
+            isDark ? 'border-zinc-800 bg-zinc-900/20' : 'border-zinc-100 bg-white'
           }`}>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
-                <Flame className="w-5 h-5 animate-pulse" />
+              <div className="h-10 w-10 rounded-xl bg-amber-50 border border-amber-200/80 dark:bg-amber-500/10 dark:border-amber-500/20 flex items-center justify-center shrink-0">
+                <Flame className="w-5 h-5 text-amber-500" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold tracking-tight">Daily Priority Briefing</h2>
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
-                    totalCount > 0 
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-[15px] font-bold tracking-tight">Daily Priority Briefing</h2>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    totalCount > 0
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400'
+                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
                   }`}>
                     {totalCount} {totalCount === 1 ? 'action' : 'actions'}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {format(new Date(), 'EEEE, MMMM d')} · Focus overview
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                  {format(new Date(), 'EEEE, MMMM d')} · <span className="font-medium">Focus overview</span>
                 </p>
               </div>
             </div>
-
             <button
               onClick={handleDismiss}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                isDark ? 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800' : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100'
-              }`}
-              title="Close briefing"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Minimalist Scrollable Content */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5 scrollbar-thin">
+          {/* ── Body ── */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
 
-            {/* Quick Natural Language Summary Banner */}
+            {/* Summary banner */}
             {totalCount > 0 && (
-              <div className={`px-4 py-3 rounded-xl border flex items-start gap-3 ${
-                isDark ? 'bg-zinc-900/60 border-zinc-800/80' : 'bg-zinc-50/80 border-zinc-200/60'
+              <div className={`px-4 py-3.5 rounded-xl border ${
+                isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-50 border-zinc-200/80'
               }`}>
-                <div className="w-1 self-stretch rounded-full bg-amber-500 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium leading-relaxed text-zinc-700 dark:text-zinc-300">
-                    {summaryNarrative}
+                {narrativeParts.length > 0 ? (
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                    {'You have '}
+                    {narrativeParts.map((part, i) => (
+                      <React.Fragment key={i}>
+                        <span className={part.cls}>{part.text}</span>
+                        {i < narrativeParts.length - 2 ? ', ' : i === narrativeParts.length - 2 ? ', and ' : ''}
+                      </React.Fragment>
+                    ))}
+                    {' priority tasks requiring attention today.'}
                   </p>
-
-                  {/* Elegant Horizontal Counters */}
-                  <div className="flex items-center gap-3 mt-2.5 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/60 text-[11px]">
-                    {urgencyAnalytics.groups.critical.count > 0 && (
-                      <span className="flex items-center gap-1.5 font-medium text-rose-600 dark:text-rose-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                        {urgencyAnalytics.groups.critical.count} Critical
-                      </span>
-                    )}
-                    {urgencyAnalytics.groups.high.count > 0 && (
-                      <span className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        {urgencyAnalytics.groups.high.count} High
-                      </span>
-                    )}
-                    {pendingApprovals.length > 0 && (
-                      <span className="flex items-center gap-1.5 font-medium text-indigo-600 dark:text-indigo-400">
-                        <Hourglass className="w-3 h-3" />
-                        {pendingApprovals.length} Approval{pendingApprovals.length === 1 ? '' : 's'}
-                      </span>
-                    )}
-                    {urgencyAnalytics.groups.medium.count > 0 && (
-                      <span className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
-                        {urgencyAnalytics.groups.medium.count} Medium
-                      </span>
-                    )}
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300">All active tasks and approvals are up to date.</p>
+                )}
+                <PriorityProgressBar high={highTotal} medium={medCount} low={lowCount} />
               </div>
             )}
 
-            {/* Section 1: Pending Approvals */}
+            {/* Pending Approvals */}
             {enrichedApprovals.length > 0 && (
               <div>
-                <div className="flex items-center gap-1.5 mb-2.5">
-                  <Hourglass className="w-3.5 h-3.5 text-amber-500" />
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Approvals Awaiting Review ({enrichedApprovals.length})
-                  </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Hourglass className="w-3.5 h-3.5 text-amber-500" />
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      Approvals Awaiting Review ({enrichedApprovals.length})
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-zinc-400">Sorted by Priority</span>
                 </div>
-
                 <div className="space-y-2">
                   {enrichedApprovals.map(({ sub, parentTitle, creatorName }) => (
                     <div
                       key={sub.id}
-                      className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
-                        isDark 
-                          ? 'bg-zinc-900/40 border-zinc-800 hover:border-amber-500/40' 
-                          : 'bg-white border-zinc-200/80 hover:border-amber-400/80'
+                      className={`relative rounded-xl border overflow-hidden flex items-center justify-between gap-3 p-3 transition-all ${
+                        isDark ? 'bg-amber-950/10 border-amber-900/50 hover:border-amber-700/60' : 'bg-amber-50/40 border-amber-200 hover:border-amber-300'
                       }`}
                     >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-xl" />
+                      <div className="min-w-0 flex-1 pl-2">
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
                             Approval
                           </span>
                           {parentTitle && (
-                            <span className="text-[11px] text-muted-foreground truncate max-w-[180px]">
-                              {parentTitle}
-                            </span>
+                            <span className="text-[11px] text-zinc-400 truncate max-w-[190px]">{parentTitle}</span>
                           )}
                         </div>
-                        <p className="text-xs font-semibold truncate text-zinc-800 dark:text-zinc-100">
-                          {sub.title}
-                        </p>
-                        <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-                          <span>Requested by {creatorName}</span>
+                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{sub.title}</p>
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
+                          <span>Requested by <strong>{creatorName}</strong></span>
                           {sub.budgetRequested && (
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                               ₦{Number(sub.budgetRequested).toLocaleString()}
                             </span>
                           )}
                         </div>
                       </div>
-
                       <button
                         onClick={() => handleNavigateToTask(sub)}
-                        className="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-amber-500 hover:bg-amber-400 text-white flex items-center gap-1 shadow-xs shrink-0 transition-all cursor-pointer"
+                        className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-sm"
                       >
-                        Review <ChevronRight className="w-3.5 h-3.5" />
+                        Review Now <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
@@ -531,67 +449,62 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
               </div>
             )}
 
-            {/* Section 2: Active Tasks in Order of Urgency */}
+            {/* Active tasks */}
             {enrichedUrgentTasks.length > 0 && (
               <div>
-                <div className="flex items-center gap-1.5 mb-2.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-zinc-500" />
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Active Tasks by Urgency ({enrichedUrgentTasks.length})
-                  </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      Active Tasks by Urgency ({enrichedUrgentTasks.length})
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-zinc-400">Sorted by Priority</span>
                 </div>
-
                 <div className="space-y-2">
-                  {enrichedUrgentTasks.map(({ sub, parentTitle, urgConf, deadlineLabel, deadlineCls, isAssignedToMe, assigneeNames }) => (
+                  {enrichedUrgentTasks.map(({ sub, parentTitle, urgConf, deadlineLabel, deadlineCls, isOverdue, isAssignedToMe, assigneeNames }) => (
                     <div
                       key={sub.id}
-                      className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
-                        isDark 
-                          ? 'bg-zinc-900/30 border-zinc-800/80 hover:border-zinc-700' 
-                          : 'bg-white border-zinc-200/70 hover:border-zinc-300'
-                      }`}
+                      className={`relative rounded-xl border overflow-hidden flex items-center justify-between gap-3 p-3 transition-all hover:shadow-sm ${urgConf.cardBg} ${urgConf.cardBorder}`}
                     >
-                      <div className="min-w-0 flex-1">
+                      {/* Left accent bar */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 ${urgConf.leftBarCls} rounded-l-xl`} />
+
+                      <div className="min-w-0 flex-1 pl-2">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                          {/* Minimalist urgency indicator */}
-                          <span className={`text-[10px] font-medium uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 ${urgConf.badgeCls}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${urgConf.dotCls}`} />
+                          <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border flex items-center gap-1 ${urgConf.badgeCls}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${urgConf.dotCls} inline-block`} />
                             {urgConf.label}
                           </span>
                           {isAssignedToMe ? (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/60">
                               Assigned to you
                             </span>
                           ) : (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              Delegated to {assigneeNames || 'team'}
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60">
+                              Delegated · {assigneeNames || 'team'}
                             </span>
                           )}
                           {parentTitle && (
-                            <span className="text-[11px] text-muted-foreground truncate max-w-[170px]">
-                              {parentTitle}
-                            </span>
+                            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate max-w-[160px]">{parentTitle}</span>
                           )}
                         </div>
-                        <p className="text-xs font-semibold truncate text-zinc-900 dark:text-zinc-100">
-                          {sub.title}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1 text-[11px]">
-                          <span className={`flex items-center gap-1 ${deadlineCls}`}>
-                            <Calendar className="w-3 h-3" /> {deadlineLabel}
-                          </span>
+
+                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-snug">{sub.title}</p>
+
+                        <div className="flex items-center gap-1.5 mt-1 text-[11px]">
+                          {isOverdue
+                            ? <AlertCircle className="w-3 h-3 text-rose-500 shrink-0" />
+                            : <Calendar    className="w-3 h-3 text-zinc-400 dark:text-zinc-500 shrink-0" />}
+                          <span className={deadlineCls}>{deadlineLabel}</span>
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleNavigateToTask(sub)}
-                        className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
-                          isDark 
-                            ? 'border-zinc-800 hover:bg-zinc-800 text-zinc-300' 
-                            : 'border-zinc-200 hover:bg-zinc-100 text-zinc-700'
-                        }`}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${urgConf.btnCls}`}
                       >
-                        View <ArrowRight className="w-3 h-3" />
+                        {urgConf.isUrgent ? 'Review Now' : 'View'} <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
@@ -599,47 +512,42 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
               </div>
             )}
 
-            {/* Empty State */}
+            {/* Empty state */}
             {totalCount === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 mb-2 opacity-80" />
-                <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">You are all caught up!</p>
-                <p className="text-xs mt-0.5">No pending approvals or high-priority tasks assigned to you right now.</p>
+              <div className="text-center py-10">
+                <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+                </div>
+                <p className="font-semibold text-sm text-zinc-800 dark:text-zinc-200">You're all caught up!</p>
+                <p className="text-xs text-zinc-400 mt-1">No pending approvals or priority tasks right now.</p>
               </div>
             )}
-
           </div>
 
-          {/* Minimalist Footer */}
+          {/* ── Footer ── */}
           <div className={`px-6 py-3.5 border-t flex items-center justify-between shrink-0 ${
-            isDark ? 'border-zinc-800/80 bg-zinc-900/30' : 'border-zinc-100 bg-zinc-50/50'
+            isDark ? 'border-zinc-800 bg-zinc-900/20' : 'border-zinc-100 bg-zinc-50/60'
           }`}>
-            <p className="text-[11px] text-muted-foreground">
-              Shows on app open · Click <Flame className="w-3 h-3 inline text-amber-500" /> anytime
+            <p className="text-[11px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
+              Shows on app open · Click <Flame className="w-3 h-3 text-amber-500 mx-0.5" /> anytime
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleDismiss}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                  isDark 
-                    ? 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800' 
-                    : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-100'
+                className={`px-3.5 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
+                  isDark ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800' : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
                 }`}
               >
                 Close
               </button>
               <button
-                onClick={() => {
-                  handleDismiss();
-                  navigate('/tasks');
-                }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs flex items-center gap-1 transition-all cursor-pointer"
+                onClick={() => { handleDismiss(); navigate('/tasks'); }}
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
                 Task Register <ExternalLink className="w-3 h-3" />
               </button>
             </div>
           </div>
-
         </motion.div>
       </div>
     </AnimatePresence>

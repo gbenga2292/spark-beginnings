@@ -522,9 +522,9 @@ export function ActiveSiteInvoicesModal({
                             {siteItem.clientName}
                           </span>
                         )}
-                        {siteItem.hasMultipleConcurrent && (
+                        {siteItem.concurrentCount > 1 && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                            {siteItem.concurrentCount} Concurrent Invoices
+                            {siteItem.invoiceRelationLabel || `${siteItem.concurrentCount} Invoices`}
                           </span>
                         )}
                       </div>

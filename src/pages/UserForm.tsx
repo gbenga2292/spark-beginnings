@@ -49,6 +49,32 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canViewDecisionIntelligence', label: 'Decision Intelligence AI' },
           { key: 'canViewClientSummary', label: 'View Client Account Summary' }
         ] },
+      { key: 'client360', label: 'Client 360 (Tabs & Stats)', parentKey: 'client360', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'Master View' },
+          { key: 'canViewFinancialStats', label: 'Financial Stats (Revenue, VAT Deficit)', special: true },
+          { key: 'canViewInvoiceStats', label: 'Invoice Count Stats', special: true },
+          { key: 'canViewTimelineTab', label: 'Timeline Tab' },
+          { key: 'canViewOverviewTab', label: 'Overview Tab' },
+          { key: 'canViewFinancialsTab', label: 'Financials Tab' },
+          { key: 'canViewStatementTab', label: 'Statement Tab' },
+          { key: 'canViewOperationsTab', label: 'Site 360 Tab' },
+          { key: 'canViewContactsTab', label: 'Contacts Tab' },
+          { key: 'canViewCommsTab', label: 'Comms Tab' },
+          { key: 'canViewTasksTab', label: 'Tasks Tab' },
+        ] },
+      { key: 'site360', label: 'Site 360 (Tabs & Stats)', parentKey: 'site360', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'Master View' },
+          { key: 'canViewFinancialStats', label: 'Financial Stats (Billed, Balance, Maint)', special: true },
+          { key: 'canViewTimelineTab', label: 'Timeline Tab' },
+          { key: 'canViewFinancialsTab', label: 'Financials Tab' },
+          { key: 'canViewOperationsTab', label: 'Operations Tab' },
+          { key: 'canViewMaintenanceTab', label: 'Maintenance Tab' },
+          { key: 'canViewTasksTab', label: 'Tasks Tab' },
+          { key: 'canViewCommsTab', label: 'Comms Tab' },
+          { key: 'canViewContactsTab', label: 'Contacts Tab' },
+        ] },
     ]
   },
   {
@@ -105,7 +131,7 @@ const PRIV_GROUPS: PG[] = [
       { key: 'evaluations', label: 'Evaluations', parentKey: 'evaluations', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
       { key: 'interviews', label: 'Interview Management', parentKey: 'interviews', masterField: 'canView',
-        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Invite' }, { key: 'canEdit', label: 'Conduct/Score' }, { key: 'canDelete', label: 'Delete', danger: true }] },
+        fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Invite' }, { key: 'canEdit', label: 'Conduct/Score' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canConductInterview', label: 'Conduct Interview', special: true }, { key: 'canRecordVerdict', label: 'Record Verdict', special: true }, { key: 'canForwardToOnboarding', label: 'Forward to Onboarding', special: true }] },
       { key: 'disciplinary', label: 'Performance & Conduct', parentKey: 'disciplinary', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
     ],
@@ -140,6 +166,11 @@ const PRIV_GROUPS: PG[] = [
       { key: 'opsVehicles', label: 'Vehicles', parentKey: 'opsVehicles', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'Master View' }, 
+          { key: 'canAdd', label: 'Add (General)', special: true },
+          { key: 'canEdit', label: 'Edit (General)' },
+          { key: 'canDelete', label: 'Delete (General)', danger: true },
+          { key: 'canImport', label: 'Import' },
+          { key: 'canExport', label: 'Export' },
           // Logs
           { key: 'canViewLogs', label: 'View Logs' },
           { key: 'canAddLogs', label: 'Record Trips', special: true },

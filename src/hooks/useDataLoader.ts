@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, FULL_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem, dbToVendorInvoice, dbToVendorInvoicePayment } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -213,6 +213,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           dailyJournals: appData.dailyJournals || [],
           siteJournalEntries: appData.siteJournalEntries || [],
           budgetItems: appData.budgetItems || [],
+          vendorInvoices: appData.vendorInvoices || [],
+          vendorInvoicePayments: appData.vendorInvoicePayments || [],
           ...(appData.payrollVariables ? { payrollVariables: appData.payrollVariables as any } : {}),
           ...(appData.payeTaxVariables ? { payeTaxVariables: appData.payeTaxVariables as any } : {}),
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
@@ -666,6 +668,34 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 useAppStore.setState({ companyExpenses: current.map(e => e.id === updated.id ? updated : e) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ companyExpenses: current.filter(e => e.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'vendor_invoices': {
+              const current = appState.vendorInvoices;
+              if (eventType === 'INSERT') {
+                if (!current.some(v => v.id === newRow.id)) {
+                  useAppStore.setState({ vendorInvoices: [dbToVendorInvoice(newRow), ...current] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToVendorInvoice(newRow);
+                useAppStore.setState({ vendorInvoices: current.map(v => v.id === updated.id ? updated : v) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ vendorInvoices: current.filter(v => v.id !== oldRow.id) });
+              }
+              break;
+            }
+            case 'vendor_invoice_payments': {
+              const current = appState.vendorInvoicePayments;
+              if (eventType === 'INSERT') {
+                if (!current.some(p => p.id === newRow.id)) {
+                  useAppStore.setState({ vendorInvoicePayments: [dbToVendorInvoicePayment(newRow), ...current] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToVendorInvoicePayment(newRow);
+                useAppStore.setState({ vendorInvoicePayments: current.map(p => p.id === updated.id ? updated : p) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ vendorInvoicePayments: current.filter(p => p.id !== oldRow.id) });
               }
               break;
             }

@@ -48,6 +48,14 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
   const invoiceDuration = invoice.duration ?? 0;
   const invoiceStartDate = invoice.date ?? '';
 
+  const isAuxOnly = (Number(invoice.noOfMachine || 0) === 0) && (invoice.auxiliaryEquipment?.length || 0) > 0;
+  const auxNames = useMemo(() => 
+    (invoice.auxiliaryEquipment || []).map(a => (a.name || '').trim().toLowerCase()).filter(Boolean)
+  , [invoice.auxiliaryEquipment]);
+
+  const invoiceSiteName = (invoice.siteName || (invoice as any).site || '').trim().toLowerCase();
+  const invoiceSiteId = (invoice.siteId || '').trim().toLowerCase();
+
   /** All effective linked machine IDs including automatic successors from machine swaps */
   const effectiveLinkedIds = useMemo(() => {
     const ids = new Set<string>(linkedIds);
@@ -58,11 +66,24 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
         }
       }
     });
-    return Array.from(ids);
-  }, [linkedIds, sitePumpDates, invoice.siteId]);
 
-  const invoiceSiteName = (invoice.siteName || (invoice as any).site || '').trim().toLowerCase();
-  const invoiceSiteId = (invoice.siteId || '').trim().toLowerCase();
+    // If no explicit linked IDs and it's an auxiliary-only invoice, auto-link matching maintenance assets
+    if (ids.size === 0 && isAuxOnly && auxNames.length > 0) {
+      maintenanceAssets.forEach(a => {
+        const aSite = (a.site || '').trim().toLowerCase();
+        const matchSite = aSite === invoiceSiteId || aSite === invoiceSiteName ||
+          (invoiceSiteName && aSite.includes(invoiceSiteName)) || (invoiceSiteName && invoiceSiteName.includes(aSite));
+        if (matchSite) {
+          const aName = (a.name || '').toLowerCase();
+          if (auxNames.some(aux => aName.includes(aux) || aux.includes(aName))) {
+            ids.add(a.id);
+          }
+        }
+      });
+    }
+
+    return Array.from(ids);
+  }, [linkedIds, sitePumpDates, invoice.siteId, isAuxOnly, auxNames, maintenanceAssets, invoiceSiteId, invoiceSiteName]);
 
   /** Logs for linked machines, on or after invoice start date, for this site */
   const relevantLogs = useMemo(() => {
@@ -82,6 +103,12 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
 
   const machineConfigs: any[] = invoice.machineConfigs ?? [];
   const totalContractedDays = useMemo(() => {
+    if (isAuxOnly && invoice.auxiliaryEquipment && invoice.auxiliaryEquipment.length > 0) {
+      return invoice.auxiliaryEquipment.reduce((sum, c) => {
+        const d = parseFloat(String(c.duration ?? 0)) || invoiceDuration;
+        return sum + d;
+      }, 0);
+    }
     if (machineConfigs.length > 0) {
       const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
       let total = machineConfigs.reduce((sum, c) => {
@@ -95,7 +122,7 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
     }
     const count = invoice.noOfMachine || 1;
     return count * invoiceDuration;
-  }, [machineConfigs, invoice.noOfMachine, invoiceDuration]);
+  }, [isAuxOnly, invoice.auxiliaryEquipment, machineConfigs, invoice.noOfMachine, invoiceDuration]);
 
   /** Consumed days = sum of day fractions per log */
   const consumedDays = useMemo(() => {

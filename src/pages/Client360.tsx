@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, startTransition } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, MapPin, AlertTriangle, FileText, CheckCircle2, Clock,
@@ -442,6 +442,19 @@ export function Client360() {
   const canDeleteSite = !currentUser || (sitePriv?.canView === true && sitePriv?.canDeleteSite === true);
   const canViewComm   = !currentUser || currentUser?.privileges?.commLog?.canView === true;
 
+  const c360Priv = currentUser?.privileges?.client360;
+  const canViewFinancialStats = c360Priv ? c360Priv.canViewFinancialStats : (currentUser?.privileges?.billing?.canViewAmounts ?? true);
+  const canViewInvoiceStats   = c360Priv ? c360Priv.canViewInvoiceStats : (currentUser?.privileges?.billing?.canView ?? true);
+
+  const canViewTimelineTab    = c360Priv ? c360Priv.canViewTimelineTab : (currentUser?.privileges?.sites?.canView !== false);
+  const canViewOverviewTab    = c360Priv ? c360Priv.canViewOverviewTab : Boolean(currentUser?.privileges?.clients?.canView);
+  const canViewFinancialsTab  = c360Priv ? c360Priv.canViewFinancialsTab : Boolean(currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView);
+  const canViewStatementTab   = c360Priv ? c360Priv.canViewStatementTab : Boolean(currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView);
+  const canViewOperationsTab  = c360Priv ? c360Priv.canViewOperationsTab : Boolean(currentUser?.privileges?.sites?.canView);
+  const canViewContactsTab    = c360Priv ? c360Priv.canViewContactsTab : Boolean(currentUser?.privileges?.clients?.canView);
+  const canViewCommsTab       = c360Priv ? c360Priv.canViewCommsTab : Boolean(currentUser?.privileges?.commLog?.canView);
+  const canViewTasksTab       = c360Priv ? c360Priv.canViewTasksTab : Boolean(currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks);
+
   const [narrativeSite, setNarrativeSite] = useState<{ site: Site; q: any | null } | null>(null);
 
   const handleDeleteSite = async (id: string) => {
@@ -576,9 +589,9 @@ export function Client360() {
         (siteNameParam && s.name.toLowerCase().trim() === siteNameParam.toLowerCase().trim())
       );
       if (match) {
-        setSelectedSite(match);
+        setSelectedSite(prev => prev?.id === match.id ? prev : match);
         if (match.client) {
-          setRawSelectedClient(match.client);
+          setRawSelectedClient(prev => prev === match.client ? prev : match.client);
         }
       }
     }
@@ -1157,25 +1170,44 @@ export function Client360() {
     return (queryTab as TabType) || 'timeline';
   });
 
-  const setSelectedClient = (clientName: string | ((prev: string) => string)) => {
-    const nextClient = typeof clientName === 'function' ? clientName(selectedClient) : clientName;
-    setRawSelectedClient(nextClient);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.set('client', nextClient);
-      return next;
-    });
-  };
+  // Ref to the main scrollable content area — used to reset scroll on tab switch
+  const contentScrollRef = useRef<HTMLDivElement>(null);
 
-  const setActiveTab = (tabId: TabType | ((prev: TabType) => TabType)) => {
+  const setSelectedClient = useCallback((clientName: string | ((prev: string) => string)) => {
+    const nextClient = typeof clientName === 'function' ? clientName(selectedClient) : clientName;
+    setSelectedSite(null);
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollTop = 0;
+    }
+    startTransition(() => {
+      setRawSelectedClient(nextClient);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('client', nextClient);
+        next.delete('site');
+        next.delete('siteId');
+        return next;
+      }, { replace: true });
+    });
+  }, [selectedClient, setSearchParams]);
+
+  // Batch the state update + URL update into one React transition so only
+  // one render fires — this eliminates the double-render flash/glitch.
+  const setActiveTab = useCallback((tabId: TabType | ((prev: TabType) => TabType)) => {
     const nextTab = typeof tabId === 'function' ? tabId(activeTab) : tabId;
-    setRawActiveTab(nextTab);
-    setSearchParams(prev => {
-      const next = new URLSearchParams(prev);
-      next.set('tab', nextTab);
-      return next;
-    }, { replace: true });
-  };
+    // Reset scroll position immediately before React re-renders the tab content
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollTop = 0;
+    }
+    startTransition(() => {
+      setRawActiveTab(nextTab);
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', nextTab);
+        return next;
+      }, { replace: true });
+    });
+  }, [activeTab, setSearchParams]);
 
   useEffect(() => {
     const queryClient = searchParams.get('client');
@@ -1197,6 +1229,26 @@ export function Client360() {
       setRawActiveTab(queryTab as TabType);
     }
   }, [allClients, searchParams, selectedClient, activeTab]);
+
+  const availableTabs = useMemo(() => [
+    { id: 'timeline' as TabType, show: canViewTimelineTab },
+    { id: 'overview' as TabType, show: canViewOverviewTab },
+    { id: 'financials' as TabType, show: canViewFinancialsTab },
+    { id: 'report' as TabType, show: canViewStatementTab },
+    { id: 'operations' as TabType, show: canViewOperationsTab },
+    { id: 'contacts' as TabType, show: canViewContactsTab },
+    { id: 'activity' as TabType, show: canViewCommsTab },
+    { id: 'tasks' as TabType, show: canViewTasksTab },
+  ].filter(t => t.show), [
+    canViewTimelineTab, canViewOverviewTab, canViewFinancialsTab, canViewStatementTab,
+    canViewOperationsTab, canViewContactsTab, canViewCommsTab, canViewTasksTab
+  ]);
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some(t => t.id === activeTab)) {
+      setActiveTab(availableTabs[0].id);
+    }
+  }, [availableTabs, activeTab, setActiveTab]);
 
   const clientPendingSites = useMemo(() => {
     const isAll = selectedClient === 'ALL' || selectedClient === 'All Clients';
@@ -2294,7 +2346,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
   ];
 
   const headerActions = (
-    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 w-full md:w-auto">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
       {/* Search Input and Dropdown */}
       <GlobalSearch 
         isDark={isDark} 
@@ -2302,24 +2354,6 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
         onSelectResult={handleSearchNavigation} 
       />
 
-      {/* Quick Stats Toggle */}
-      {clientData && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsQuickStatsOpen(!isQuickStatsOpen)}
-          className={cn(
-            "h-8 px-2.5 flex items-center gap-1.5 border shadow-none rounded-md text-xs font-semibold transition-colors",
-            isQuickStatsOpen
-              ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/60 dark:border-blue-800 dark:text-blue-300"
-              : isDark ? "bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-          )}
-          title="Toggle quick telemetry overview"
-        >
-          <Activity className="w-3.5 h-3.5 text-blue-500" />
-          <span className="hidden sm:inline">Quick Stats</span>
-        </Button>
-      )}
 
       {/* AI Brief Trigger Button */}
       {currentUser?.privileges?.clients?.canViewDecisionIntelligence && (
@@ -2331,7 +2365,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               sendChatMessage(true);
             }
           }}
-          className="h-8 px-3 flex items-center gap-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-[0_2px_12px_rgba(14,165,233,0.35)] transition-all border-0"
+          className="h-8 px-3 flex items-center gap-1.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white rounded-xl text-xs font-bold shadow-[0_2px_12px_rgba(14,165,233,0.35)] transition-all border-0 shrink-0"
           title="Open Decision Intelligence Assistant"
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -2341,7 +2375,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
       {/* Filters Dropdown */}
       {clientData && (
-        <div className="relative">
+        <div className="relative shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -2445,7 +2479,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
         const isInactiveSelected = !isAll && currentStatus === 'normal' && !!selectedClient;
         return (
           <div className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-md border shadow-none transition-all shrink-0 order-first md:order-last w-full md:w-auto",
+            "flex items-center gap-1.5 px-2.5 py-1 h-8 rounded-md border shadow-none transition-all shrink min-w-0 max-w-[130px] sm:max-w-[170px] md:max-w-[210px] lg:max-w-[250px]",
             isAll
               ? (isDark ? "bg-blue-950/60 border-blue-800/80" : "bg-blue-50 border-blue-200")
               : currentStatus === 'active'
@@ -2468,12 +2502,12 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
               )} />
             )}
 
-            <div className="relative flex items-center w-full">
+            <div className="relative flex items-center min-w-0 flex-1">
               <select
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}
                 className={cn(
-                  "appearance-none bg-transparent font-bold text-xs pr-5 focus:outline-none cursor-pointer w-full md:max-w-[170px] truncate transition-colors",
+                  "appearance-none bg-transparent font-bold text-xs pr-4 focus:outline-none cursor-pointer w-full truncate transition-colors",
                   isAll
                     ? "text-blue-900 dark:text-blue-200"
                     : currentStatus === 'active'
@@ -2491,7 +2525,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     color: isDark ? '#c7d2fe' : '#4338ca'
                   }}
                 >
-                  🌐 All Clients (Summary)
+                  All Clients
                 </option>
                 <option disabled value="__DIVIDER__">──────────────────────────</option>
                 {/* Active & Onboarding clients only */}
@@ -2677,6 +2711,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
     <>
       {selectedSite ? (
         <Site360View
+          key={selectedSite.id}
           site={selectedSite}
           clientSites={clientData?.clientSites || [selectedSite]}
           onSiteChange={setSelectedSite}
@@ -2693,7 +2728,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
           }}
         >
           {/* Main Content Area */}
-          <div className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 pb-6 style-scroll">
+          <div ref={contentScrollRef} className="flex-1 overflow-y-auto px-2 sm:px-4 lg:px-6 pb-6 style-scroll">
             {clientData ? (
               <div className="max-w-6xl mx-auto space-y-3 pt-2">
                 {/* ── Compact Client Identity Bar ── */}
@@ -2743,6 +2778,25 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
                   {/* Right: Quick Action Buttons */}
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Quick Stats Toggle */}
+                    {clientData && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsQuickStatsOpen(!isQuickStatsOpen)}
+                        className={cn(
+                          "h-7.5 px-2.5 flex items-center gap-1.5 text-xs font-bold rounded-xl border shadow-xs transition-all",
+                          isQuickStatsOpen
+                            ? "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-950/60 dark:border-blue-800 dark:text-blue-300"
+                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+                        )}
+                        title="Toggle quick telemetry overview"
+                      >
+                        <Activity className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="hidden sm:inline">Quick Stats</span>
+                      </Button>
+                    )}
+
                     {canViewComm && (
                       <Button
                         size="sm"
@@ -2777,21 +2831,21 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 {/* ── Expandable Quick Stats Telemetry Strip ── */}
                 {isQuickStatsOpen && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-1 animate-in fade-in-50 duration-150">
-                    {[
-                      {
+                    {([
+                      canViewFinancialStats ? {
                         label: 'TOTAL REVENUE',
                         value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : '₦***',
                         sub: 'Lifetime Billed',
                         bg: 'linear-gradient(135deg, #047857 0%, #10b981 100%)',
                         glow: 'rgba(16, 185, 129, 0.35)',
-                      },
-                      {
+                      } : null,
+                      canViewFinancialStats ? {
                         label: 'VAT DEFICIT',
                         value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.vatDeficit).toLocaleString()}` : '₦***',
                         sub: clientData.vatDeficit > 0 ? 'Tax Outstanding' : 'All Settled',
                         bg: clientData.vatDeficit > 0 ? 'linear-gradient(135deg, #be123c 0%, #f43f5e 100%)' : 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
                         glow: clientData.vatDeficit > 0 ? 'rgba(244, 63, 94, 0.35)' : 'rgba(20, 184, 166, 0.3)',
-                      },
+                      } : null,
                       {
                         label: 'ACTIVE SITES',
                         value: `${clientData.activeSites} / ${clientData.totalSites}`,
@@ -2806,13 +2860,13 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         bg: clientData.healthScore > 80 ? 'linear-gradient(135deg, #059669 0%, #34d399 100%)' : clientData.healthScore > 50 ? 'linear-gradient(135deg, #d97706 0%, #fbbf24 100%)' : 'linear-gradient(135deg, #e11d48 0%, #f87171 100%)',
                         glow: 'rgba(245, 158, 11, 0.35)',
                       },
-                      {
+                      canViewInvoiceStats ? {
                         label: 'INVOICES',
                         value: `${clientData.clientInvoices.length} issued`,
                         sub: 'Commercial Invoices',
                         bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
                         glow: 'rgba(6, 182, 212, 0.35)',
-                      },
+                      } : null,
                       {
                         label: 'PENDING TASKS',
                         value: `${clientData.pendingTasks.length} tasks`,
@@ -2820,7 +2874,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         bg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
                         glow: 'rgba(71, 85, 105, 0.35)',
                       },
-                    ].map((card, idx) => (
+                    ].filter(Boolean) as { label: string; value: string; sub: string; bg: string; glow: string }[]).map((card, idx) => (
                       <div
                         key={idx}
                         className="relative overflow-hidden rounded-2xl p-3.5 text-white transition-all duration-200 hover:-translate-y-0.5 cursor-default flex flex-col justify-between group"
@@ -2864,14 +2918,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 {/* ── Flat Segmented Navigation Tabs (Sticky Header Strip) ── */}
                 <div className="sticky top-0 z-20 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-2 border-b border-slate-200/80 dark:border-slate-800">
                   {[
-                    { id: 'timeline', label: 'Timeline & History', show: currentUser?.privileges?.sites?.canView !== false },
-                    { id: 'overview', label: 'Overview', show: currentUser?.privileges?.clients?.canView },
-                    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                    { id: 'report', label: 'Client Statement', show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-                    { id: 'operations', label: 'Site 360', count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: currentUser?.privileges?.sites?.canView },
-                    { id: 'contacts', label: 'Contacts', count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.clients?.canView },
-                    { id: 'activity', label: 'Comms', count: commLogs.filter(l => selectedClient === 'ALL' || l.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: currentUser?.privileges?.commLog?.canView },
-                    { id: 'tasks', label: 'Tasks', count: clientData.pendingTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
+                    { id: 'timeline', label: 'Timeline & History', show: canViewTimelineTab },
+                    { id: 'overview', label: 'Overview', show: canViewOverviewTab },
+                    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: canViewFinancialsTab },
+                    { id: 'report', label: 'Client Statement', show: canViewStatementTab },
+                    { id: 'operations', label: 'Site 360', count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: canViewOperationsTab },
+                    { id: 'contacts', label: 'Contacts', count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: canViewContactsTab },
+                    { id: 'activity', label: 'Comms', count: commLogs.filter(l => selectedClient === 'ALL' || l.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: canViewCommsTab },
+                    { id: 'tasks', label: 'Tasks', count: clientData.pendingTasks.length, show: canViewTasksTab },
                   ].filter(tab => tab.show !== false).map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -2900,6 +2954,14 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     );
                   })}
                 </div>
+
+                {availableTabs.length === 0 && (
+                  <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 my-6 shadow-sm">
+                    <ShieldAlert className="w-10 h-10 text-amber-500 mx-auto mb-2" />
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Access Restricted</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">You do not have permission to view any tabs in Client 360.</p>
+                  </div>
+                )}
 
             {/* Tab Content */}
             <div className="space-y-4">

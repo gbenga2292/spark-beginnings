@@ -454,7 +454,7 @@ export function CreateTaskDialog({
                     onClick={() => setUrgency(u)}
                     className={`flex-1 flex justify-center items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm border cursor-pointer ${
                       isSelected
-                        ? `${conf.badgeCls} ${conf.borderCls} ring-1 ring-primary/20 scale-[1.02]`
+                        ? `${conf.badgeCls} ${conf.cardBorder} ring-1 ring-primary/20 scale-[1.02]`
                         : (isDarkTheme ? "border-transparent text-white/50 hover:text-white hover:bg-white/5" : "border-transparent text-muted-foreground hover:text-foreground hover:bg-black/5")
                     }`}
                   >

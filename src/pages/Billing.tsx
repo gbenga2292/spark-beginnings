@@ -243,14 +243,18 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     // Separate night count logic (backwards compatible: undefined = same as day)
     const isNightCountSame = input.technicianNightCountSameAsDay ?? true;
     const noOfTechnicianNight = isNightCountSame ? noOfTechnician : (parseFloat(input.noOfTechnicianNight) || 0);
-    // Accommodation crew basis: use night crew if toggled, otherwise day crew
+    const isAccomCountSame = input.technicianAccommodationCountSameAsDay ?? true;
     const useNightForAccom = input.technicianAccommodationUseNightCount ?? false;
-    const accomCrewCount = useNightForAccom ? noOfTechnicianNight : noOfTechnician;
+    const legacyAccomCrewCount = useNightForAccom ? noOfTechnicianNight : noOfTechnician;
+    const accomCrewCount = isAccomCountSame ? legacyAccomCrewCount : (parseFloat(input.noOfTechnicianAccommodation) || 0);
+
+    const isAccomDurationSame = input.technicianAccommodationDurationSameAsDay ?? true;
+    const actualAccomDuration = isAccomDurationSame ? actualTechDuration : (parseFloat(input.technicianAccommodationDuration) || 0);
 
     // Calculate technicians cost separately for day, night, and accommodation
     const techDayCost = noOfTechnician * techDayFee * actualTechDuration;
     const techNightCost = noOfTechnicianNight * techNightFee * actualNightDuration;
-    const techAccomCost = accomCrewCount * techAccommodation * actualTechDuration;
+    const techAccomCost = accomCrewCount * techAccommodation * actualAccomDuration;
     const techniciansCost = techDayCost + techNightCost + techAccomCost;
 
     const instMobDemob = mobDemob + installation;
@@ -366,6 +370,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       noOfTechnicianNight: isNightCountSame ? undefined : noOfTechnicianNight,
       technicianNightCountSameAsDay: isNightCountSame,
       technicianAccommodationUseNightCount: useNightForAccom,
+      noOfTechnicianAccommodation: isAccomCountSame ? undefined : (parseFloat(input.noOfTechnicianAccommodation) || 0),
+      technicianAccommodationCountSameAsDay: isAccomCountSame,
+      technicianAccommodationDuration: isAccomDurationSame ? undefined : (parseFloat(input.technicianAccommodationDuration) || 0),
+      technicianAccommodationDurationSameAsDay: isAccomDurationSame,
     };
   };
 
@@ -435,6 +443,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
         noOfTechnicianNight: inv.noOfTechnicianNight,
         technicianNightCountSameAsDay: inv.technicianNightCountSameAsDay,
         technicianAccommodationUseNightCount: inv.technicianAccommodationUseNightCount,
+        noOfTechnicianAccommodation: inv.noOfTechnicianAccommodation,
+        technicianAccommodationCountSameAsDay: inv.technicianAccommodationCountSameAsDay,
+        technicianAccommodationDuration: inv.technicianAccommodationDuration,
+        technicianAccommodationDurationSameAsDay: inv.technicianAccommodationDurationSameAsDay,
       });
       deletePendingInvoice(inv.id);
       if (selectedId === inv.id) handleClear();
@@ -493,6 +505,10 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       noOfTechnicianNight: String(inv.noOfTechnicianNight || ''),
       technicianNightCountSameAsDay: inv.technicianNightCountSameAsDay ?? true,
       technicianAccommodationUseNightCount: inv.technicianAccommodationUseNightCount ?? false,
+      noOfTechnicianAccommodation: String(inv.noOfTechnicianAccommodation || ''),
+      technicianAccommodationCountSameAsDay: inv.technicianAccommodationCountSameAsDay ?? true,
+      technicianAccommodationDuration: String(inv.technicianAccommodationDuration || ''),
+      technicianAccommodationDurationSameAsDay: inv.technicianAccommodationDurationSameAsDay ?? true,
       dieselCostPerLtr: String(inv.dieselCostPerLtr || 0),
       dailyUsage: String(inv.dailyUsage || 0),
       mobDemob: '0',
@@ -2692,7 +2708,14 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       const noOfTechDay  = invoice.noOfTechnician || 0;
       const noOfTechNight = isNightCountSame ? noOfTechDay : ((invoice as any).noOfTechnicianNight || 0);
       const useNightForAccom = (invoice as any).technicianAccommodationUseNightCount ?? false;
-      const accomCrewCount = useNightForAccom ? noOfTechNight : noOfTechDay;
+      const isAccomCountSame = (invoice as any).technicianAccommodationCountSameAsDay !== false;
+      const legacyAccomCrewCount = useNightForAccom ? noOfTechNight : noOfTechDay;
+      const accomCrewCount = isAccomCountSame ? legacyAccomCrewCount : (parseFloat((invoice as any).noOfTechnicianAccommodation) || 0);
+
+      const isAccomDurationSame = (invoice as any).technicianAccommodationDurationSameAsDay !== false;
+      const actualAccomDuration = isAccomDurationSame
+        ? actualTechDuration
+        : (parseFloat((invoice as any).technicianAccommodationDuration) || 0);
 
       const hasMultiComponent = nightRate > 0 || accomRate > 0;
 
@@ -2722,15 +2745,15 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
             amount: nightCost,
           });
         }
-        if (accomRate > 0 && accomCrewCount > 0) {
-          const accomCost = accomCrewCount * accomRate * actualTechDuration;
+        if (accomRate > 0 && accomCrewCount > 0 && actualAccomDuration > 0) {
+          const accomCost = accomCrewCount * accomRate * actualAccomDuration;
           list.push({
             id: generateId(),
             selected: true,
             type: 'technician',
-            desc: `Crew Accommodation Charge\n${accomCrewCount} staff @ ₦${accomRate.toLocaleString()}/tech/day for ${actualTechDuration} day${actualTechDuration !== 1 ? 's' : ''}.`,
+            desc: `Crew Accommodation Charge\n${accomCrewCount} staff @ ₦${accomRate.toLocaleString()}/tech/day for ${actualAccomDuration} day${actualAccomDuration !== 1 ? 's' : ''}.`,
             qty: accomCrewCount,
-            unitRate: accomRate * actualTechDuration,
+            unitRate: accomRate * actualAccomDuration,
             amount: accomCost,
           });
         }

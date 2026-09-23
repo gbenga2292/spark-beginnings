@@ -129,9 +129,9 @@ export const navigation: NavCategory[] = [
     iconColor: 'text-amber-600 dark:text-amber-400',
     items: [
       { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
-      { name: 'Dewatering Calculator', href: '/operations/dewatering-calculator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
-      { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
-      { name: 'VAT Calculator', href: '/operations/vat-calculator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
+      { name: 'Dewatering Calculator', href: '/operations/dewatering-calculator', icon: Calculator, privKey: 'dewateringCalculator', privField: 'canView' },
+      { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'estimator', privField: 'canView' },
+      { name: 'VAT Calculator', href: '/operations/vat-calculator', icon: Calculator, privKey: 'vatCalculator', privField: 'canView' },
     ],
   },
   {
@@ -198,7 +198,7 @@ export const navigation: NavCategory[] = [
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Bank AI Import', href: '/bank-import', icon: Sparkles, privKey: 'bankImport', privField: 'canView' },
-      { name: 'Company Expenses', href: '/company-expenses', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
+      { name: 'Vendor Invoices', href: '/company-expenses', icon: ReceiptText, privKey: 'ledger', privField: 'canView' },
       { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
     ],
   },
@@ -241,7 +241,7 @@ export function getVisibleNavItems(items: NavItem[], currentUser: any): NavItem[
     if (IS_LIMITED_WEB_WEB) {
       const isTaskPath = item.href.startsWith('/tasks') || item.href === '/comm-log';
       const isDashboardPath = item.href === '/';
-      const isCompanyExpenses = item.href === '/company-expenses';
+      const isCompanyExpenses = item.href === '/company-expenses' || item.href === '/vendor-invoices';
       const isDailyJournal = item.href === '/daily-journal';
       if (!isTaskPath && !isDashboardPath && !isCompanyExpenses && !isDailyJournal) return false;
     }

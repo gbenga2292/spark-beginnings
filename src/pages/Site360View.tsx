@@ -132,6 +132,17 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const { createMainTask, users, addSubtask, updateSubtask } = useAppData();
   const { user: authUser } = useAuth();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
+
+  const s360Priv = currentUser?.privileges?.site360;
+  const canViewFinancialStats = s360Priv ? s360Priv.canViewFinancialStats : (currentUser?.privileges?.billing?.canViewAmounts ?? true);
+  const canViewTimelineTab    = s360Priv ? s360Priv.canViewTimelineTab : true;
+  const canViewFinancialsTab  = s360Priv ? s360Priv.canViewFinancialsTab : Boolean(currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView);
+  const canViewOperationsTab  = s360Priv ? s360Priv.canViewOperationsTab : Boolean(currentUser?.privileges?.sites?.canView);
+  const canViewMaintenanceTab = s360Priv ? s360Priv.canViewMaintenanceTab : Boolean(currentUser?.privileges?.sites?.canView);
+  const canViewTasksTab       = s360Priv ? s360Priv.canViewTasksTab : Boolean(currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks);
+  const canViewCommsTab       = s360Priv ? s360Priv.canViewCommsTab : Boolean(currentUser?.privileges?.commLog?.canView);
+  const canViewContactsTab    = s360Priv ? s360Priv.canViewContactsTab : Boolean(currentUser?.privileges?.clients?.canView);
+
   const allSites = useAppStore(s => s.sites);
   const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
   const allClients = useMemo(() => {
@@ -286,6 +297,10 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
+    setMessages([]);
+    setSelectedInvoice(null);
+    setExpandedTasks(new Set());
+    setOpenSubtaskId(null);
   }, [site.id]);
 
 
@@ -770,15 +785,37 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const card = cn('p-4 sm:p-5 rounded-md border shadow-none', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200');
 
-  const tabs: { id: SiteTab; label: string; count?: number | string; show?: boolean }[] = [
-    { id: 'timeline', label: 'Timeline', show: true },
-    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : undefined, show: currentUser?.privileges?.billing?.canView || currentUser?.privileges?.payments?.canView },
-    { id: 'operations', label: 'Operations', count: data.machinesOnSiteCount + data.pumpsOnSite.length, show: currentUser?.privileges?.sites?.canView },
-    { id: 'maintenance', label: 'Maintenance', count: data.siteMaintAssets.length, show: currentUser?.privileges?.sites?.canView },
-    { id: 'comms', label: 'Comms', count: data.siteComms.length, show: currentUser?.privileges?.commLog?.canView },
-    { id: 'tasks', label: 'Tasks', count: data.pendingSiteTasks.length, show: currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks },
-    { id: 'contacts', label: 'Contacts', count: data.siteContacts.length, show: currentUser?.privileges?.clients?.canView },
-  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; count?: number | string }[];
+  const tabs = useMemo(() => [
+    { id: 'timeline', label: 'Timeline', show: canViewTimelineTab },
+    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : undefined, show: canViewFinancialsTab },
+    { id: 'operations', label: 'Operations', count: data.machinesOnSiteCount + data.pumpsOnSite.length, show: canViewOperationsTab },
+    { id: 'maintenance', label: 'Maintenance', count: data.siteMaintAssets.length, show: canViewMaintenanceTab },
+    { id: 'comms', label: 'Comms', count: data.siteComms.length, show: canViewCommsTab },
+    { id: 'tasks', label: 'Tasks', count: data.pendingSiteTasks.length, show: canViewTasksTab },
+    { id: 'contacts', label: 'Contacts', count: data.siteContacts.length, show: canViewContactsTab },
+  ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; count?: number | string }[], [
+    canViewTimelineTab,
+    canViewFinancialsTab,
+    currentUser?.privileges?.billing?.canViewAmounts,
+    data.totalBilled,
+    canViewOperationsTab,
+    data.machinesOnSiteCount,
+    data.pumpsOnSite.length,
+    canViewMaintenanceTab,
+    data.siteMaintAssets.length,
+    canViewCommsTab,
+    data.siteComms.length,
+    canViewTasksTab,
+    data.pendingSiteTasks.length,
+    canViewContactsTab,
+    data.siteContacts.length
+  ]);
+
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.some(t => t.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
 
   // AI Chat
   const sendChatMessage = async (isInitialBrief = false) => {
@@ -976,7 +1013,7 @@ Answer site-specific questions and field progress accurately using this context.
     </div>
   );
 
-  useSetPageTitle('Site 360', `Operational command center for ${site.name}`, headerActions, [filterMonth, filterYear, site.name, isDark, showFilters, clientSites, isQuickStatsOpen, isAiDrawerOpen], onBack);
+  useSetPageTitle('Site 360', `Operational command center for ${site.name}`, headerActions, [site.id, filterMonth, filterYear, site.name, isDark, showFilters, clientSites, isQuickStatsOpen, isAiDrawerOpen], onBack);
 
 
 
@@ -1299,21 +1336,21 @@ Answer site-specific questions and field progress accurately using this context.
                 className="overflow-hidden"
               >
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-1 animate-in fade-in-50 duration-150">
-                  {[
-                    {
+                  {([
+                    canViewFinancialStats ? {
                       label: 'TOTAL BILLED',
                       value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : '₦***',
                       sub: `${data.siteInvoices.length} Invoices`,
                       bg: 'linear-gradient(135deg, #047857 0%, #10b981 100%)',
                       glow: 'rgba(16, 185, 129, 0.35)',
-                    },
-                    {
+                    } : null,
+                    canViewFinancialStats ? {
                       label: 'UNPAID BALANCE',
                       value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.outstanding).toLocaleString()}` : '₦***',
                       sub: data.outstanding > 0 ? 'Outstanding' : 'Fully Paid',
                       bg: data.outstanding > 0 ? 'linear-gradient(135deg, #be123c 0%, #f43f5e 100%)' : 'linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)',
                       glow: data.outstanding > 0 ? 'rgba(244, 63, 94, 0.35)' : 'rgba(20, 184, 166, 0.3)',
-                    },
+                    } : null,
                     {
                       label: 'MACHINE DAYS',
                       value: `${data.machineDays}d`,
@@ -1328,13 +1365,13 @@ Answer site-specific questions and field progress accurately using this context.
                       bg: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
                       glow: 'rgba(245, 158, 11, 0.35)',
                     },
-                    {
+                    canViewFinancialStats ? {
                       label: 'MAINTENANCE',
                       value: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalMaintenanceCost).toLocaleString()}` : '₦***',
                       sub: `${data.siteMaintAssets.length} Plant Assets`,
                       bg: 'linear-gradient(135deg, #b91c1c 0%, #ef4444 100%)',
                       glow: 'rgba(239, 68, 68, 0.35)',
-                    },
+                    } : null,
                     {
                       label: 'PUMPS ON SITE',
                       value: `${data.activePumpsCount} Active`,
@@ -1342,7 +1379,7 @@ Answer site-specific questions and field progress accurately using this context.
                       bg: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
                       glow: 'rgba(6, 182, 212, 0.35)',
                     },
-                  ].map((card, idx) => (
+                  ].filter(Boolean) as { label: string; value: string; sub: string; bg: string; glow: string }[]).map((card, idx) => (
                     <div
                       key={idx}
                       className="relative overflow-hidden rounded-2xl p-3.5 text-white transition-all duration-200 hover:-translate-y-0.5 cursor-default flex flex-col justify-between group"
@@ -1427,6 +1464,14 @@ Answer site-specific questions and field progress accurately using this context.
               );
             })}
           </div>
+
+          {tabs.length === 0 && (
+            <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 my-6 shadow-sm">
+              <ShieldAlert className="w-10 h-10 text-amber-500 mx-auto mb-2" />
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">Access Restricted</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">You do not have permission to view any tabs in Site 360.</p>
+            </div>
+          )}
 
           {/* Tab Content */}
           <div className="space-y-4">

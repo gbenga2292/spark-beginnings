@@ -9,7 +9,7 @@ import type {
   DisciplinaryRecord, EvaluationRecord, Department, Position,
   LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog, CommLogRead,
   CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem,
-  PayrollSnapshot
+  PayrollSnapshot, VendorInvoice, VendorInvoicePayment
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
 import type { InterviewCandidate } from '@/src/types/interviews';
@@ -137,6 +137,10 @@ export function dbToInvoice(r: any): Invoice {
     noOfTechnicianNight: r.no_of_technician_night != null ? Number(r.no_of_technician_night) : undefined,
     technicianNightCountSameAsDay: r.technician_night_count_same_as_day ?? true,
     technicianAccommodationUseNightCount: r.technician_accommodation_use_night_count ?? false,
+    noOfTechnicianAccommodation: r.no_of_technician_accommodation != null ? Number(r.no_of_technician_accommodation) : undefined,
+    technicianAccommodationCountSameAsDay: r.technician_accommodation_count_same_as_day ?? true,
+    technicianAccommodationDuration: r.technician_accommodation_duration != null ? Number(r.technician_accommodation_duration) : undefined,
+    technicianAccommodationDurationSameAsDay: r.technician_accommodation_duration_same_as_day ?? true,
   };
 }
 
@@ -173,6 +177,10 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     noOfTechnicianNight: r.no_of_technician_night != null ? Number(r.no_of_technician_night) : undefined,
     technicianNightCountSameAsDay: r.technician_night_count_same_as_day ?? true,
     technicianAccommodationUseNightCount: r.technician_accommodation_use_night_count ?? false,
+    noOfTechnicianAccommodation: r.no_of_technician_accommodation != null ? Number(r.no_of_technician_accommodation) : undefined,
+    technicianAccommodationCountSameAsDay: r.technician_accommodation_count_same_as_day ?? true,
+    technicianAccommodationDuration: r.technician_accommodation_duration != null ? Number(r.technician_accommodation_duration) : undefined,
+    technicianAccommodationDurationSameAsDay: r.technician_accommodation_duration_same_as_day ?? true,
   };
 }
 
@@ -299,7 +307,16 @@ export function dbToLedgerCategory(r: any): LedgerCategory {
 }
 
 export function dbToLedgerVendor(r: any): LedgerVendor {
-  return { id: r.id, name: r.name, tinNumber: r.tin_number };
+  return {
+    id: r.id,
+    name: r.name,
+    tinNumber: r.tin_number || undefined,
+    address: r.address || undefined,
+    phone: r.phone || undefined,
+    accountNumber: r.account_number || undefined,
+    bankName: r.bank_name || undefined,
+    notes: r.notes || undefined,
+  };
 }
 
 export function dbToLedgerBank(r: any): LedgerBank {
@@ -349,6 +366,44 @@ export function dbToCompanyExpense(r: any): CompanyExpense {
     enteredBy: r.entered_by,
     createdAt: r.created_at,
     status: r.status || 'Pending'
+  };
+}
+
+export function dbToVendorInvoice(r: any): VendorInvoice {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id,
+    invoiceNumber: r.invoice_number,
+    vendorId: r.vendor_id || '',
+    vendorName: r.vendor_name,
+    dateReceived: r.date_received,
+    dueDate: r.due_date || undefined,
+    description: r.description,
+    totalAmount: Number(r.total_amount),
+    status: r.status as VendorInvoice['status'],
+    notes: r.notes || undefined,
+    documentUrl: r.document_url || undefined,
+    documentName: r.document_name || undefined,
+    documentId: r.document_id || undefined,
+    enteredBy: r.entered_by,
+    createdAt: r.created_at,
+  };
+}
+
+export function dbToVendorInvoicePayment(r: any): VendorInvoicePayment {
+  return {
+    id: r.id,
+    workspaceId: r.workspace_id,
+    invoiceId: r.invoice_id,
+    paymentDate: r.payment_date,
+    amountPaid: Number(r.amount_paid),
+    paidFromBank: r.paid_from_bank,
+    paidToBankName: r.paid_to_bank_name || undefined,
+    paidToAccountNo: r.paid_to_account_no || undefined,
+    ledgerEntryId: r.ledger_entry_id || undefined,
+    notes: r.notes || undefined,
+    enteredBy: r.entered_by,
+    createdAt: r.created_at,
   };
 }
 
@@ -792,6 +847,10 @@ function invoiceToDb(i: Invoice) {
     no_of_technician_night: i.noOfTechnicianNight,
     technician_night_count_same_as_day: i.technicianNightCountSameAsDay ?? true,
     technician_accommodation_use_night_count: i.technicianAccommodationUseNightCount ?? false,
+    no_of_technician_accommodation: i.noOfTechnicianAccommodation,
+    technician_accommodation_count_same_as_day: i.technicianAccommodationCountSameAsDay ?? true,
+    technician_accommodation_duration: i.technicianAccommodationDuration,
+    technician_accommodation_duration_same_as_day: i.technicianAccommodationDurationSameAsDay ?? true,
   };
 }
 
@@ -828,6 +887,10 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     no_of_technician_night: p.noOfTechnicianNight != null ? p.noOfTechnicianNight : null,
     technician_night_count_same_as_day: p.technicianNightCountSameAsDay ?? true,
     technician_accommodation_use_night_count: p.technicianAccommodationUseNightCount ?? false,
+    no_of_technician_accommodation: p.noOfTechnicianAccommodation != null ? p.noOfTechnicianAccommodation : null,
+    technician_accommodation_count_same_as_day: p.technicianAccommodationCountSameAsDay ?? true,
+    technician_accommodation_duration: p.technicianAccommodationDuration != null ? p.technicianAccommodationDuration : null,
+    technician_accommodation_duration_same_as_day: p.technicianAccommodationDurationSameAsDay ?? true,
   };
 }
 
@@ -1158,6 +1221,7 @@ export async function fetchAllAppData(privs?: any) {
     ledgerCategoriesRes, ledgerVendorsRes, ledgerBanksRes, ledgerBeneficiaryBanksRes, ledgerEntriesRes, companyExpensesRes,
     vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes,
     budgetItemsRes,
+    vendorInvoicesRes, vendorInvoicePaymentsRes,
   ] = await Promise.all([
     supabase.from('sites').select('*').order('created_at').limit(50000),
     supabase.from('clients').select('*').order('name').limit(50000),
@@ -1196,6 +1260,8 @@ export async function fetchAllAppData(privs?: any) {
     supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(10000),
     supabase.from('site_journal_entries').select('*').order('created_at', { ascending: false }).limit(10000),
     canView('budget') ? supabase.from('budget_items').select('*').order('week_start', { ascending: false }).limit(10000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('vendor_invoices').select('*').order('date_received', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('vendor_invoice_payments').select('*').order('payment_date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
   ]);
 
   const settings = settingsRes.data;
@@ -1263,6 +1329,8 @@ export async function fetchAllAppData(privs?: any) {
     dailyJournals: (dailyJournalsRes.data || []).map(dbToDailyJournal),
     siteJournalEntries: (siteJournalEntriesRes.data || []).map(dbToSiteJournalEntry),
     budgetItems: ((budgetItemsRes as any).data || []).map(dbToBudgetItem),
+    vendorInvoices: ((vendorInvoicesRes as any).data || []).map(dbToVendorInvoice),
+    vendorInvoicePayments: ((vendorInvoicePaymentsRes as any).data || []).map(dbToVendorInvoicePayment),
   };
 }
 
@@ -1888,6 +1956,10 @@ export const db = {
       noOfTechnicianNight: 'no_of_technician_night',
       technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
       technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count',
+      noOfTechnicianAccommodation: 'no_of_technician_accommodation',
+      technicianAccommodationCountSameAsDay: 'technician_accommodation_count_same_as_day',
+      technicianAccommodationDuration: 'technician_accommodation_duration',
+      technicianAccommodationDurationSameAsDay: 'technician_accommodation_duration_same_as_day',
       auxiliaryCost: 'auxiliary_cost',
       auxiliaryEquipment: 'auxiliary_equipment'
     };
@@ -1957,7 +2029,11 @@ export const db = {
       technicianNightDurationSameAsMachine: 'technician_night_duration_same_as_machine',
       noOfTechnicianNight: 'no_of_technician_night',
       technicianNightCountSameAsDay: 'technician_night_count_same_as_day',
-      technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count'
+      technicianAccommodationUseNightCount: 'technician_accommodation_use_night_count',
+      noOfTechnicianAccommodation: 'no_of_technician_accommodation',
+      technicianAccommodationCountSameAsDay: 'technician_accommodation_count_same_as_day',
+      technicianAccommodationDuration: 'technician_accommodation_duration',
+      technicianAccommodationDurationSameAsDay: 'technician_accommodation_duration_same_as_day'
     };
     const validDbColumns = new Set(Object.values(map));
     const update: any = {};
@@ -2303,13 +2379,27 @@ export const db = {
   },
 
   async insertLedgerVendor(v: LedgerVendor) {
-    const { error } = await supabase.from('ledger_vendors').insert({ id: v.id, name: v.name, tin_number: v.tinNumber });
+    const { error } = await supabase.from('ledger_vendors').insert({
+      id: v.id,
+      name: v.name,
+      tin_number: v.tinNumber,
+      address: v.address,
+      phone: v.phone,
+      account_number: v.accountNumber,
+      bank_name: v.bankName,
+      notes: v.notes,
+    });
     if (error) { console.error('Database error:', error); throw error; }
   },
   async updateLedgerVendor(id: string, v: Partial<LedgerVendor>) {
     const update: any = {};
     if (v.name !== undefined) update.name = v.name;
     if (v.tinNumber !== undefined) update.tin_number = v.tinNumber;
+    if (v.address !== undefined) update.address = v.address;
+    if (v.phone !== undefined) update.phone = v.phone;
+    if (v.accountNumber !== undefined) update.account_number = v.accountNumber;
+    if (v.bankName !== undefined) update.bank_name = v.bankName;
+    if (v.notes !== undefined) update.notes = v.notes;
     const { error } = await supabase.from('ledger_vendors').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
@@ -2429,6 +2519,72 @@ export const db = {
   },
   async deleteCompanyExpense(id: string) {
     const { error } = await supabase.from('company_expenses').delete().eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+
+  // Vendor Invoices
+  async insertVendorInvoice(v: VendorInvoice) {
+    const ws = getWS();
+    const { error } = await supabase.from('vendor_invoices').insert({
+      id: v.id, workspace_id: ws, invoice_number: v.invoiceNumber,
+      vendor_id: v.vendorId || null, vendor_name: v.vendorName,
+      date_received: v.dateReceived, due_date: v.dueDate || null,
+      description: v.description, total_amount: v.totalAmount,
+      status: v.status, notes: v.notes || null, entered_by: v.enteredBy,
+      document_url: v.documentUrl || null, document_name: v.documentName || null,
+      document_id: v.documentId || null,
+    });
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async updateVendorInvoice(id: string, v: Partial<VendorInvoice>) {
+    const update: any = {};
+    if (v.invoiceNumber !== undefined) update.invoice_number = v.invoiceNumber;
+    if (v.vendorId !== undefined) update.vendor_id = v.vendorId || null;
+    if (v.vendorName !== undefined) update.vendor_name = v.vendorName;
+    if (v.dateReceived !== undefined) update.date_received = v.dateReceived;
+    if (v.dueDate !== undefined) update.due_date = v.dueDate || null;
+    if (v.description !== undefined) update.description = v.description;
+    if (v.totalAmount !== undefined) update.total_amount = v.totalAmount;
+    if (v.status !== undefined) update.status = v.status;
+    if (v.notes !== undefined) update.notes = v.notes || null;
+    if (v.documentUrl !== undefined) update.document_url = v.documentUrl || null;
+    if (v.documentName !== undefined) update.document_name = v.documentName || null;
+    if (v.documentId !== undefined) update.document_id = v.documentId || null;
+    const { error } = await supabase.from('vendor_invoices').update(update).eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async deleteVendorInvoice(id: string) {
+    const { error } = await supabase.from('vendor_invoices').delete().eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+
+  // Vendor Invoice Payments
+  async insertVendorInvoicePayment(p: VendorInvoicePayment) {
+    const ws = getWS();
+    const { error } = await supabase.from('vendor_invoice_payments').insert({
+      id: p.id, workspace_id: ws, invoice_id: p.invoiceId,
+      payment_date: p.paymentDate, amount_paid: p.amountPaid,
+      paid_from_bank: p.paidFromBank, paid_to_bank_name: p.paidToBankName || null,
+      paid_to_account_no: p.paidToAccountNo || null,
+      ledger_entry_id: p.ledgerEntryId || null,
+      notes: p.notes || null, entered_by: p.enteredBy,
+    });
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async updateVendorInvoicePayment(id: string, p: Partial<VendorInvoicePayment>) {
+    const update: any = {};
+    if (p.paymentDate !== undefined) update.payment_date = p.paymentDate;
+    if (p.amountPaid !== undefined) update.amount_paid = p.amountPaid;
+    if (p.paidFromBank !== undefined) update.paid_from_bank = p.paidFromBank;
+    if (p.paidToBankName !== undefined) update.paid_to_bank_name = p.paidToBankName || null;
+    if (p.paidToAccountNo !== undefined) update.paid_to_account_no = p.paidToAccountNo || null;
+    if (p.ledgerEntryId !== undefined) update.ledger_entry_id = p.ledgerEntryId || null;
+    if (p.notes !== undefined) update.notes = p.notes || null;
+    const { error } = await supabase.from('vendor_invoice_payments').update(update).eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async deleteVendorInvoicePayment(id: string) {
+    const { error } = await supabase.from('vendor_invoice_payments').delete().eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
 
@@ -2561,7 +2717,16 @@ export const db = {
     const NIL_UUID = '00000000-0000-0000-0000-000000000000';
     await supabase.from('ledger_vendors').delete().neq('id', NIL_UUID);
     if (vendors.length > 0) {
-      const { error } = await supabase.from('ledger_vendors').insert(vendors.map(v => ({ id: v.id, name: v.name, tin_number: v.tinNumber })));
+      const { error } = await supabase.from('ledger_vendors').insert(vendors.map(v => ({
+        id: v.id,
+        name: v.name,
+        tin_number: v.tinNumber,
+        address: v.address,
+        phone: v.phone,
+        account_number: v.accountNumber,
+        bank_name: v.bankName,
+        notes: v.notes,
+      })));
       if (error) { console.error('Database error:', error); throw error; }
     }
   },

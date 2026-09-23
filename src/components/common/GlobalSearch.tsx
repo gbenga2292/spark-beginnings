@@ -304,7 +304,7 @@ export const GlobalSearch: React.FC<Client360SearchProps> = ({ isDark, allClient
   return (
     <div ref={searchContainerRef} className="relative w-full md:w-auto">
       <div className={cn(
-        "flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-all duration-300 w-full md:w-64 focus-within:md:w-80",
+        "flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-sm transition-all duration-300 w-full sm:w-36 md:w-48 lg:w-60 focus-within:sm:w-52 focus-within:md:w-64 focus-within:lg:w-80",
         isDark 
           ? "bg-slate-900 border-slate-700 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20" 
           : "bg-white border-slate-200 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20"

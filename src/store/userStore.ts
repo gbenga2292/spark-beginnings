@@ -158,6 +158,33 @@ export interface AiCopilotPriv {
   canAccess: boolean;
 }
 
+// ─── Client 360 & Site 360 ──────────────────────────────────
+export interface Client360Priv {
+  canView: boolean;
+  canViewFinancialStats: boolean;
+  canViewInvoiceStats: boolean;
+  canViewTimelineTab: boolean;
+  canViewOverviewTab: boolean;
+  canViewFinancialsTab: boolean;
+  canViewStatementTab: boolean;
+  canViewOperationsTab: boolean;
+  canViewContactsTab: boolean;
+  canViewCommsTab: boolean;
+  canViewTasksTab: boolean;
+}
+
+export interface Site360Priv {
+  canView: boolean;
+  canViewFinancialStats: boolean;
+  canViewTimelineTab: boolean;
+  canViewFinancialsTab: boolean;
+  canViewOperationsTab: boolean;
+  canViewMaintenanceTab: boolean;
+  canViewTasksTab: boolean;
+  canViewCommsTab: boolean;
+  canViewContactsTab: boolean;
+}
+
 // ─── Master interface ─────────────────────────────────────────
 export interface UserPrivileges {
   dashboard:         DashboardPriv;
@@ -197,11 +224,13 @@ export interface UserPrivileges {
   weeklyReport:      WeeklyReportPriv;
   interviews:        InterviewsPriv;
   simulator:         SimulatorPriv;
-  dewateringCalculator?: DewateringCalculatorPriv;
-  vatCalculator?:        VatCalculatorPriv;
-  estimator?:            EstimatorPriv;
+  dewateringCalculator: DewateringCalculatorPriv;
+  vatCalculator:        VatCalculatorPriv;
+  estimator:            EstimatorPriv;
   budget:            BudgetPriv;
   aiCopilot?:        AiCopilotPriv;
+  client360?:        Client360Priv;
+  site360?:          Site360Priv;
 }
 
 export interface AppUser {
@@ -278,6 +307,30 @@ export const FULL_ACCESS: UserPrivileges = {
   estimator:        { canView: true },
   budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
   aiCopilot:        { canAccess: true },
+  client360: {
+    canView: true,
+    canViewFinancialStats: true,
+    canViewInvoiceStats: true,
+    canViewTimelineTab: true,
+    canViewOverviewTab: true,
+    canViewFinancialsTab: true,
+    canViewStatementTab: true,
+    canViewOperationsTab: true,
+    canViewContactsTab: true,
+    canViewCommsTab: true,
+    canViewTasksTab: true,
+  },
+  site360: {
+    canView: true,
+    canViewFinancialStats: true,
+    canViewTimelineTab: true,
+    canViewFinancialsTab: true,
+    canViewOperationsTab: true,
+    canViewMaintenanceTab: true,
+    canViewTasksTab: true,
+    canViewCommsTab: true,
+    canViewContactsTab: true,
+  },
 };
 
 // ─── NO ACCESS ───────────────────────────────────────────────
@@ -332,6 +385,30 @@ export const NO_ACCESS: UserPrivileges = {
   estimator:        { canView: false },
   budget:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
   aiCopilot:        { canAccess: false },
+  client360: {
+    canView: false,
+    canViewFinancialStats: false,
+    canViewInvoiceStats: false,
+    canViewTimelineTab: false,
+    canViewOverviewTab: false,
+    canViewFinancialsTab: false,
+    canViewStatementTab: false,
+    canViewOperationsTab: false,
+    canViewContactsTab: false,
+    canViewCommsTab: false,
+    canViewTasksTab: false,
+  },
+  site360: {
+    canView: false,
+    canViewFinancialStats: false,
+    canViewTimelineTab: false,
+    canViewFinancialsTab: false,
+    canViewOperationsTab: false,
+    canViewMaintenanceTab: false,
+    canViewTasksTab: false,
+    canViewCommsTab: false,
+    canViewContactsTab: false,
+  },
 };
 
 // ─── DEFAULT PRESETS ─────────────────────────────────────────

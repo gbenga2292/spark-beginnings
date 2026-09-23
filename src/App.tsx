@@ -55,7 +55,7 @@ const PerformanceConduct = lazy(() => import('./pages/PerformanceConduct').then(
 const Evaluations = lazy(() => import('./pages/Evaluations').then(m => ({ default: m.Evaluations })));
 const Ledger = lazy(() => import('./pages/Ledger').then(m => ({ default: m.Ledger })));
 const BankImport = lazy(() => import('./pages/BankImport'));
-const CompanyExpenses = lazy(() => import('./pages/CompanyExpenses').then(m => ({ default: m.CompanyExpenses })));
+const VendorInvoices = lazy(() => import('./pages/VendorInvoices').then(m => ({ default: m.VendorInvoices })));
 const TaskDashboard = lazy(() => import('./pages/TaskDashboard').then(m => ({ default: m.TaskDashboard })));
 const TaskReminders = lazy(() => import('./pages/TaskReminders').then(m => ({ default: m.TaskReminders })));
 const Tasks = lazy(() => import('./pages/Tasks').then(m => ({ default: m.Tasks })));
@@ -309,9 +309,9 @@ function AppContent() {
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
                       <Route path="simulator" element={<ProtectedRoute requiredModule="simulator"><Simulator /></ProtectedRoute>} />
-                      <Route path="estimator" element={<ProtectedRoute requiredModule="simulator"><Estimator /></ProtectedRoute>} />
-                      <Route path="dewatering-calculator" element={<ProtectedRoute requiredModule="simulator"><DewateringCalculator /></ProtectedRoute>} />
-                      <Route path="vat-calculator" element={<ProtectedRoute requiredModule="simulator"><VatCalculator /></ProtectedRoute>} />
+                      <Route path="estimator" element={<ProtectedRoute requiredModule="estimator"><Estimator /></ProtectedRoute>} />
+                      <Route path="dewatering-calculator" element={<ProtectedRoute requiredModule="dewateringCalculator"><DewateringCalculator /></ProtectedRoute>} />
+                      <Route path="vat-calculator" element={<ProtectedRoute requiredModule="vatCalculator"><VatCalculator /></ProtectedRoute>} />
                       <Route path="machine-reconciliation" element={<ProtectedRoute requiredModule={['opsMachineRecon']}><MachineReconciliation /></ProtectedRoute>} />
                       <Route path="site-analytics" element={<ProtectedRoute requiredModule={['operations', 'opsSites', 'sites']}><ActiveSiteAnalytics /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
@@ -327,7 +327,8 @@ function AppContent() {
 
         {/* ── Shared Routes (Available in Web Build) ─────────────────────────── */}
         <Route path="profile" element={<Page label="Profile"><ProtectedRoute><Profile /></ProtectedRoute></Page>} />
-        <Route path="company-expenses" element={<Page label="Company Expenses"><ProtectedRoute requiredModule="ledger"><CompanyExpenses /></ProtectedRoute></Page>} />
+        <Route path="company-expenses" element={<Page label="Vendor Invoices"><ProtectedRoute requiredModule="ledger"><VendorInvoices /></ProtectedRoute></Page>} />
+        <Route path="vendor-invoices" element={<Page label="Vendor Invoices"><ProtectedRoute requiredModule="ledger"><VendorInvoices /></ProtectedRoute></Page>} />
         
         <Route path="tasks" element={<Page label="Task Register"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />
         <Route path="tasks/dashboard" element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />

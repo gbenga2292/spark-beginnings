@@ -65,6 +65,10 @@ export const initialInvoiceForm = {
   noOfTechnicianNight: '',
   technicianNightCountSameAsDay: true,
   technicianAccommodationUseNightCount: false,
+  noOfTechnicianAccommodation: '',
+  technicianAccommodationCountSameAsDay: true,
+  technicianAccommodationDuration: '',
+  technicianAccommodationDurationSameAsDay: true,
   dieselCostPerLtr: '',
   dailyUsage: '',
   mobDemob: '',
@@ -159,6 +163,10 @@ export function InvoiceFormModal({
         noOfTechnicianNight: 'noOfTechnicianNight' in inv ? String(inv.noOfTechnicianNight ?? '') : '',
         technicianNightCountSameAsDay: 'technicianNightCountSameAsDay' in inv ? (inv.technicianNightCountSameAsDay ?? true) : true,
         technicianAccommodationUseNightCount: 'technicianAccommodationUseNightCount' in inv ? (inv.technicianAccommodationUseNightCount ?? false) : false,
+        noOfTechnicianAccommodation: 'noOfTechnicianAccommodation' in inv ? String(inv.noOfTechnicianAccommodation ?? '') : '',
+        technicianAccommodationCountSameAsDay: 'technicianAccommodationCountSameAsDay' in inv ? (inv.technicianAccommodationCountSameAsDay ?? true) : true,
+        technicianAccommodationDuration: 'technicianAccommodationDuration' in inv ? String(inv.technicianAccommodationDuration ?? '') : '',
+        technicianAccommodationDurationSameAsDay: 'technicianAccommodationDurationSameAsDay' in inv ? (inv.technicianAccommodationDurationSameAsDay ?? true) : true,
         dieselCostPerLtr: 'dieselCostPerLtr' in inv ? String(inv.dieselCostPerLtr ?? 0) : '0',
         dailyUsage: 'dailyUsage' in inv ? String(inv.dailyUsage ?? 0) : '0',
         mobDemob: 'mobDemob' in inv ? String(inv.mobDemob ?? 0) : '0',
@@ -502,6 +510,7 @@ export function InvoiceFormModal({
 
     const actualTechDuration = form.technicianDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianDuration) || 0);
     const actualNightDuration = form.technicianNightDurationSameAsMachine ? maxDuration : (parseFloat(form.technicianNightDuration) || 0);
+    const actualAccomDuration = form.technicianAccommodationDurationSameAsDay !== false ? actualTechDuration : (parseFloat(form.technicianAccommodationDuration) || 0);
 
     const dieselCost = machineConfigs.length > 0
       ? machineConfigs.reduce((sum, row) => {
@@ -511,11 +520,12 @@ export function InvoiceFormModal({
       : noOfMachine * dailyUsage * dieselCostPerLtr * maxDuration;
 
     const noOfTechnicianNight = form.technicianNightCountSameAsDay ? noOfTechnician : (parseFloat(form.noOfTechnicianNight) || 0);
-    const accomCrewCount = form.technicianAccommodationUseNightCount ? noOfTechnicianNight : noOfTechnician;
+    const legacyAccomCrewCount = form.technicianAccommodationUseNightCount ? noOfTechnicianNight : noOfTechnician;
+    const accomCrewCount = form.technicianAccommodationCountSameAsDay !== false ? legacyAccomCrewCount : (parseFloat(form.noOfTechnicianAccommodation) || 0);
 
     const techDayCost = noOfTechnician * techDayFee * actualTechDuration;
     const techNightCost = noOfTechnicianNight * techNightFee * actualNightDuration;
-    const techAccomCost = accomCrewCount * techAccommodation * actualTechDuration;
+    const techAccomCost = accomCrewCount * techAccommodation * actualAccomDuration;
     const techniciansCost = techDayCost + techNightCost + techAccomCost;
 
     const instMobDemob = mobDemob + installation;
@@ -615,9 +625,9 @@ export function InvoiceFormModal({
       totalCost, subtotalCost, discount, vat, totalCharge, vatInc,
       vatScope, vatableSections, vatableAmount, nonVatableAmount,
       equipmentVat, techniciansVat, dieselVat, mobDemobVat, installationVat, damagesVat, otherChargesVat,
-      maxDuration, actualTechDuration, actualNightDuration,
+      maxDuration, actualTechDuration, actualNightDuration, actualAccomDuration,
       techniciansCost, effectiveTechDailyRate, noOfTechnicianNight,
-      accomCrewCount, dieselCost, rentalCost, auxiliaryCost, auxiliaryEquipment, mobDemob, installation, damages,
+      accomCrewCount, techAccomCost, dieselCost, rentalCost, auxiliaryCost, auxiliaryEquipment, mobDemob, installation, damages,
     };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
@@ -729,12 +739,17 @@ export function InvoiceFormModal({
 
     const isNightCountSame = input.technicianNightCountSameAsDay ?? true;
     const noOfTechnicianNight = isNightCountSame ? noOfTechnician : (parseFloat(input.noOfTechnicianNight) || 0);
+    const isAccomCountSame = input.technicianAccommodationCountSameAsDay ?? true;
     const useNightForAccom = input.technicianAccommodationUseNightCount ?? false;
-    const accomCrewCount = useNightForAccom ? noOfTechnicianNight : noOfTechnician;
+    const legacyAccomCrewCount = useNightForAccom ? noOfTechnicianNight : noOfTechnician;
+    const accomCrewCount = isAccomCountSame ? legacyAccomCrewCount : (parseFloat(input.noOfTechnicianAccommodation) || 0);
+
+    const isAccomDurationSame = input.technicianAccommodationDurationSameAsDay ?? true;
+    const actualAccomDuration = isAccomDurationSame ? actualTechDuration : (parseFloat(input.technicianAccommodationDuration) || 0);
 
     const techDayCost = noOfTechnician * techDayFee * actualTechDuration;
     const techNightCost = noOfTechnicianNight * techNightFee * actualNightDuration;
-    const techAccomCost = accomCrewCount * techAccommodation * actualTechDuration;
+    const techAccomCost = accomCrewCount * techAccommodation * actualAccomDuration;
     const techniciansCost = techDayCost + techNightCost + techAccomCost;
 
     const instMobDemob = mobDemob + installation;
@@ -842,6 +857,10 @@ export function InvoiceFormModal({
       noOfTechnicianNight: isNightCountSame ? undefined : noOfTechnicianNight,
       technicianNightCountSameAsDay: isNightCountSame,
       technicianAccommodationUseNightCount: useNightForAccom,
+      noOfTechnicianAccommodation: isAccomCountSame ? undefined : (parseFloat(input.noOfTechnicianAccommodation) || 0),
+      technicianAccommodationCountSameAsDay: isAccomCountSame,
+      technicianAccommodationDuration: isAccomDurationSame ? undefined : (parseFloat(input.technicianAccommodationDuration) || 0),
+      technicianAccommodationDurationSameAsDay: isAccomDurationSame,
     };
   };
 
@@ -920,6 +939,10 @@ export function InvoiceFormModal({
         noOfTechnicianNight: data.noOfTechnicianNight,
         technicianNightCountSameAsDay: data.technicianNightCountSameAsDay,
         technicianAccommodationUseNightCount: data.technicianAccommodationUseNightCount,
+        noOfTechnicianAccommodation: data.noOfTechnicianAccommodation,
+        technicianAccommodationCountSameAsDay: data.technicianAccommodationCountSameAsDay,
+        technicianAccommodationDuration: data.technicianAccommodationDuration,
+        technicianAccommodationDurationSameAsDay: data.technicianAccommodationDurationSameAsDay,
       };
 
       if (movingFromQuotationToActive) {
@@ -1775,11 +1798,11 @@ export function InvoiceFormModal({
                     </div>
                   </div>
 
-                  {/* Night Shift & Accommodation details card */}
+                  {/* Night Shift details card */}
                   <div className="bg-slate-50/70 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b border-slate-200/60 dark:border-slate-800">
                       <span className="w-2.5 h-2.5 rounded-full bg-slate-900 dark:bg-slate-100" />
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Night Shift &amp; Special Rates</p>
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Night Shift Settings</p>
                     </div>
 
                     <div className="space-y-3">
@@ -1857,46 +1880,110 @@ export function InvoiceFormModal({
                           placeholder="e.g. 8"
                         />
                       </div>
+                    </div>
+                  </div>
+                </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Accommodation (₦ / tech / day)</label>
-                        <NumericFormat
-                          customInput={Input}
-                          thousandSeparator
-                          decimalScale={2}
-                          value={form.technicianAccommodation}
-                          onValueChange={(v) => handleChange('technicianAccommodation', v.value || '')}
-                          placeholder="0.00"
-                          className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-10 font-mono font-semibold text-slate-800 dark:text-white"
-                        />
+                {/* Crew Accommodation & Lodging Row */}
+                <div className="bg-slate-50/70 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Crew Accommodation &amp; Lodging</p>
+                    </div>
+                    {livePreview.techAccomCost > 0 && (
+                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                        {livePreview.accomCrewCount} tech{livePreview.accomCrewCount === 1 ? '' : 's'} × ₦{(parseFloat(form.technicianAccommodation) || 0).toLocaleString()} × {livePreview.actualAccomDuration}d
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                    {/* No. of Technicians */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Technicians</label>
+                        <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
+                          <input
+                            type="checkbox"
+                            checked={form.technicianAccommodationCountSameAsDay}
+                            onChange={(e) => handleChange('technicianAccommodationCountSameAsDay', e.target.checked)}
+                            className="accent-blue-600 w-3 h-3 rounded-sm"
+                          />
+                          Same as Crew
+                        </label>
                       </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={form.technicianAccommodationCountSameAsDay ? form.noOfTechnician || '' : form.noOfTechnicianAccommodation}
+                        onChange={(e) => handleChange('noOfTechnicianAccommodation', e.target.value)}
+                        disabled={form.technicianAccommodationCountSameAsDay}
+                        className={
+                          form.technicianAccommodationCountSameAsDay
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 font-semibold'
+                            : 'bg-white dark:bg-slate-900 h-10 font-bold text-slate-800 dark:text-white'
+                        }
+                        placeholder={form.technicianAccommodationCountSameAsDay ? `Same as Crew (${form.noOfTechnician || 0})` : 'Accommodated count'}
+                      />
+                    </div>
 
-                      {!form.technicianNightCountSameAsDay && parseFloat(form.technicianAccommodation) > 0 && (
-                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60">
-                          <div>
-                            <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Accommodation Crew Basis</p>
-                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
-                              {form.technicianAccommodationUseNightCount
-                                ? `Calculated on Night crew (${form.noOfTechnicianNight || 0} techs)`
-                                : `Calculated on Day crew (${form.noOfTechnician || 0} techs)`}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleChange('technicianAccommodationUseNightCount', !form.technicianAccommodationUseNightCount)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                              form.technicianAccommodationUseNightCount ? 'bg-slate-800 dark:bg-slate-200' : 'bg-amber-400'
-                            }`}
-                            title="Toggle accommodation crew basis"
-                          >
-                            <span
-                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white dark:bg-slate-900 shadow transition-transform ${
-                                form.technicianAccommodationUseNightCount ? 'translate-x-4' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      )}
+                    {/* Accommodation Rate */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Rate (₦ / tech / day)</label>
+                      <NumericFormat
+                        customInput={Input}
+                        thousandSeparator
+                        decimalScale={2}
+                        value={form.technicianAccommodation}
+                        onValueChange={(v) => handleChange('technicianAccommodation', v.value || '')}
+                        placeholder="0.00"
+                        className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 h-10 font-mono font-semibold text-slate-800 dark:text-white"
+                      />
+                    </div>
+
+                    {/* Duration (Days) */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Duration (Days)</label>
+                        <label className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 cursor-pointer select-none font-bold">
+                          <input
+                            type="checkbox"
+                            checked={form.technicianAccommodationDurationSameAsDay}
+                            onChange={(e) => handleChange('technicianAccommodationDurationSameAsDay', e.target.checked)}
+                            className="accent-blue-600 w-3 h-3 rounded-sm"
+                          />
+                          Link to Day Shift
+                        </label>
+                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={
+                          form.technicianAccommodationDurationSameAsDay
+                            ? livePreview.actualTechDuration || ''
+                            : form.technicianAccommodationDuration
+                        }
+                        onChange={(e) => handleChange('technicianAccommodationDuration', e.target.value)}
+                        disabled={form.technicianAccommodationDurationSameAsDay}
+                        className={
+                          form.technicianAccommodationDurationSameAsDay
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed h-10 font-semibold'
+                            : 'bg-white dark:bg-slate-900 h-10 font-semibold text-slate-800 dark:text-white'
+                        }
+                        placeholder={form.technicianAccommodationDurationSameAsDay ? `Day Shift (${livePreview.actualTechDuration || 0}d)` : 'Days'}
+                      />
+                    </div>
+
+                    {/* Accommodation Total Cost */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Accommodation Cost</label>
+                      <div className="h-10 px-3 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between font-mono font-bold text-slate-800 dark:text-white text-sm">
+                        <span className="text-xs text-slate-400 font-normal">Total</span>
+                        <span className="tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
+                          ₦{livePreview.techAccomCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2332,22 +2419,11 @@ export function InvoiceFormModal({
                       <span className="flex flex-col">
                         <span className="font-bold text-slate-705 dark:text-slate-350">Crew Accommodation</span>
                         <span className="text-[10px] text-slate-400 font-medium">
-                          {livePreview.accomCrewCount} tech{livePreview.accomCrewCount !== 1 ? 's' : ''}
-                          {!form.technicianNightCountSameAsDay
-                            ? form.technicianAccommodationUseNightCount
-                              ? ' (night basis)'
-                              : ' (day basis)'
-                            : ''}{' '}
-                          × ₦{(parseFloat(form.technicianAccommodation) || 0).toLocaleString()}/d × {livePreview.actualTechDuration}d
+                          {livePreview.accomCrewCount} tech{livePreview.accomCrewCount !== 1 ? 's' : ''} × ₦{(parseFloat(form.technicianAccommodation) || 0).toLocaleString()}/d × {livePreview.actualAccomDuration}d
                         </span>
                       </span>
                       <span className="font-mono font-bold text-slate-855 dark:text-slate-205 shrink-0">
-                        ₦
-                        {(
-                          (livePreview.accomCrewCount || 0) *
-                          (parseFloat(form.technicianAccommodation) || 0) *
-                          livePreview.actualTechDuration
-                        ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ₦{livePreview.techAccomCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   )}

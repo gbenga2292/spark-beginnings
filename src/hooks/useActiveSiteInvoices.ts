@@ -53,6 +53,8 @@ export interface ActiveSiteInvoiceSummary {
   clientName: string;
   hasMultipleConcurrent: boolean;
   concurrentCount: number;
+  isSequentialChain?: boolean;
+  invoiceRelationLabel?: string;
   invoices: ActiveSiteInvoiceDetail[];
   primaryInvoice?: ActiveSiteInvoiceDetail;
   hasActiveInvoices: boolean;
@@ -80,6 +82,23 @@ export interface ActiveSiteInvoiceSummary {
   latestScheduledEndDate?: string;
   latestLiveEndDate?: string;
 }
+
+export const isAuxiliaryAsset = (m: { name?: string }) => {
+  const n = (m.name || '').toLowerCase();
+  return n.includes('tank') || n.includes('hose') || n.includes('fitting') || n.includes('pipe') || n.includes('adapter');
+};
+
+export const checkIsInvoiceAuxOnly = (inv: Invoice): boolean => {
+  const hasAux = (inv.auxiliaryEquipment?.length || 0) > 0;
+  if (!hasAux) return false;
+  const noOfMach = Number(inv.noOfMachine || 0);
+  const rentalCost = Number(inv.rentalCost || (inv as any).rental_cost || 0);
+  const auxCost = Number(inv.auxiliaryCost || (inv as any).auxiliary_cost || 0);
+  const configs = (inv as any).machineConfigs;
+  const allConfigsZero = Array.isArray(configs) && configs.length > 0 && configs.every((c: any) => Number(c.rate || 0) === 0);
+
+  return noOfMach === 0 || (rentalCost === 0 && auxCost > 0) || allConfigsZero;
+};
 
 export function useActiveSiteInvoices() {
   const { sites = [], invoices = [], pendingSites = [] } = useAppStore();
@@ -235,11 +254,29 @@ export function useActiveSiteInvoices() {
         scheduledDateObj.setDate(scheduledDateObj.getDate() + duration - 1);
         const scheduledEndDate = scheduledDateObj.toISOString().split('T')[0];
 
-        // 2. Subsequent invoice detection
+        // 2. Subsequent invoice detection (scoped by equipment track: pump vs auxiliary)
+        const isInvAuxOnly = checkIsInvoiceAuxOnly(inv);
+        const invAuxNames = (inv.auxiliaryEquipment || []).map(a => (a.name || '').trim().toLowerCase()).filter(Boolean);
+
         const subsequentInvoices = allSiteInvoices.filter(other => {
           if (other.id === inv.id) return false;
           const otherStart = normalizeDate(other.date || other.dueDate || '');
-          return Boolean(otherStart && otherStart > startDateStr);
+          if (!otherStart || otherStart <= startDateStr) return false;
+
+          const isOtherAuxOnly = checkIsInvoiceAuxOnly(other);
+
+          // Pump invoices only chain with subsequent pump invoices
+          if (!isInvAuxOnly && isOtherAuxOnly) return false;
+
+          // Auxiliary invoices only chain with subsequent auxiliary invoices covering the same equipment
+          if (isInvAuxOnly) {
+            if (!isOtherAuxOnly) return false;
+            const otherAuxNames = (other.auxiliaryEquipment || []).map(a => (a.name || '').trim().toLowerCase()).filter(Boolean);
+            const sharesItem = invAuxNames.some(n => otherAuxNames.some(on => on.includes(n) || n.includes(on)));
+            if (!sharesItem) return false;
+          }
+
+          return true;
         });
         const hasNextInvoice = subsequentInvoices.length > 0;
         const nextInvoice = hasNextInvoice
@@ -260,9 +297,35 @@ export function useActiveSiteInvoices() {
             }
           }
         });
-        // Fallback: if no machines explicitly linked to invoice, use site machines
+        // Fallback: if no machines explicitly linked to invoice:
         if (effectiveLinkedIds.size === 0) {
-          siteMachineIds.forEach(id => effectiveLinkedIds.add(id));
+          if (isInvAuxOnly && invAuxNames.length > 0) {
+            (maintenanceAssets || []).forEach(a => {
+              const aSite = (a.site || '').trim().toLowerCase();
+              const match = aSite === siteNameLower || aSite === siteId.toLowerCase() ||
+                (aSite.length > 3 && siteNameLower && siteNameLower.includes(aSite)) ||
+                (siteNameLower && siteNameLower.length > 3 && aSite.includes(siteNameLower));
+              if (match) {
+                const aName = (a.name || '').toLowerCase();
+                if (invAuxNames.some(aux => aName.includes(aux) || aux.includes(aName))) {
+                  effectiveLinkedIds.add(a.id);
+                }
+              }
+            });
+          } else {
+            // For pump invoices: only add pump assets (exclude auxiliary tanks/equipment)
+            siteMachineIds.forEach(id => {
+              const asset = (maintenanceAssets || []).find(a => a.id === id);
+              const aName = (asset?.name || '').toLowerCase();
+              const isAuxAsset = aName.includes('tank') || aName.includes('hose') || aName.includes('fitting');
+              if (!isAuxAsset) {
+                effectiveLinkedIds.add(id);
+              }
+            });
+            if (effectiveLinkedIds.size === 0) {
+              siteMachineIds.forEach(id => effectiveLinkedIds.add(id));
+            }
+          }
         }
         const effectiveLinkedArray = Array.from(effectiveLinkedIds);
 
@@ -306,14 +369,19 @@ export function useActiveSiteInvoices() {
 
         const firstDur = machineConfigs[0]?.duration ? parseFloat(String(machineConfigs[0].duration)) : duration;
 
-        let totalContractedDays = machineConfigs.length > 0
-          ? machineConfigs.reduce((sum, cfg, idx) => {
-              const dur = idx === 0 
-                ? firstDur 
-                : (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || duration));
-              return sum + dur;
-            }, 0)
-          : duration;
+        let totalContractedDays = duration;
+        if (isInvAuxOnly && (inv.auxiliaryEquipment?.length || 0) > 0) {
+          totalContractedDays = inv.auxiliaryEquipment!.reduce((sum, item) => {
+            return sum + (parseFloat(String(item.duration ?? 0)) || duration);
+          }, 0);
+        } else if (machineConfigs.length > 0) {
+          totalContractedDays = machineConfigs.reduce((sum, cfg, idx) => {
+            const dur = idx === 0 
+              ? firstDur 
+              : (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || duration));
+            return sum + dur;
+          }, 0);
+        }
 
         // Build list of unique machines known to this invoice
         const siteMachinesMap = new Map<string, { id: string; name: string; serialNumber?: string }>();
@@ -342,12 +410,22 @@ export function useActiveSiteInvoices() {
                         (aSite.length > 3 && siteNameLower && siteNameLower.includes(aSite)) || 
                         (siteNameLower && siteNameLower.length > 3 && aSite.includes(siteNameLower));
           if (match && !siteMachinesMap.has(a.id)) {
-            siteMachinesMap.set(a.id, { id: a.id, name: a.name, serialNumber: a.serialNumber });
+            // For auxiliary invoices, only include matching auxiliary assets
+            if (isInvAuxOnly && invAuxNames.length > 0) {
+              const aName = (a.name || '').toLowerCase();
+              if (invAuxNames.some(aux => aName.includes(aux) || aux.includes(aName))) {
+                siteMachinesMap.set(a.id, { id: a.id, name: a.name, serialNumber: a.serialNumber });
+              }
+            } else if (!isInvAuxOnly) {
+              siteMachinesMap.set(a.id, { id: a.id, name: a.name, serialNumber: a.serialNumber });
+            }
           }
         });
         (sitePumpDates || []).forEach(pd => {
           if (pd.siteId === siteId && !siteMachinesMap.has(pd.assetId)) {
             const asset = maintenanceAssets.find(a => a.id === pd.assetId);
+            if (!isInvAuxOnly && asset && isAuxiliaryAsset(asset)) return;
+            if (isInvAuxOnly && asset && !isAuxiliaryAsset(asset)) return;
             siteMachinesMap.set(pd.assetId, { 
               id: pd.assetId, 
               name: asset?.name || 'Machine', 
@@ -358,6 +436,8 @@ export function useActiveSiteInvoices() {
         relevantMachineLogs.forEach(l => {
           if (l.assetId && !siteMachinesMap.has(l.assetId)) {
             const asset = maintenanceAssets.find(a => a.id === l.assetId);
+            if (!isInvAuxOnly && asset && isAuxiliaryAsset(asset)) return;
+            if (isInvAuxOnly && asset && !isAuxiliaryAsset(asset)) return;
             siteMachinesMap.set(l.assetId, { 
               id: l.assetId, 
               name: l.assetName || asset?.name || 'Machine', 
@@ -367,14 +447,16 @@ export function useActiveSiteInvoices() {
         });
 
         const siteMachinesArray = Array.from(siteMachinesMap.values());
-        const invoicedMachineCount = Math.max(
-          machineConfigs.length,
-          Number(inv.noOfMachine) || 1
-        );
+        const invoicedMachineCount = isInvAuxOnly
+          ? Math.max(1, inv.auxiliaryEquipment?.length || 1)
+          : Math.max(
+              machineConfigs.length,
+              Number(inv.noOfMachine) || 1
+            );
         const machineCount = invoicedMachineCount;
 
-        // Fallback: if machineConfigs is empty but site has multiple machines, scale totalContractedDays
-        if (machineConfigs.length === 0 && totalContractedDays === duration && machineCount > 1) {
+        // Fallback: if machineConfigs is empty but site has multiple machines, scale totalContractedDays (pumps only)
+        if (!isInvAuxOnly && machineConfigs.length === 0 && totalContractedDays === duration && machineCount > 1) {
           totalContractedDays = machineCount * duration;
         }
 
@@ -409,6 +491,7 @@ export function useActiveSiteInvoices() {
 
           // Calculate unlogged past days between machine/invoice start and yesterday.
           // Unlogged days are assumed active (1.0 day/day) unless explicitly logged otherwise or on hold.
+          // Note: Auxiliary items (e.g. Sedimentation Tank) are passive rentals, not active pump engines.
           const pumpDateRec = (sitePumpDates || []).find(pd => pd.siteId === siteId && pd.assetId === m.id);
           const mStartStr = pumpDateRec?.pumpStartDate ? normalizeDate(pumpDateRec.pumpStartDate) : startDateStr;
           const mEffectiveStart = mStartStr > startDateStr ? mStartStr : startDateStr;
@@ -417,7 +500,7 @@ export function useActiveSiteInvoices() {
           let mUnloggedDays = 0;
           const mUnloggedDates: string[] = [];
 
-          if (!m.isStopped && mEffectiveStart <= yesterdayStr) {
+          if (!isInvAuxOnly && !isAuxiliaryAsset(m) && !m.isStopped && mEffectiveStart <= yesterdayStr) {
             const iterDate = new Date(mEffectiveStart);
             let limit = 0;
             while (limit < 365) {
@@ -564,7 +647,7 @@ export function useActiveSiteInvoices() {
           urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
         } else if (daysRemaining <= 4) {
           urgency = 'soon';
-          urgencyLabel = `Due in ${daysRemaining} days`;
+          urgencyLabel = `Due in ${daysRemaining}d`;
           urgencyBadgeClass = 'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
         } else {
           urgency = 'safe';
@@ -624,15 +707,22 @@ export function useActiveSiteInvoices() {
         return a.daysRemaining - b.daysRemaining;
       });
 
-      const hasMultipleConcurrent = runningInvoices.length > 1;
-      if (hasMultipleConcurrent) {
+      const hasMultipleInvoices = runningInvoices.length > 1;
+      // An invoice chain is sequential if invoices follow each other (e.g. #305 -> #309 with hasNextInvoice)
+      const isSequentialChain = hasMultipleInvoices && runningInvoices.some(inv => inv.hasNextInvoice);
+      const invoiceRelationLabel = hasMultipleInvoices
+        ? (isSequentialChain ? `${runningInvoices.length} Chained Invoices` : `${runningInvoices.length} Concurrent Invoices`)
+        : undefined;
+
+      const hasMultipleConcurrent = hasMultipleInvoices && !isSequentialChain;
+
+      if (hasMultipleInvoices) {
         runningInvoices.forEach(inv => {
-          inv.isConcurrent = true;
+          inv.isConcurrent = !isSequentialChain;
         });
       }
 
-      // Cumulative Site Pool Calculations
-      const totalBilledDays = runningInvoices.reduce((sum, inv) => sum + inv.totalContractedDays, 0);
+      // Cumulative Site Pool Calculations (totalBilledDays is split by track below)
 
       // Collect all machines for the site from all running invoices
       const siteMachinesMap = new Map<string, ActiveSiteInvoiceMachineDetail>();
@@ -642,13 +732,19 @@ export function useActiveSiteInvoices() {
             siteMachinesMap.set(m.id, { ...m });
           } else {
             const existing = siteMachinesMap.get(m.id)!;
-            existing.consumedDays = Math.max(existing.consumedDays, m.consumedDays);
-            existing.unloggedDays = Math.max(existing.unloggedDays || 0, m.unloggedDays || 0);
-            existing.projectedConsumedDays = Math.max(existing.projectedConsumedDays || 0, m.projectedConsumedDays || 0);
+            // For sequential invoices, machine logs were partitioned into non-overlapping date ranges
+            // per invoice period, so we sum the consumed days across periods to reflect full usage.
+            if (isSequentialChain) {
+              existing.consumedDays = Number((existing.consumedDays + m.consumedDays).toFixed(1));
+            } else {
+              existing.consumedDays = Math.max(existing.consumedDays, m.consumedDays);
+            }
             if (m.unloggedDates && m.unloggedDates.length > 0) {
               const combined = new Set([...(existing.unloggedDates || []), ...m.unloggedDates]);
               existing.unloggedDates = Array.from(combined).sort();
             }
+            existing.unloggedDays = (existing.unloggedDates || []).length;
+            existing.projectedConsumedDays = Number((existing.consumedDays + existing.unloggedDays).toFixed(1));
           }
         });
       });
@@ -660,11 +756,20 @@ export function useActiveSiteInvoices() {
         return a.name.localeCompare(b.name);
       });
 
-      const totalLoggedDays = Number(poolMachines.reduce((sum, m) => sum + m.consumedDays, 0).toFixed(1));
-      const activePumps = poolMachines.filter(m => !m.isStopped);
+      // Separate running invoices by track: pump invoices vs auxiliary invoices
+      const pumpRunningInvoices = runningInvoices.filter(inv => !checkIsInvoiceAuxOnly(inv.invoice));
+      const auxRunningInvoices = runningInvoices.filter(inv => checkIsInvoiceAuxOnly(inv.invoice));
+      
+      // If there are pump invoices running, totalBilledDays reflects pump contracted capacity
+      const totalBilledDays = pumpRunningInvoices.length > 0
+        ? pumpRunningInvoices.reduce((sum, inv) => sum + inv.totalContractedDays, 0)
+        : runningInvoices.reduce((sum, inv) => sum + inv.totalContractedDays, 0);
+
+      const activePumps = poolMachines.filter(m => !m.isStopped && !isAuxiliaryAsset(m));
+      const activeAuxMachines = poolMachines.filter(m => !m.isStopped && isAuxiliaryAsset(m));
       const activeMachinesCount = Math.max(
         1,
-        activePumps.length || (runningInvoices[0]?.machineCount || 1)
+        activePumps.length || (pumpRunningInvoices[0]?.machineCount || runningInvoices[0]?.machineCount || 1)
       );
 
       // Collect missing log dates across active running pumps
@@ -676,6 +781,11 @@ export function useActiveSiteInvoices() {
       const unloggedDaysCount = missingLogDates.length;
       const hasUnloggedDays = unloggedDaysCount > 0;
       const totalUnloggedDays = Number(activePumps.reduce((sum, m) => sum + (m.unloggedDays || 0), 0).toFixed(1));
+
+      // Only count logged days of pumps towards pump capacity (if pumps are present)
+      const totalLoggedDays = Number((pumpRunningInvoices.length > 0
+        ? poolMachines.filter(m => !isAuxiliaryAsset(m)).reduce((sum, m) => sum + m.consumedDays, 0)
+        : poolMachines.reduce((sum, m) => sum + m.consumedDays, 0)).toFixed(1));
       const totalProjectedDays = Number((totalLoggedDays + totalUnloggedDays).toFixed(1));
 
       // In the site pool, total billed days are distributed across active running machines
@@ -722,17 +832,18 @@ export function useActiveSiteInvoices() {
       });
 
       // 2. Timeline pairing for stopped machines not linked via replacedAssetId
-      const unclaimedStopped = stoppedPumps.filter(p => !claimedStoppedIds.has(p.id));
+      const unclaimedStopped = stoppedPumps.filter(p => !claimedStoppedIds.has(p.id) && !isAuxiliaryAsset(p));
       if (unclaimedStopped.length > 0 && activePumps.length > 0) {
         unclaimedStopped.forEach(stoppedM => {
           const stopDate = stoppedM.stopDate;
           const pairedActive = activePumps.find(activeM => {
+            if (activeM.predecessors && activeM.predecessors.length > 0) return false;
             const pumpDateRec = (sitePumpDates || []).find(p => p.siteId === siteId && p.assetId === activeM.id);
             const startD = pumpDateRec?.pumpStartDate;
             if (stopDate && startD) {
               return startD >= stopDate;
             }
-            return !activeM.predecessors || activeM.predecessors.length === 0;
+            return true;
           });
 
           if (pairedActive) {
@@ -758,6 +869,15 @@ export function useActiveSiteInvoices() {
         m.overDays = m.isOver ? Number((slotWithUnlogged - m.contractedDays).toFixed(1)) : 0;
       });
 
+      // For active auxiliary machines (e.g. Sedimentation Tank), allocate their contracted quota from aux running invoices
+      const totalAuxBilledDays = auxRunningInvoices.reduce((sum, inv) => sum + inv.totalContractedDays, 0);
+      activeAuxMachines.forEach(m => {
+        m.contractedDays = totalAuxBilledDays > 0 ? totalAuxBilledDays : m.contractedDays;
+        m.slotConsumedDays = m.consumedDays;
+        m.isOver = m.contractedDays > 0 && m.consumedDays > m.contractedDays;
+        m.overDays = m.isOver ? Number((m.consumedDays - m.contractedDays).toFixed(1)) : 0;
+      });
+
       // Any remaining unclaimed stopped machines do not hold active capacity quota
       stoppedPumps.filter(p => !claimedStoppedIds.has(p.id)).forEach(m => {
         m.contractedDays = 0;
@@ -766,24 +886,26 @@ export function useActiveSiteInvoices() {
         m.overDays = 0;
       });
 
-      // Final roster: active pumps (with nested swap info) followed by any remaining unclaimed stopped pumps
+      // Final roster: active pumps (with nested swap info) followed by any remaining unclaimed stopped pumps and active aux items
       const finalPoolMachines = [
         ...activePumps,
-        ...stoppedPumps.filter(p => !claimedStoppedIds.has(p.id))
+        ...stoppedPumps.filter(p => !claimedStoppedIds.has(p.id)),
+        ...activeAuxMachines
       ];
 
       const isOverrun = totalBilledDays > 0 && totalProjectedDays > totalBilledDays;
       const overrunDays = isOverrun ? Number((totalProjectedDays - totalBilledDays).toFixed(1)) : 0;
       const remainingDays = isOverrun ? 0 : Math.max(0, Number((totalBilledDays - totalProjectedDays).toFixed(1)));
 
-      const earliestStartDate = runningInvoices.length > 0
-        ? [...runningInvoices].map(i => i.startDate).filter(Boolean).sort()[0]
+      const targetInvoices = pumpRunningInvoices.length > 0 ? pumpRunningInvoices : runningInvoices;
+      const earliestStartDate = targetInvoices.length > 0
+        ? [...targetInvoices].map(i => i.startDate).filter(Boolean).sort()[0]
         : undefined;
-      const latestScheduledEndDate = runningInvoices.length > 0
-        ? [...runningInvoices].map(i => i.scheduledEndDate).filter(Boolean).sort().reverse()[0]
+      const latestScheduledEndDate = targetInvoices.length > 0
+        ? [...targetInvoices].map(i => i.scheduledEndDate).filter(Boolean).sort().reverse()[0]
         : undefined;
-      const latestLiveEndDate = runningInvoices.length > 0
-        ? [...runningInvoices].map(i => i.liveEndDate).filter(Boolean).sort().reverse()[0]
+      const latestLiveEndDate = targetInvoices.length > 0
+        ? [...targetInvoices].map(i => i.liveEndDate).filter(Boolean).sort().reverse()[0]
         : undefined;
 
       // Calculate calendar days remaining to live target
@@ -844,6 +966,8 @@ export function useActiveSiteInvoices() {
         clientName: site.client || '',
         hasMultipleConcurrent,
         concurrentCount: runningInvoices.length,
+        isSequentialChain,
+        invoiceRelationLabel,
         invoices: runningInvoices,
         primaryInvoice: runningInvoices[0] || undefined,
         hasActiveInvoices: runningInvoices.length > 0,

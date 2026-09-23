@@ -740,13 +740,16 @@ export function Ledger() {
     });
 
     if (hasUnsavedPending) {
-      // Mark these items as saved in company expenses
       pendingLedgerEntries.forEach(exp => {
         updateCompanyExpense(exp.id, { status: 'Saved to Ledger' });
+        const hasVip = useAppStore.getState().vendorInvoicePayments.some(p => p.id === exp.id);
+        if (hasVip) {
+          useAppStore.getState().updateVendorInvoicePayment(exp.id, { ledgerEntryId: targetVoucherNo });
+        }
       });
       clearPendingLedgerEntries();
       setHasUnsavedPending(false);
-      toast.success('Pending expenses moved to ledger and marked as saved in Company Expenses.');
+      toast.success('Pending expenses/payments moved to ledger and marked as saved.');
     }
 
     toast.success(`Saved voucher ${targetVoucherNo}.`);

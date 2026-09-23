@@ -152,7 +152,16 @@ export interface StaffMeritRecord {
 }
 
 export interface LedgerCategory { id: string; name: string; }
-export interface LedgerVendor { id: string; name: string; tinNumber?: string; }
+export interface LedgerVendor {
+  id: string;
+  name: string;
+  tinNumber?: string;
+  address?: string;
+  phone?: string;
+  accountNumber?: string;
+  bankName?: string;
+  notes?: string;
+}
 export interface LedgerBank { id: string; name: string; }
 export interface LedgerBeneficiaryBank { id: string; name: string; accountNo: string; }
 export interface LedgerEntry {
@@ -193,6 +202,41 @@ export interface CompanyExpense {
   enteredBy: string;
   createdAt: string;
   status?: string;
+}
+
+// ─── Vendor Invoice & Payments ───────────────────────────────────────────────
+export interface VendorInvoice {
+  id: string;
+  workspaceId: string;
+  invoiceNumber: string;
+  vendorId: string;
+  vendorName: string;
+  dateReceived: string;
+  dueDate?: string;
+  description: string;
+  totalAmount: number;
+  status: 'unpaid' | 'partial' | 'paid';
+  notes?: string;
+  documentUrl?: string;
+  documentName?: string;
+  documentId?: string;
+  enteredBy: string;
+  createdAt: string;
+}
+
+export interface VendorInvoicePayment {
+  id: string;
+  workspaceId: string;
+  invoiceId: string;
+  paymentDate: string;
+  amountPaid: number;
+  paidFromBank: string;
+  paidToBankName?: string;
+  paidToAccountNo?: string;
+  ledgerEntryId?: string;
+  notes?: string;
+  enteredBy: string;
+  createdAt: string;
 }
 
 export interface ClientProfile {
@@ -669,6 +713,10 @@ export interface PendingInvoice {
   noOfTechnicianNight?: number;
   technicianNightCountSameAsDay?: boolean;
   technicianAccommodationUseNightCount?: boolean;
+  noOfTechnicianAccommodation?: number;
+  technicianAccommodationCountSameAsDay?: boolean;
+  technicianAccommodationDuration?: number;
+  technicianAccommodationDurationSameAsDay?: boolean;
 }
 
 export interface Invoice {
@@ -724,6 +772,10 @@ export interface Invoice {
   noOfTechnicianNight?: number;
   technicianNightCountSameAsDay?: boolean;
   technicianAccommodationUseNightCount?: boolean;
+  noOfTechnicianAccommodation?: number;
+  technicianAccommodationCountSameAsDay?: boolean;
+  technicianAccommodationDuration?: number;
+  technicianAccommodationDurationSameAsDay?: boolean;
 }
 
 export interface SalaryAdvance {
@@ -895,6 +947,8 @@ interface AppState {
   ledgerEntries: LedgerEntry[];
   companyExpenses: CompanyExpense[];
   pendingLedgerEntries: CompanyExpense[];
+  vendorInvoices: VendorInvoice[];
+  vendorInvoicePayments: VendorInvoicePayment[];
   staffMeritRecords: StaffMeritRecord[];
    vehicles: Vehicle[];
   vehicleTrips: VehicleTripLeg[];
@@ -1020,6 +1074,18 @@ interface AppState {
 
   setPendingLedgerEntries: (entries: CompanyExpense[]) => void;
   clearPendingLedgerEntries: () => void;
+
+  // Vendor Invoices
+  addVendorInvoice: (invoice: VendorInvoice) => void;
+  updateVendorInvoice: (id: string, updates: Partial<VendorInvoice>) => void;
+  deleteVendorInvoice: (id: string) => void;
+  setVendorInvoices: (invoices: VendorInvoice[]) => void;
+
+  // Vendor Invoice Payments
+  addVendorInvoicePayment: (payment: VendorInvoicePayment) => void;
+  updateVendorInvoicePayment: (id: string, updates: Partial<VendorInvoicePayment>) => void;
+  deleteVendorInvoicePayment: (id: string) => void;
+  setVendorInvoicePayments: (payments: VendorInvoicePayment[]) => void;
 
   // Budget
   budgetItems: BudgetItem[];
@@ -1189,6 +1255,8 @@ export const useAppStore = create<AppState>()(
       ledgerEntries: [],
       companyExpenses: [],
       pendingLedgerEntries: [],
+      vendorInvoices: [],
+      vendorInvoicePayments: [],
       budgetItems: [],
       staffMeritRecords: [],
       vehicles: [],
@@ -1594,6 +1662,18 @@ export const useAppStore = create<AppState>()(
 
       setPendingLedgerEntries: (entries) => set({ pendingLedgerEntries: entries }),
       clearPendingLedgerEntries: () => set({ pendingLedgerEntries: [] }),
+
+      // Vendor Invoices
+      addVendorInvoice: (invoice) => { set(s => ({ vendorInvoices: [invoice, ...s.vendorInvoices] })); db.insertVendorInvoice(invoice); },
+      updateVendorInvoice: (id, updates) => { set(s => ({ vendorInvoices: s.vendorInvoices.map(v => v.id === id ? { ...v, ...updates } : v) })); db.updateVendorInvoice(id, updates); },
+      deleteVendorInvoice: (id) => { set(s => ({ vendorInvoices: s.vendorInvoices.filter(v => v.id !== id), vendorInvoicePayments: s.vendorInvoicePayments.filter(p => p.invoiceId !== id) })); db.deleteVendorInvoice(id); },
+      setVendorInvoices: (invoices) => set({ vendorInvoices: invoices }),
+
+      // Vendor Invoice Payments
+      addVendorInvoicePayment: (payment) => { set(s => ({ vendorInvoicePayments: [payment, ...s.vendorInvoicePayments] })); db.insertVendorInvoicePayment(payment); },
+      updateVendorInvoicePayment: (id, updates) => { set(s => ({ vendorInvoicePayments: s.vendorInvoicePayments.map(p => p.id === id ? { ...p, ...updates } : p) })); db.updateVendorInvoicePayment(id, updates); },
+      deleteVendorInvoicePayment: (id) => { set(s => ({ vendorInvoicePayments: s.vendorInvoicePayments.filter(p => p.id !== id) })); db.deleteVendorInvoicePayment(id); },
+      setVendorInvoicePayments: (payments) => set({ vendorInvoicePayments: payments }),
 
       // Budget Items
       addBudgetItem: (item) => { set(s => ({ budgetItems: [...s.budgetItems, item] })); db.insertBudgetItem(item); },

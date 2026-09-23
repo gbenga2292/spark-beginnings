@@ -422,6 +422,8 @@ export function Settings() {
         ledgerCategories: state.ledgerCategories,
         ledgerBeneficiaryBanks: state.ledgerBeneficiaryBanks,
         companyExpenses: state.companyExpenses,
+        vendorInvoices: state.vendorInvoices,
+        vendorInvoicePayments: state.vendorInvoicePayments,
         // Operations Context
         vehicleFuelLogs: operationsState.vehicleFuelLogs,
         dieselRefills: operationsState.dieselRefills,
@@ -544,6 +546,8 @@ export function Settings() {
         if (d.vehicleDocumentTypes) useAppStore.setState({ vehicleDocumentTypes: d.vehicleDocumentTypes });
         if (d.ledgerBeneficiaryBanks) useAppStore.setState({ ledgerBeneficiaryBanks: d.ledgerBeneficiaryBanks });
         if (d.companyExpenses)      useAppStore.setState({ companyExpenses: d.companyExpenses });
+        if (d.vendorInvoices)       useAppStore.setState({ vendorInvoices: d.vendorInvoices });
+        if (d.vendorInvoicePayments) useAppStore.setState({ vendorInvoicePayments: d.vendorInvoicePayments });
         if (d.budgetItems)          useAppStore.setState({ budgetItems: d.budgetItems });
 
         // Restore Operations & Tasks context states
@@ -647,6 +651,8 @@ export function Settings() {
       if (d.ledgerBeneficiaryBanks) useAppStore.setState({ ledgerBeneficiaryBanks: d.ledgerBeneficiaryBanks });
       if (d.ledgerEntries)        useAppStore.setState({ ledgerEntries: d.ledgerEntries });
       if (d.companyExpenses)      useAppStore.setState({ companyExpenses: d.companyExpenses });
+      if (d.vendorInvoices)       useAppStore.setState({ vendorInvoices: d.vendorInvoices });
+      if (d.vendorInvoicePayments) useAppStore.setState({ vendorInvoicePayments: d.vendorInvoicePayments });
       if (d.hrVariables)          useAppStore.setState({ hrVariables: d.hrVariables });
       if (d.vehicles)             useAppStore.setState({ vehicles: d.vehicles });
       if (d.vehicleTrips)         useAppStore.setState({ vehicleTrips: d.vehicleTrips });

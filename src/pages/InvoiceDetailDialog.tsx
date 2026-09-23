@@ -44,8 +44,14 @@ function fmt(n: number): string {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNavigate, onEdit, onPrint }: InvoiceDetailDialogProps) {
-  const { maintenanceAssets, dailyMachineLogs, waybills, assets, sitePumpDates } = useOperations();
+export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, onNavigate, onEdit, onPrint }: InvoiceDetailDialogProps) {
+  const {
+    maintenanceAssets = [],
+    dailyMachineLogs = [],
+    waybills = [],
+    assets = [],
+    sitePumpDates = [],
+  } = useOperations() || {};
   const payments = useAppStore(state => state.payments);
   const invoices = useAppStore(state => state.invoices);
   const sites = useAppStore(state => state.sites);
@@ -134,6 +140,11 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
   const invoiceDuration = invoice?.duration ?? 0;
   const invoiceStartDate = inv?.startDate || invoice?.date || '';
 
+  const isAuxOnly = (Number(invoice?.noOfMachine || 0) === 0) && (invoice?.auxiliaryEquipment?.length || 0) > 0;
+  const auxNames = useMemo(() => 
+    (invoice?.auxiliaryEquipment || []).map(a => (a.name || '').trim().toLowerCase()).filter(Boolean)
+  , [invoice?.auxiliaryEquipment]);
+
   // -- Match logs by site name directly or flexibly (most reliable)
   const relevantLogs = useMemo(() => {
     if (!invoiceSiteName || !invoiceStartDate || !invoice) return [];
@@ -144,10 +155,24 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                             logSite === invoiceSiteId || 
                             (logSite.length > 3 && invoiceSiteName.includes(logSite)) || 
                             (invoiceSiteName.length > 3 && logSite.includes(invoiceSiteName));
-        return isSiteMatch && l.date >= invoiceStartDate;
+        if (!isSiteMatch || l.date < invoiceStartDate) return false;
+
+        const assetNameLower = (l.assetName || '').trim().toLowerCase();
+        // If invoice is exclusively for auxiliary equipment, only match logs for that auxiliary equipment
+        if (isAuxOnly && auxNames.length > 0) {
+          return auxNames.some(aux => assetNameLower.includes(aux) || aux.includes(assetNameLower));
+        }
+
+        // If invoice is a pump invoice and has dewatering pumps, do not include auxiliary assets
+        if (!isAuxOnly) {
+          const isAuxAsset = assetNameLower.includes('tank') || assetNameLower.includes('hose') || assetNameLower.includes('fitting');
+          if (isAuxAsset) return false;
+        }
+
+        return true;
       })
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [dailyMachineLogs, invoiceSiteName, invoiceSiteId, invoiceStartDate, invoice]);
+  }, [dailyMachineLogs, invoiceSiteName, invoiceSiteId, invoiceStartDate, invoice, isAuxOnly, auxNames]);
 
   const displayStatus = settlement ? settlement.status : (invoice?.status ?? 'Sent');
 
@@ -163,7 +188,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
     const seen = new Map<string, { id: string; name: string; serialNumber?: string }>();
 
     // 1. Get all machines currently assigned to this site in Operations
-    maintenanceAssets.forEach(a => {
+    (maintenanceAssets || []).forEach(a => {
       const aSite = (a.site || '').trim().toLowerCase();
       const match = aSite === invoiceSiteName || 
              aSite === invoiceSiteId || 
@@ -175,7 +200,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
     });
 
     // 2. Get machines assigned via Waybills (the source of truth for Site Inventory)
-    const siteWaybills = waybills.filter(w => {
+    const siteWaybills = (waybills || []).filter(w => {
       const wSite = (w.siteName || '').trim().toLowerCase();
       return (wSite === invoiceSiteName || 
               w.siteId === invoiceSiteId ||
@@ -186,12 +211,12 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
 
     const inventoryMap = new Map<string, number>();
     siteWaybills.filter(w => w.type === 'waybill').forEach(wb => {
-      wb.items.forEach(item => {
+      (wb.items || []).forEach(item => {
         inventoryMap.set(item.assetId, (inventoryMap.get(item.assetId) || 0) + item.quantity);
       });
     });
     siteWaybills.filter(w => w.type === 'return').forEach(wb => {
-      wb.items.forEach(item => {
+      (wb.items || []).forEach(item => {
         const qty = inventoryMap.get(item.assetId) || 0;
         inventoryMap.set(item.assetId, Math.max(0, qty - item.quantity));
       });
@@ -199,7 +224,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
 
     Array.from(inventoryMap.entries()).forEach(([id, qty]) => {
       if (qty > 0 && !seen.has(id)) {
-        const asset = assets.find(a => a.id === id);
+        const asset = (assets || []).find(a => a.id === id);
         // Only include equipment that requires logging
         if (asset && asset.type === 'equipment' && asset.requiresLogging) {
           seen.set(id, { id: asset.id, name: asset.name, serialNumber: asset.serialNumber });
@@ -208,9 +233,9 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
     });
 
     // 3. Add machines that have historical logs for this site during the invoice period
-    relevantLogs.forEach(l => {
+    (relevantLogs || []).forEach(l => {
       if (!seen.has(l.assetId)) {
-        const asset = assets.find(a => a.id === l.assetId);
+        const asset = (assets || []).find(a => a.id === l.assetId);
         seen.set(l.assetId, { id: l.assetId, name: l.assetName, serialNumber: asset?.serialNumber });
       }
     });
@@ -224,17 +249,39 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
       return { ...m, isStopped, stopDate };
     });
 
-    list.sort((a, b) => {
+    let filteredList = list;
+    if (isAuxOnly && auxNames.length > 0) {
+      filteredList = list.filter(m => {
+        const mName = (m.name || '').toLowerCase();
+        return auxNames.some(aux => mName.includes(aux) || aux.includes(mName));
+      });
+    } else if (!isAuxOnly) {
+      const hasPumps = list.some(m => (m.name || '').toLowerCase().includes('pump'));
+      if (hasPumps) {
+        filteredList = list.filter(m => {
+          const mName = (m.name || '').toLowerCase();
+          return !mName.includes('tank') && !mName.includes('hose') && !mName.includes('fitting');
+        });
+      }
+    }
+
+    filteredList.sort((a, b) => {
       if (a.isStopped && !b.isStopped) return 1;
       if (!a.isStopped && b.isStopped) return -1;
       return a.name.localeCompare(b.name);
     });
 
-    return list;
-  }, [maintenanceAssets, waybills, assets, invoiceSiteName, invoiceSiteId, relevantLogs, sitePumpDates, invoice?.siteId]);
+    return filteredList;
+  }, [maintenanceAssets, waybills, assets, invoiceSiteName, invoiceSiteId, relevantLogs, sitePumpDates, invoice?.siteId, isAuxOnly, auxNames]);
 
   const machineConfigs: any[] = invoice?.machineConfigs ?? [];
   const totalContractedDays = useMemo(() => {
+    if (isAuxOnly && invoice?.auxiliaryEquipment && invoice.auxiliaryEquipment.length > 0) {
+      return invoice.auxiliaryEquipment.reduce((sum, c) => {
+        const d = parseFloat(String(c.duration ?? 0)) || invoiceDuration;
+        return sum + d;
+      }, 0);
+    }
     if (machineConfigs.length > 0) {
       const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
       let total = machineConfigs.reduce((sum, c) => {
@@ -248,7 +295,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
     }
     const count = invoice?.noOfMachine || 1;
     return count * invoiceDuration;
-  }, [machineConfigs, invoice?.noOfMachine, invoiceDuration]);
+  }, [isAuxOnly, invoice?.auxiliaryEquipment, machineConfigs, invoice?.noOfMachine, invoiceDuration]);
 
   const consumedDays = useMemo(() =>
     relevantLogs.reduce((acc, l) => acc + dayValue(l), 0)
@@ -462,6 +509,17 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                   ? invoiceDuration 
                   : (parseFloat(inv.technicianNightDuration) || invoiceDuration);
 
+                const isAccomDurationSame = inv.technicianAccommodationDurationSameAsDay !== false;
+                const actualAccomDuration = isAccomDurationSame
+                  ? actualTechDuration
+                  : (parseFloat(inv.technicianAccommodationDuration) || actualTechDuration);
+
+                const isAccomCountSame = inv.technicianAccommodationCountSameAsDay !== false;
+                const legacyAccomCount = inv.technicianAccommodationUseNightCount ? noOfTechnicianNight : noOfTechnician;
+                const actualAccomCount = isAccomCountSame
+                  ? legacyAccomCount
+                  : (parseFloat(inv.noOfTechnicianAccommodation) || noOfTechnician);
+
                 return (
                   <div className="bg-slate-50 border border-slate-200 dark:border-slate-800 rounded-sm p-3 space-y-2">
                     <div className="flex items-center justify-between">
@@ -491,8 +549,8 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                         )}
                         {accommodationRate > 0 && (
                           <div className="flex justify-between">
-                            <span>Accommodation: {countsDiffer ? `${accommodatedTechs} × ` : ''}₦{fmt(accommodationRate)}/day</span>
-                            <span className="font-medium text-slate-400">Duration: {actualTechDuration} days</span>
+                            <span>Accommodation: {actualAccomCount > 0 ? `${actualAccomCount} × ` : ''}₦{fmt(accommodationRate)}/day</span>
+                            <span className="font-medium text-slate-400">Duration: {actualAccomDuration} days</span>
                           </div>
                         )}
                       </div>
@@ -624,13 +682,22 @@ export function InvoiceDetailDialog({ invoice, invoiceList, open, onClose, onNav
                     {siteMachines.map((a, idx) => {
                       const machineLogs = relevantLogs.filter(l => l.assetId === a.id);
                       const machineConsumed = machineLogs.reduce((s, l) => s + dayValue(l), 0);
-                      const invoicedCount = invoice?.noOfMachine || machineConfigs.length || 1;
+                      const invoicedCount = isAuxOnly
+                        ? (invoice?.auxiliaryEquipment?.length || 1)
+                        : (invoice?.noOfMachine || machineConfigs.length || 1);
                       const hasSwaps = siteMachines.length > invoicedCount || siteMachines.some(m => (m as any).isStopped);
                       const firstDur = parseFloat(String(machineConfigs[0]?.duration ?? 0)) || invoiceDuration;
                       const cfg = !hasSwaps ? machineConfigs[idx] : undefined;
-                      const machineDuration = cfg
-                        ? (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || invoiceDuration))
-                        : invoiceDuration;
+                      const auxItem = isAuxOnly ? (invoice?.auxiliaryEquipment || []).find(item => {
+                        const iName = (item.name || '').toLowerCase();
+                        const aName = (a.name || '').toLowerCase();
+                        return iName.includes(aName) || aName.includes(iName);
+                      }) : undefined;
+                      const machineDuration = isAuxOnly
+                        ? (parseFloat(String(auxItem?.duration ?? 0)) || invoiceDuration)
+                        : (cfg
+                          ? (cfg.sameDurationAsFirst ? firstDur : (parseFloat(String(cfg.duration ?? 0)) || firstDur || invoiceDuration))
+                          : invoiceDuration);
                       const isOver = machineDuration > 0 && machineConsumed > machineDuration;
                       const overDays = isOver ? machineConsumed - machineDuration : 0;
                       const isStopped = (a as any).isStopped;

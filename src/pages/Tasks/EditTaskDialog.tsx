@@ -304,7 +304,7 @@ export function EditTaskDialog({ task, users, onClose, onSave }: EditTaskDialogP
                     onClick={() => setUrgency(u)}
                     className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[11px] font-semibold transition-all cursor-pointer ${
                       isSelected
-                        ? `${conf.badgeCls} ${conf.borderCls} shadow-sm scale-105 ring-1 ring-primary/20`
+                        ? `${conf.badgeCls} ${conf.cardBorder} shadow-sm scale-105 ring-1 ring-primary/20`
                         : 'border-border bg-muted text-muted-foreground hover:text-foreground'
                     }`}
                   >
