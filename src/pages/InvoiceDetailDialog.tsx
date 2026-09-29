@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { X, Printer, Edit, Clock, Calendar, TrendingUp, Fuel, Package, DollarSign, CheckCircle, FileText, ChevronLeft, ChevronRight, CreditCard, ArrowRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { X, Printer, Edit, Clock, Calendar, TrendingUp, Fuel, Package, DollarSign, CheckCircle, FileText, ChevronLeft, ChevronRight, CreditCard, ArrowRight, StickyNote, ChevronDown, ChevronUp } from 'lucide-react';
 import { Invoice } from '@/src/store/appStore';
 import { DailyMachineLog } from '@/src/types/operations';
 import { Button } from '@/src/components/ui/button';
@@ -58,6 +58,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
   const openPaymentModalForInvoice = useAppStore(state => state.openPaymentModalForInvoice);
 
   const inv = invoice as any;
+  const [notesCollapsed, setNotesCollapsed] = useState(false);
 
   const settlement = useMemo(() => {
     if (!invoice) return null;
@@ -241,9 +242,11 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
     });
     
     const list = Array.from(seen.values()).map(m => {
-      const pumpDateRec = (sitePumpDates || []).find(pd => 
+      const allPDs = (sitePumpDates || []).filter(pd => 
         (pd.siteId === invoiceSiteId || (invoiceSiteName && pd.siteId === invoice?.siteId)) && pd.assetId === m.id
       );
+      const pumpDateRec = allPDs.find(pd => !pd.pumpStopDate) ||
+        [...allPDs].sort((x, y) => (y.pumpStartDate || '').localeCompare(x.pumpStartDate || ''))[0];
       const isStopped = Boolean(pumpDateRec?.pumpStopDate);
       const stopDate = pumpDateRec?.pumpStopDate || undefined;
       return { ...m, isStopped, stopDate };
@@ -796,6 +799,88 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
               </div>
             </div>
           </div>
+
+          {/* Notes & Itemized Details (Collapsible) */}
+          {(invoice.internalNotes || (invoice.noteLineItems && invoice.noteLineItems.length > 0)) && (
+            <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800">
+              <div
+                className="flex items-center justify-between cursor-pointer select-none group"
+                onClick={() => setNotesCollapsed((prev) => !prev)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600 dark:text-blue-400">
+                    <StickyNote className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
+                    Notes &amp; Itemized Details
+                  </h3>
+                  {invoice.noteLineItems && invoice.noteLineItems.length > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 rounded font-semibold text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/40">
+                      {invoice.noteLineItems.length} {invoice.noteLineItems.length === 1 ? 'item' : 'items'}
+                    </Badge>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                  aria-label={notesCollapsed ? "Expand notes" : "Collapse notes"}
+                >
+                  {notesCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </button>
+              </div>
+
+              {!notesCollapsed && (
+                <div className="mt-3.5 space-y-4">
+                  {invoice.internalNotes && (
+                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-md p-3.5 text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {invoice.internalNotes}
+                    </div>
+                  )}
+
+                  {invoice.noteLineItems && invoice.noteLineItems.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Itemized Breakdown</p>
+                      <div className="border border-slate-200 dark:border-slate-800 rounded-sm overflow-hidden text-xs">
+                        <div className="grid grid-cols-[1fr_60px_100px_100px] bg-slate-50 dark:bg-slate-900 px-3 py-2 font-bold text-slate-400 uppercase tracking-wider text-[10px]">
+                          <span>Item / Description</span>
+                          <span className="text-center">Qty</span>
+                          <span className="text-right">Price</span>
+                          <span className="text-right">Total</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-slate-950">
+                          {invoice.noteLineItems.map((item, idx) => {
+                            const q = parseFloat(String(item.qty)) || 0;
+                            const r = parseFloat(String(item.rate).replace(/,/g, '')) || 0;
+                            const t = item.total !== undefined ? item.total : (q * r);
+                            return (
+                              <div key={item.id || idx} className="grid grid-cols-[1fr_60px_100px_100px] px-3 py-2 hover:bg-slate-50/70 dark:hover:bg-slate-900/40 transition-colors items-center">
+                                <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{item.desc || '—'}</span>
+                                <span className="text-center font-mono text-slate-600 dark:text-slate-400">{item.qty}</span>
+                                <span className="text-right font-mono text-slate-600 dark:text-slate-400">₦{fmt(r)}</span>
+                                <span className="text-right font-mono font-semibold text-slate-800 dark:text-slate-100">₦{fmt(t)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="grid grid-cols-[1fr_60px_100px_100px] bg-slate-50/80 dark:bg-slate-900/80 px-3 py-2 font-bold border-t border-slate-200 dark:border-slate-800 text-xs">
+                          <span className="text-slate-600 dark:text-slate-300">Total Items Cost</span>
+                          <span />
+                          <span />
+                          <span className="text-right font-mono text-emerald-600 dark:text-emerald-400">
+                            ₦{fmt(invoice.noteLineItems.reduce((acc, it) => {
+                              const q = parseFloat(String(it.qty)) || 0;
+                              const r = parseFloat(String(it.rate).replace(/,/g, '')) || 0;
+                              return acc + (it.total !== undefined ? it.total : (q * r));
+                            }, 0))}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Settlement & Payment Status */}
           {settlement && (

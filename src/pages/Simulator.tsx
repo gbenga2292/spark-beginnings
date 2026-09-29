@@ -1174,7 +1174,7 @@ export default function Simulator() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Left Vertical Tool Dock ── */}
-        <div className="relative z-50 flex-shrink-0">
+        <div className="relative z-20 flex-shrink-0">
           <CadToolDock
             activeTool={activeTool}
             onToolSelect={handleToolSelect}
@@ -1193,7 +1193,7 @@ export default function Simulator() {
 
         {/* ── Slide-out Design / Layers & Levels Panel ── */}
         {showLayersPanel && (
-          <div className="relative z-40 flex-shrink-0 animate-in slide-in-from-left duration-200">
+          <div className="relative z-20 flex-shrink-0 animate-in slide-in-from-left duration-200">
             <DesignPanel
               layerItems={layerItems}
               selectedId={selectedCanvasId}

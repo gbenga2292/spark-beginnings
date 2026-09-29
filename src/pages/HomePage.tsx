@@ -244,6 +244,7 @@ export function HomePage() {
           { name: 'Staff Evaluations', href: '/evaluations', icon: Users, privKey: 'evaluations', privField: 'canView' },
           { name: 'Candidate Interviews', href: '/interviews', icon: Users, privKey: 'interviews', privField: 'canView' },
           { name: 'Conduct & Disciplinary', href: '/performance-conduct', icon: Users, privKey: 'disciplinary', privField: 'canView' },
+          { name: 'Meeting Minutes', href: '/minutes', icon: Users, privKey: 'minute', privField: 'canView' },
         ],
       },
       {

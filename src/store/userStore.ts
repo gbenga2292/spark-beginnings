@@ -28,6 +28,7 @@ export interface LeavesPriv      { canView: boolean; canAdd: boolean; canEdit: b
 export interface SalaryLoansPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; }
 export interface ReportsPriv     { canView: boolean; canExport: boolean; }
 export interface HmoPriv         { canView: boolean; canAdd: boolean; canEdit: boolean; canExport: boolean; }
+export interface MinutePriv      { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canConvertTasks: boolean; canExport: boolean; }
 
 // ─── Admin ───────────────────────────────────────────────────
 export interface ClientsPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canViewDecisionIntelligence: boolean; }
@@ -82,7 +83,7 @@ export interface FinancialReportsPriv {
   canView: boolean; canExport: boolean; canViewAmounts: boolean;
   canViewPayrollSummary: boolean; canViewLoansAndAdvances: boolean;
 }
-export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; }
+export interface LedgerPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canImport: boolean; canExport: boolean; canDirectApprove?: boolean; }
 export interface BankImportPriv {
   canView: boolean;
   canUpload: boolean;
@@ -196,6 +197,7 @@ export interface UserPrivileges {
   leaves:            LeavesPriv;
   salaryLoans:       SalaryLoansPriv;
   hmo:               HmoPriv;
+  minute?:           MinutePriv;
   reports:           ReportsPriv;
   clients:           ClientsPriv;
   sites:             SitesPriv;
@@ -266,6 +268,7 @@ export const FULL_ACCESS: UserPrivileges = {
   leaves:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewSummary: true },
   salaryLoans:      { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true },
   hmo:              { canView: true, canAdd: true, canEdit: true, canExport: true },
+  minute:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canConvertTasks: true, canExport: true },
   reports:          { canView: true, canExport: true },
   clients:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewDecisionIntelligence: true },
   sites:            { canView: true, canAddSite: true, canEditSite: true, canDeleteSite: true, canAddClient: true, canEditClient: true, canDeleteClient: true, canViewClientSummary: true, canImport: true, canExport: true, canViewDecisionIntelligence: true },
@@ -273,7 +276,7 @@ export const FULL_ACCESS: UserPrivileges = {
   payments:         { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true, canViewVat: true, canManageVat: true, canImport: true, canExport: true },
   payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
-  ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
+  ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true, canDirectApprove: true },
   bankImport:       { canView: true, canUpload: true, canReconcile: true, canSave: true, canDelete: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true, canBackup: true, canRestore: true },
   users:            { canView: true, canManage: true, canOverrideDiaryDelete: true },
@@ -344,6 +347,7 @@ export const NO_ACCESS: UserPrivileges = {
   leaves:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewSummary: false },
   salaryLoans:      { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false },
   hmo:              { canView: false, canAdd: false, canEdit: false, canExport: false },
+  minute:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canConvertTasks: false, canExport: false },
   reports:          { canView: false, canExport: false },
   clients:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewDecisionIntelligence: false },
   sites:            { canView: false, canAddSite: false, canEditSite: false, canDeleteSite: false, canAddClient: false, canEditClient: false, canDeleteClient: false, canViewClientSummary: false, canImport: false, canExport: false, canViewDecisionIntelligence: false },
@@ -434,6 +438,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       beneficiaries:{ canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       weeklyReport: { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
       budget:       { canView: true, canAdd: true, canEdit: true, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
+      minute:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConvertTasks: true, canExport: true },
     },
   },
   {
@@ -451,6 +456,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       reports:          { canView: true, canExport: true },
       tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
       budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
+      minute:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canConvertTasks: false, canExport: false },
     },
   },
   {
@@ -483,6 +489,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       activityLog:      { canView: true, canExport: false },
       commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       beneficiaries:    { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
+      minute:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canConvertTasks: false, canExport: false },
     },
   },
 ];

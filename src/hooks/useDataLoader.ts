@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, FULL_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem, dbToVendorInvoice, dbToVendorInvoicePayment } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem, dbToVendorInvoice, dbToVendorInvoicePayment, dbToLedgerVendor } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -744,10 +744,10 @@ export function useRealtimeData(isAuthenticated: boolean) {
               const current = appState.ledgerVendors;
               if (eventType === 'INSERT') {
                 if (!current.some(v => v.id === newRow.id)) {
-                  useAppStore.setState({ ledgerVendors: [...current, { id: newRow.id, name: newRow.name, tinNumber: newRow.tin_number || '' }] });
+                  useAppStore.setState({ ledgerVendors: [...current, dbToLedgerVendor(newRow)] });
                 }
               } else if (eventType === 'UPDATE') {
-                useAppStore.setState({ ledgerVendors: current.map(v => v.id === newRow.id ? { id: newRow.id, name: newRow.name, tinNumber: newRow.tin_number || '' } : v) });
+                useAppStore.setState({ ledgerVendors: current.map(v => v.id === newRow.id ? dbToLedgerVendor(newRow) : v) });
               } else if (eventType === 'DELETE') {
                 useAppStore.setState({ ledgerVendors: current.filter(v => v.id !== oldRow.id) });
               }

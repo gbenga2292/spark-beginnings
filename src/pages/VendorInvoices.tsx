@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -6,7 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { useAppStore, VendorInvoice, VendorInvoicePayment, LedgerEntry, LedgerVendor } from '@/src/store/appStore';
+import { useAppStore, VendorInvoice, VendorInvoicePayment, LedgerEntry, LedgerVendor, InvoiceVersion } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -16,7 +16,8 @@ import {
   Calendar, Building2, ChevronLeft, ChevronRight, ArrowUpDown,
   BookOpen, ExternalLink, Filter, Wallet, FileText, Check, Sparkles,
   Link2, Unlink, Edit2, Users, Paperclip, Upload, Eye, Loader2,
-  Phone, MapPin, Landmark
+  Phone, MapPin, Landmark, ShieldCheck, History, Send, ThumbsUp,
+  ThumbsDown, MessageSquare, TrendingDown, Tag, RotateCcw, UserCheck, Lock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -42,6 +43,16 @@ export interface LedgerMatchCandidate {
 // ─── Formatting Helpers ────────────────────────────────────────────────────────
 const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayStr = () => new Date().toISOString().split('T')[0];
+
+/**
+ * Check if invoice is approved for payment disbursements.
+ * Legacy and previously recorded invoices without an explicit approvalStatus
+ * are automatically treated as approved.
+ */
+export function isInvoiceApproved(inv?: { approvalStatus?: string } | null): boolean {
+  if (!inv) return false;
+  return !inv.approvalStatus || inv.approvalStatus === 'approved';
+}
 
 function formatDateDisplay(dStr?: string) {
   if (!dStr) return '—';
@@ -228,6 +239,104 @@ function InvoiceStatusBadge({ status, isOverdue }: { status: VendorInvoice['stat
   );
 }
 
+// ─── Unified Minimalist Status Badge Component ────────────────────────────────
+function UnifiedInvoiceStatusBadge({
+  invoice,
+  onClickApproval,
+}: {
+  invoice: ComputedVendorInvoice;
+  onClickApproval?: () => void;
+}) {
+  const approval = invoice.approvalStatus;
+
+  // 1. Pending Approval: primary operational blocker
+  if (approval === 'pending_approval') {
+    return (
+      <button
+        type="button"
+        onClick={onClickApproval}
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
+        title={`Pending approval by ${invoice.approverName || 'Approver'}. Click to review.`}
+      >
+        <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+        <span>Pending Approval</span>
+      </button>
+    );
+  }
+
+  // 2. Rejected / Needs Revision
+  if (approval === 'rejected') {
+    return (
+      <button
+        type="button"
+        onClick={onClickApproval}
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
+        title={invoice.rejectionReason ? `Rejected: ${invoice.rejectionReason}. Click to view.` : 'Revision required. Click to view.'}
+      >
+        <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" />
+        <span>Revision Needed</span>
+      </button>
+    );
+  }
+
+  // 3. Draft
+  if (approval === 'draft') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 whitespace-nowrap">
+        <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+        <span>Draft</span>
+      </span>
+    );
+  }
+
+  // 4. Approved (Single Minimalist Capsule: Approved · Payment Status)
+  const status = invoice.derivedStatus;
+  const isOverdue = invoice.isOverdue;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 whitespace-nowrap shadow-2xs">
+      <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 font-bold shrink-0">
+        <Check className="w-3 h-3 stroke-[3]" />
+        <span>Approved</span>
+      </span>
+      <span className="text-slate-300 dark:text-slate-600 font-light">·</span>
+      <span className={`font-semibold shrink-0 ${
+        status === 'paid'
+          ? 'text-emerald-600 dark:text-emerald-400'
+          : isOverdue
+            ? 'text-rose-600 dark:text-rose-400'
+            : status === 'partial'
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-slate-600 dark:text-slate-300'
+      }`}>
+        {status === 'paid' ? 'Fully Paid' : isOverdue ? 'Overdue' : status === 'partial' ? 'Partial' : 'Unpaid'}
+      </span>
+    </span>
+  );
+}
+
+// ─── Line Item Type & Formatters ───────────────────────────────────────────────
+type LineItem = { id: string; desc: string; qty: string; rate: string };
+
+const formatAmountInput = (val: string | number): string => {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val);
+  const clean = str.replace(/[^0-9.]/g, '');
+  if (!clean) return '';
+  const parts = clean.split('.');
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (parts.length > 1) {
+    return `${intPart}.${parts.slice(1).join('').slice(0, 2)}`;
+  }
+  return intPart;
+};
+
+const parseAmountInput = (val: string | number): number => {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  const num = parseFloat(String(val || '').replace(/,/g, ''));
+  return isNaN(num) ? 0 : num;
+};
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function VendorInvoices() {
   const navigate = useNavigate();
@@ -253,8 +362,19 @@ export function VendorInvoices() {
   const updateLedgerVendor = useAppStore((s) => s.updateLedgerVendor);
   const removeLedgerVendor = useAppStore((s) => s.removeLedgerVendor);
 
+  // ─── User Authority & Approvals ───────────────────────────────────────────
+  const allUsers = useUserStore((s) => s.users);
+  const activeUsers = useMemo(() => allUsers.filter((u) => u.isActive), [allUsers]);
+  const canDirectApprove = Boolean(
+    priv?.canDirectApprove ||
+    currentUser?.role?.toLowerCase().includes('admin') ||
+    currentUser?.role?.toLowerCase().includes('director') ||
+    currentUser?.role?.toLowerCase().includes('managing') ||
+    !currentUser
+  );
+
   // ─── State: Filters, Search, Sort & Pagination ──────────────────────────────
-  const [activeTab, setActiveTab] = useState<'all' | 'outstanding' | 'overdue' | 'paid'>('outstanding');
+  const [activeTab, setActiveTab] = useState<'all' | 'outstanding' | 'awaiting_approval' | 'overdue' | 'paid'>('outstanding');
   const [searchTerm, setSearchTerm] = useState('');
   const [vendorFilter, setVendorFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'balance-desc' | 'due-soon'>('date-desc');
@@ -264,6 +384,20 @@ export function VendorInvoices() {
   // ─── State: Modals ──────────────────────────────────────────────────────────
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<VendorInvoice | null>(null);
+
+  // ─── State: Approval Review Modal ──────────────────────────────────────────
+  const [isApprovalReviewModalOpen, setIsApprovalReviewModalOpen] = useState(false);
+  const [reviewingInvoice, setReviewingInvoice] = useState<ComputedVendorInvoice | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isRejectingOpen, setIsRejectingOpen] = useState(false);
+  // Per-line-item decisions while reviewing: itemId → 'approved' | 'flagged' | 'pending'
+  const [lineItemDecisions, setLineItemDecisions] = useState<Record<string, 'approved' | 'flagged' | 'pending'>>({});
+
+  // ─── State: Invoice Form Approval Routing ──────────────────────────────────
+  const [invApprovalAction, setInvApprovalAction] = useState<'approve_direct' | 'send_approval' | 'draft'>('approve_direct');
+  const [invApproverId, setInvApproverId] = useState('');
+  const [invApproverName, setInvApproverName] = useState('');
+  const [invVersionNote, setInvVersionNote] = useState('');
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<ComputedVendorInvoice | null>(null);
@@ -300,6 +434,161 @@ export function VendorInvoices() {
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string } | null>(null);
 
+  // ─── Line Items State ───────────────────────────────────────────────────────
+  const blankLine = (): LineItem => ({ id: crypto.randomUUID(), desc: '', qty: '1', rate: '' });
+  const [lineItems, setLineItems] = useState<LineItem[]>([blankLine()]);
+  const [showBulkPaste, setShowBulkPaste] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkParseError, setBulkParseError] = useState('');
+
+  const lineItemsTotal = lineItems.reduce((sum, li) => {
+    const q = parseFloat(li.qty) || 0;
+    const r = parseAmountInput(li.rate);
+    return sum + q * r;
+  }, 0);
+
+  const updateLine = (id: string, field: keyof LineItem, value: string) =>
+    setLineItems((prev) => prev.map((li) => (li.id === id ? { ...li, [field]: value } : li)));
+
+  const addLine = (afterId?: string) => {
+    const newLine = blankLine();
+    if (afterId) {
+      setLineItems((prev) => {
+        const idx = prev.findIndex((li) => li.id === afterId);
+        const next = [...prev];
+        next.splice(idx + 1, 0, newLine);
+        return next;
+      });
+    } else {
+      setLineItems((prev) => [...prev, newLine]);
+    }
+    // Focus the new row's desc field after render
+    setTimeout(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('[data-linedesc]');
+      inputs[inputs.length - 1]?.focus();
+    }, 30);
+  };
+
+  const removeLine = (id: string) =>
+    setLineItems((prev) => (prev.length > 1 ? prev.filter((li) => li.id !== id) : prev));
+
+  // ── Bulk text parser ──────────────────────────────────────────────────────
+  // Handles formats like:
+  //   "1\" Pipe — ₦2,200 × 4 pcs = ₦8,800"
+  //   "Labour — ₦15,000"
+  //   "Labour: 15000"
+  //   "Labour  15000  1"
+  //   "Plumbing Work:" (category header — skipped)
+  //   "Total: ₦95,400" (summary — skipped)
+  const parseBulkText = (raw: string): LineItem[] => {
+    const clean = (s: string) => parseAmountInput(s.replace(/[₦#\s]/g, ''));
+    const results: LineItem[] = [];
+
+    const lines = raw.split(/\n/).map((l) => l.trim()).filter(Boolean);
+
+    for (const line of lines) {
+      // Skip summary / header lines
+      if (/^total[:\s]/i.test(line)) continue;
+      if (/^[A-Za-z ]+:$/.test(line)) continue; // e.g. "Plumbing Work:"
+
+      // Pattern A: "desc — ₦rate × qty (pcs|pc|units) = ₦total"
+      const pA = line.match(/^(.+?)\s*[\u2014\-]{1,2}\s*[₦#]?([\d,\.]+)\s*[×x\*]\s*([\d,\.]+)\s*(?:pcs?|units?|nos?)?\s*=?/i);
+      if (pA) {
+        const desc = pA[1].replace(/^[\u2014\-]+/, '').trim();
+        const rate = clean(pA[2]);
+        const qty = clean(pA[3]);
+        if (desc && rate > 0) {
+          results.push({ id: crypto.randomUUID(), desc, qty: String(qty || 1), rate: formatAmountInput(rate) });
+          continue;
+        }
+      }
+
+      // Pattern B: "desc — ₦rate" (no qty)
+      const pB = line.match(/^(.+?)\s*[\u2014\-]{1,2}\s*[₦#]?([\d,\.]+)\s*$/i);
+      if (pB) {
+        const desc = pB[1].trim();
+        const rate = clean(pB[2]);
+        if (desc && rate > 0) {
+          results.push({ id: crypto.randomUUID(), desc, qty: '1', rate: formatAmountInput(rate) });
+          continue;
+        }
+      }
+
+      // Pattern C: "desc: rate" or "desc: rate × qty"
+      const pC = line.match(/^(.+?):\s*[₦#]?([\d,\.]+)(?:\s*[×x\*]\s*([\d,\.]+))?\s*$/i);
+      if (pC) {
+        const desc = pC[1].trim();
+        const rate = clean(pC[2]);
+        const qty = pC[3] ? clean(pC[3]) : 1;
+        if (desc && rate > 0) {
+          results.push({ id: crypto.randomUUID(), desc, qty: String(qty), rate: formatAmountInput(rate) });
+          continue;
+        }
+      }
+
+      // Pattern D: tab/space separated columns: "desc  rate  qty"
+      const parts = line.split(/\t|  +/);
+      if (parts.length >= 2) {
+        const desc = parts[0].trim();
+        const rate = clean(parts[1]);
+        const qty = parts[2] ? clean(parts[2]) : 1;
+        if (desc && rate > 0) {
+          results.push({ id: crypto.randomUUID(), desc, qty: String(qty), rate: formatAmountInput(rate) });
+        }
+      }
+    }
+
+    return results;
+  };
+
+  const handleApplyBulkPaste = () => {
+    const parsed = parseBulkText(bulkText);
+    if (parsed.length === 0) {
+      setBulkParseError('Could not parse any items. Try the format: Item — ₦rate × qty');
+      return;
+    }
+    setBulkParseError('');
+    setLineItems(parsed);
+    setBulkText('');
+    setShowBulkPaste(false);
+  };
+
+  const serializeLineItems = (items: LineItem[]): string =>
+    items
+      .filter((li) => li.desc.trim() || parseAmountInput(li.rate) > 0)
+      .map((li) => {
+        const q = parseFloat(li.qty) || 1;
+        const r = parseAmountInput(li.rate);
+        const t = q * r;
+        return q !== 1
+          ? `${li.desc.trim()} — ₦${fmt(r)} × ${q} = ₦${fmt(t)}`
+          : `${li.desc.trim()} — ₦${fmt(r)}`;
+      })
+      .join('  |  ');
+
+  const loadLineItems = (jsonStr?: string, fallbackDesc?: string): LineItem[] => {
+    if (jsonStr) {
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((p: any) => ({
+            id: crypto.randomUUID(),
+            desc: String(p.desc || ''),
+            qty: String(p.qty ?? 1),
+            rate: formatAmountInput(p.rate ?? ''),
+          }));
+        }
+      } catch { /* ignore */ }
+    }
+    // fallback: try to parse old description string
+    if (fallbackDesc) {
+      const parsed = parseBulkText(fallbackDesc.replace(/  \|  /g, '\n'));
+      if (parsed.length > 0) return parsed;
+      return [{ id: crypto.randomUUID(), desc: fallbackDesc, qty: '1', rate: '' }];
+    }
+    return [blankLine()];
+  };
+
   // ─── Payment Form State (Simplified & Dual-Entry) ───────────────────────────
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(todayStr());
@@ -326,7 +615,8 @@ export function VendorInvoices() {
       const payments = vendorInvoicePayments.filter((p) => p.invoiceId === inv.id);
       const paid = payments.reduce((sum, p) => sum + Number(p.amountPaid || 0), 0);
       const balance = Math.max(0, Number(inv.totalAmount || 0) - paid);
-      const daysOverdue = inv.dueDate && inv.status !== 'paid' ? getDaysOverdue(inv.dueDate) : 0;
+      const isApproved = isInvoiceApproved(inv);
+      const daysOverdue = isApproved && inv.dueDate && inv.status !== 'paid' ? getDaysOverdue(inv.dueDate) : 0;
       const isOverdue = daysOverdue > 0 && balance > 0;
 
       let derivedStatus: VendorInvoice['status'] = 'unpaid';
@@ -348,6 +638,19 @@ export function VendorInvoices() {
     });
   }, [vendorInvoices, vendorInvoicePayments]);
 
+  // Invoices waiting for current user's approval
+  const myPendingApprovals = useMemo(() => {
+    if (!currentUser) return [];
+    return invoicesWithBalance.filter(
+      (inv) =>
+        inv.approvalStatus === 'pending_approval' &&
+        (inv.approverId === currentUser.id ||
+          inv.approverName?.toLowerCase().trim() === currentUser.name?.toLowerCase().trim() ||
+          currentUser.role?.toLowerCase().includes('admin') ||
+          currentUser.role?.toLowerCase().includes('director'))
+    );
+  }, [invoicesWithBalance, currentUser]);
+
   // ─── Computations: High-level KPI summary ───────────────────────────────────
   const summary = useMemo(() => {
     let totalInvoiced = 0;
@@ -355,14 +658,26 @@ export function VendorInvoices() {
     let totalOutstanding = 0;
     let overdueCount = 0;
     let overdueAmount = 0;
+    let pendingApprovalCount = 0;
+    let totalNegotiatedSavings = 0;
 
     invoicesWithBalance.forEach((inv) => {
-      totalInvoiced += Number(inv.totalAmount || 0);
-      totalPaid += inv.paidAmount;
-      totalOutstanding += inv.balanceRemaining;
-      if (inv.isOverdue) {
-        overdueCount += 1;
-        overdueAmount += inv.balanceRemaining;
+      const isApproved = (inv.approvalStatus || 'approved') === 'approved';
+      if (isApproved) {
+        totalInvoiced += Number(inv.totalAmount || 0);
+        totalPaid += inv.paidAmount;
+        totalOutstanding += inv.balanceRemaining;
+        if (inv.isOverdue) {
+          overdueCount += 1;
+          overdueAmount += inv.balanceRemaining;
+        }
+      } else if (inv.approvalStatus === 'pending_approval') {
+        pendingApprovalCount += 1;
+      }
+
+      // Track negotiation savings across all invoices
+      if (inv.initialAmount && inv.initialAmount > inv.totalAmount) {
+        totalNegotiatedSavings += (inv.initialAmount - inv.totalAmount);
       }
     });
 
@@ -372,7 +687,10 @@ export function VendorInvoices() {
       totalOutstanding,
       overdueCount,
       overdueAmount,
-      count: invoicesWithBalance.length,
+      pendingApprovalCount,
+      totalNegotiatedSavings,
+      count: invoicesWithBalance.filter((i) => (i.approvalStatus || 'approved') === 'approved').length,
+      allCount: invoicesWithBalance.length,
     };
   }, [invoicesWithBalance]);
 
@@ -382,11 +700,13 @@ export function VendorInvoices() {
 
     // 1. Tab filter
     if (activeTab === 'outstanding') {
-      list = list.filter((i) => i.derivedStatus !== 'paid');
+      list = list.filter((i) => (i.approvalStatus || 'approved') === 'approved' && i.derivedStatus !== 'paid');
+    } else if (activeTab === 'awaiting_approval') {
+      list = list.filter((i) => i.approvalStatus === 'pending_approval' || i.approvalStatus === 'rejected' || i.approvalStatus === 'draft');
     } else if (activeTab === 'overdue') {
-      list = list.filter((i) => i.isOverdue);
+      list = list.filter((i) => (i.approvalStatus || 'approved') === 'approved' && i.isOverdue);
     } else if (activeTab === 'paid') {
-      list = list.filter((i) => i.derivedStatus === 'paid');
+      list = list.filter((i) => (i.approvalStatus || 'approved') === 'approved' && i.derivedStatus === 'paid');
     }
 
     // 2. Vendor filter
@@ -457,6 +777,14 @@ export function VendorInvoices() {
     setInvDocUrl('');
     setInvDocName('');
     setInvDocId('');
+    setLineItems([blankLine()]);
+    setShowBulkPaste(false);
+    setBulkText('');
+    setBulkParseError('');
+    setInvApprovalAction(canDirectApprove ? 'approve_direct' : 'send_approval');
+    setInvApproverId('');
+    setInvApproverName('');
+    setInvVersionNote('');
     setIsInvoiceModalOpen(true);
   };
 
@@ -614,6 +942,19 @@ export function VendorInvoices() {
     setInvDocUrl(inv.documentUrl || '');
     setInvDocName(inv.documentName || '');
     setInvDocId(inv.documentId || '');
+    setLineItems(loadLineItems(inv.lineItems, inv.description));
+    setShowBulkPaste(false);
+    setBulkText('');
+    setBulkParseError('');
+    // Preserve existing approval state when editing
+    setInvApprovalAction(
+      inv.approvalStatus === 'pending_approval' ? 'send_approval'
+      : inv.approvalStatus === 'draft' ? 'draft'
+      : canDirectApprove ? 'approve_direct' : 'send_approval'
+    );
+    setInvApproverId(inv.approverId || '');
+    setInvApproverName(inv.approverName || '');
+    setInvVersionNote('');
     setIsInvoiceModalOpen(true);
   };
 
@@ -685,6 +1026,18 @@ export function VendorInvoices() {
           documentId: undefined,
         });
       }
+      if (detailInvoice && editingInvoice && detailInvoice.id === editingInvoice.id) {
+        setDetailInvoice((prev) =>
+          prev
+            ? {
+                ...prev,
+                documentUrl: undefined,
+                documentName: undefined,
+                documentId: undefined,
+              }
+            : null
+        );
+      }
       toast.success('Document deleted successfully.');
     } catch {
       toast.error('Failed to delete document from server.');
@@ -722,6 +1075,16 @@ export function VendorInvoices() {
         setInvDocName('');
         setInvDocId('');
       }
+      setDetailInvoice((prev) =>
+        prev
+          ? {
+              ...prev,
+              documentUrl: undefined,
+              documentName: undefined,
+              documentId: undefined,
+            }
+          : null
+      );
       toast.success('Document deleted successfully.');
     } catch {
       toast.error('Failed to delete document from server.');
@@ -799,45 +1162,111 @@ export function VendorInvoices() {
       toast.error('Please enter the invoice number.');
       return;
     }
-    const amt = parseFloat(invAmount);
-    if (isNaN(amt) || amt <= 0) {
-      toast.error('Please enter a valid invoice total amount greater than zero.');
-      return;
-    }
-    if (!invDescription.trim()) {
-      toast.error('Please provide a description of the service or items.');
+
+    // Validate approver selection when sending for approval
+    if (invApprovalAction === 'send_approval' && !invApproverId) {
+      toast.error('Please select an approver before sending for approval.');
       return;
     }
 
+    // Prefer line-items total if any items have been entered, else fall back to manual amount
+    const hasLineItems = lineItems.some((li) => li.desc.trim() || parseAmountInput(li.rate) > 0);
+    const computedAmt = hasLineItems ? lineItemsTotal : parseAmountInput(invAmount);
+    if (isNaN(computedAmt) || computedAmt <= 0) {
+      toast.error('Please add at least one line item with a cost, or enter a total amount.');
+      return;
+    }
+
+    // Build description from line items (or keep manual desc)
+    const lineItemDesc = hasLineItems ? serializeLineItems(lineItems) : invDescription.trim();
+    if (!lineItemDesc) {
+      toast.error('Please provide a description or add line items.');
+      return;
+    }
+
+    // Serialize line items to JSON for storage
+    const lineItemsJson = hasLineItems
+      ? JSON.stringify(
+          lineItems
+            .filter((li) => li.desc.trim() || parseAmountInput(li.rate) > 0)
+            .map((li) => ({ desc: li.desc.trim(), qty: parseFloat(li.qty) || 1, rate: parseAmountInput(li.rate) }))
+        )
+      : undefined;
+
     const cleanVendor = invVendorName.trim();
-    // Check if this vendor is already in the Vendor Directory (ledgerVendors)
     const existingVendor = ledgerVendors.find(
       (v) => v.name.trim().toLowerCase() === cleanVendor.toLowerCase()
     );
     let finalVendorId = existingVendor ? existingVendor.id : (editingInvoice?.vendorId || '');
     if (!finalVendorId) {
-      // Automatically save new vendor to the Vendor Directory (persisted to Supabase & store)
       const newVendorId = crypto.randomUUID();
       addLedgerVendor({ id: newVendorId, name: cleanVendor });
       finalVendorId = newVendorId;
       toast.success(`Saved "${cleanVendor}" to Vendor Directory.`);
     }
 
+    // ── Resolve approval fields ────────────────────────────────────────────────
+    const now = new Date().toISOString();
+    let approvalStatus: VendorInvoice['approvalStatus'] = 'approved';
+    let approverId: string | undefined;
+    let approverName: string | undefined;
+    let approvalRequestedAt: string | undefined;
+    let approvedAt: string | undefined;
+
+    if (invApprovalAction === 'approve_direct') {
+      approvalStatus = 'approved';
+      approvedAt = now;
+    } else if (invApprovalAction === 'send_approval') {
+      approvalStatus = 'pending_approval';
+      approverId = invApproverId;
+      approverName = invApproverName;
+      approvalRequestedAt = now;
+    } else {
+      approvalStatus = 'draft';
+    }
+
     if (editingInvoice) {
+      // Build a new version snapshot if amount changed or explicitly noted
+      const prevAmt = editingInvoice.totalAmount;
+      const versionNote = invVersionNote.trim() ||
+        (computedAmt !== prevAmt ? `Amount revised from ₦${fmt(prevAmt)} → ₦${fmt(computedAmt)}` : 'Invoice edited');
+
+      const existingVersions: InvoiceVersion[] = editingInvoice.versions || [];
+      const newVersion: InvoiceVersion = {
+        version: existingVersions.length + 1,
+        amount: prevAmt,
+        description: editingInvoice.description,
+        editedBy: currentUser?.name || 'User',
+        editedAt: now,
+        note: versionNote,
+      };
+
       updateVendorInvoice(editingInvoice.id, {
         vendorName: cleanVendor,
         vendorId: finalVendorId || cleanVendor,
         invoiceNumber: invNumber.trim(),
         dateReceived: invDateReceived,
         dueDate: invDueDate || undefined,
-        totalAmount: amt,
-        description: invDescription.trim(),
+        totalAmount: computedAmt,
+        description: lineItemDesc,
+        lineItems: lineItemsJson,
         notes: invNotes.trim() || undefined,
         documentUrl: invDocUrl || undefined,
         documentName: invDocName || undefined,
         documentId: invDocId || undefined,
+        approvalStatus,
+        approverId,
+        approverName,
+        approvalRequestedAt,
+        approvedAt,
+        versions: [...existingVersions, newVersion],
+        // Keep initialAmount as the very first recorded amount
+        initialAmount: editingInvoice.initialAmount ?? prevAmt,
       });
-      toast.success('Vendor invoice updated successfully.');
+      const msg = invApprovalAction === 'send_approval'
+        ? `Invoice updated & sent to ${invApproverName} for approval.`
+        : 'Invoice updated successfully.';
+      toast.success(msg);
     } else {
       const newInv: VendorInvoice = {
         id: crypto.randomUUID(),
@@ -847,21 +1276,35 @@ export function VendorInvoices() {
         invoiceNumber: invNumber.trim(),
         dateReceived: invDateReceived,
         dueDate: invDueDate || undefined,
-        totalAmount: amt,
-        description: invDescription.trim(),
+        totalAmount: computedAmt,
+        initialAmount: computedAmt,
+        description: lineItemDesc,
+        lineItems: lineItemsJson,
         notes: invNotes.trim() || undefined,
         documentUrl: invDocUrl || undefined,
         documentName: invDocName || undefined,
         documentId: invDocId || undefined,
         status: 'unpaid',
+        approvalStatus,
+        approverId,
+        approverName,
+        approvalRequestedAt,
+        approvedAt,
+        versions: [],
         enteredBy: currentUser?.name || 'User',
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       };
       addVendorInvoice(newInv);
-      toast.success('Vendor invoice recorded.');
+      const msg = invApprovalAction === 'send_approval'
+        ? `Invoice sent to ${invApproverName} for approval.`
+        : invApprovalAction === 'draft'
+        ? 'Invoice saved as draft.'
+        : 'Invoice recorded & approved.';
+      toast.success(msg);
     }
 
     setIsInvoiceModalOpen(false);
+    setInvVersionNote('');
   };
 
   const handleDeleteInvoice = async (inv: VendorInvoice) => {
@@ -958,6 +1401,18 @@ export function VendorInvoices() {
 
   // ─── Handlers: Record Payment & Dual Filling ────────────────────────────────
   const handleOpenRecordPayment = (inv: ComputedVendorInvoice, preselectedLedger?: LedgerEntry) => {
+    // Only approved invoices can receive payment disbursements
+    if (!isInvoiceApproved(inv)) {
+      const statusLabel =
+        inv.approvalStatus === 'pending_approval'
+          ? `awaiting approval from ${inv.approverName || 'an approver'}`
+          : inv.approvalStatus === 'rejected'
+            ? 'rejected'
+            : inv.approvalStatus || 'not approved';
+      toast.error(`Cannot record payment: Invoice #${inv.invoiceNumber} is ${statusLabel}. Invoices must be approved before payments can be added.`);
+      return;
+    }
+
     setPayingInvoice(inv);
     setIsBrowsingLedger(false);
     setLedgerSearchQuery('');
@@ -1007,6 +1462,11 @@ export function VendorInvoices() {
 
   const handleSavePayment = () => {
     if (!payingInvoice) return;
+
+    if (!isInvoiceApproved(payingInvoice)) {
+      toast.error(`Cannot record payment: Invoice #${payingInvoice.invoiceNumber} is not approved.`);
+      return;
+    }
 
     const amt = parseFloat(payAmount);
     if (isNaN(amt) || amt <= 0) {
@@ -1191,6 +1651,93 @@ export function VendorInvoices() {
       .slice(0, 15);
   }, [linkingPaymentId, linkingPaymentDate, linkingPaymentAmt, linkVoucherSearch, ledgerEntries, vendorInvoicePayments]);
 
+  // ─── Approval Review Handlers ─────────────────────────────────────────────
+  const handleOpenApprovalReview = (inv: ComputedVendorInvoice) => {
+    setReviewingInvoice(inv);
+    setRejectReason('');
+    setIsRejectingOpen(false);
+    // Seed per-line-item decisions from stored lineItems
+    const items = loadLineItems(inv.lineItems, inv.description);
+    const initial: Record<string, 'approved' | 'flagged' | 'pending'> = {};
+    items.filter(i => i.desc.trim()).forEach(i => { initial[i.id] = 'pending'; });
+    setLineItemDecisions(initial);
+    setIsApprovalReviewModalOpen(true);
+  };
+
+  const handleApproveInvoice = () => {
+    if (!reviewingInvoice) return;
+    const now = new Date().toISOString();
+    updateVendorInvoice(reviewingInvoice.id, {
+      approvalStatus: 'approved',
+      approvedAt: now,
+    });
+    toast.success(`Invoice #${reviewingInvoice.invoiceNumber} approved!`);
+    
+    // Auto-advance to next pending approval in queue if available
+    const remaining = myPendingApprovals.filter((inv) => inv.id !== reviewingInvoice.id);
+    if (remaining.length > 0) {
+      setReviewingInvoice(remaining[0]);
+      setRejectReason('');
+      setIsRejectingOpen(false);
+    } else {
+      setIsApprovalReviewModalOpen(false);
+      setReviewingInvoice(null);
+    }
+  };
+
+  const handleRejectInvoice = () => {
+    if (!reviewingInvoice) return;
+    if (!rejectReason.trim()) {
+      toast.error('Please enter a reason for rejection.');
+      return;
+    }
+    const now = new Date().toISOString();
+    // Push a version snapshot of this rejection
+    const existingVersions: InvoiceVersion[] = reviewingInvoice.versions || [];
+    const rejectionVersion: InvoiceVersion = {
+      version: existingVersions.length + 1,
+      amount: reviewingInvoice.totalAmount,
+      description: reviewingInvoice.description,
+      editedBy: currentUser?.name || 'Approver',
+      editedAt: now,
+      note: `Rejected: ${rejectReason.trim()}`,
+    };
+    updateVendorInvoice(reviewingInvoice.id, {
+      approvalStatus: 'rejected',
+      rejectedAt: now,
+      rejectionReason: rejectReason.trim(),
+      versions: [...existingVersions, rejectionVersion],
+    });
+    toast.info(`Invoice #${reviewingInvoice.invoiceNumber} rejected. Creator notified to revise.`);
+    
+    // Auto-advance to next pending approval in queue if available
+    const remaining = myPendingApprovals.filter((inv) => inv.id !== reviewingInvoice.id);
+    if (remaining.length > 0) {
+      setReviewingInvoice(remaining[0]);
+      setRejectReason('');
+      setIsRejectingOpen(false);
+    } else {
+      setIsApprovalReviewModalOpen(false);
+      setReviewingInvoice(null);
+      setRejectReason('');
+    }
+  };
+
+  // Show approval popup automatically as soon as pending items are detected for the user
+  const hasAutoPromptedRef = useRef(false);
+  useEffect(() => {
+    if (!hasAutoPromptedRef.current && myPendingApprovals.length > 0 && !isApprovalReviewModalOpen) {
+      hasAutoPromptedRef.current = true;
+      const t = setTimeout(() => {
+        setReviewingInvoice(myPendingApprovals[0]);
+        setRejectReason('');
+        setIsRejectingOpen(false);
+        setIsApprovalReviewModalOpen(true);
+      }, 700);
+      return () => clearTimeout(t);
+    }
+  }, [myPendingApprovals, isApprovalReviewModalOpen]);
+
   return (
     <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 p-2.5 sm:p-4 space-y-2">
       {/* ── Compact Inline KPI Strip ─────────────────────────────────────── */}
@@ -1280,6 +1827,21 @@ export function VendorInvoices() {
               }`}
             >
               All Invoices ({invoicesWithBalance.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('awaiting_approval')}
+              className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                activeTab === 'awaiting_approval'
+                  ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-400 shadow-xs font-semibold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-amber-700'
+              }`}
+            >
+              Approvals
+              {summary.pendingApprovalCount > 0 && (
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-none">
+                  {summary.pendingApprovalCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab('overdue')}
@@ -1378,20 +1940,19 @@ export function VendorInvoices() {
           <Table>
             <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-700/80">
               <TableRow className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
-                <TableHead className="py-2 px-4 w-[280px]">Vendor & Invoice</TableHead>
-                <TableHead className="py-2 px-4">Date Received</TableHead>
-                <TableHead className="py-2 px-4">Due Date</TableHead>
-                <TableHead className="py-2 px-4 text-right">Total (₦)</TableHead>
-                <TableHead className="py-2 px-4 text-right">Paid (₦)</TableHead>
-                <TableHead className="py-2 px-4 text-right">Balance Due (₦)</TableHead>
-                <TableHead className="py-2 px-4 text-center">Status</TableHead>
-                <TableHead className="py-2 px-4 text-right">Actions</TableHead>
+                <TableHead className="py-2 px-3 w-[260px]">Vendor & Invoice</TableHead>
+                <TableHead className="py-2 px-3">Date / Due</TableHead>
+                <TableHead className="py-2 px-3 text-right">Total (₦)</TableHead>
+                <TableHead className="py-2 px-3 text-right">Paid (₦)</TableHead>
+                <TableHead className="py-2 px-3 text-right">Balance Due (₦)</TableHead>
+                <TableHead className="py-2 px-3 text-center">Status</TableHead>
+                <TableHead className="py-2 px-3 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100 dark:divide-slate-800">
               {paginatedInvoices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-16 text-center text-slate-400">
+                  <TableCell colSpan={7} className="py-16 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full">
                         <Receipt className="w-6 h-6 text-slate-400" />
@@ -1413,7 +1974,15 @@ export function VendorInvoices() {
                   return (
                     <TableRow
                       key={inv.id}
-                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                      className={`hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer border-l-[3px] ${
+                        inv.approvalStatus === 'approved' || !inv.approvalStatus
+                          ? 'border-l-emerald-400 dark:border-l-emerald-600'
+                          : inv.approvalStatus === 'pending_approval'
+                            ? 'border-l-amber-400 dark:border-l-amber-500'
+                            : inv.approvalStatus === 'rejected'
+                              ? 'border-l-rose-400 dark:border-l-rose-500'
+                              : 'border-l-slate-300 dark:border-l-slate-600'
+                      }`}
                       onClick={() => {
                         setDetailInvoice(inv);
                         setIsDetailModalOpen(true);
@@ -1447,57 +2016,83 @@ export function VendorInvoices() {
                               </button>
                             )}
                             <span className="text-xs text-slate-500 truncate max-w-[160px]">
-                              {inv.description}
+                              {(() => {
+                                if (inv.lineItems) {
+                                  try {
+                                    const parsed = JSON.parse(inv.lineItems);
+                                    const count = Array.isArray(parsed) ? parsed.filter((i: {desc?: string}) => (i.desc || '').trim()).length : 0;
+                                    if (count > 0) return `${count} item${count !== 1 ? 's' : ''}`;
+                                  } catch {}
+                                }
+                                return (inv.description || '').split('\n')[0].slice(0, 60) || '—';
+                              })()}
                             </span>
                           </div>
                         </div>
                       </TableCell>
 
-                      {/* Date Received */}
-                      <TableCell className="py-2 px-4 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        {formatDateDisplay(inv.dateReceived)}
-                      </TableCell>
-
-                      {/* Due Date */}
-                      <TableCell className="py-2 px-4 text-xs whitespace-nowrap">
-                        {inv.dueDate ? (
-                          <div className="flex flex-col">
-                            <span className={inv.isOverdue ? 'text-rose-600 font-semibold' : 'text-slate-600 dark:text-slate-300'}>
-                              {formatDateDisplay(inv.dueDate)}
-                            </span>
-                            {inv.isOverdue && (
-                              <span className="text-[10px] text-rose-500 font-medium">
-                                {inv.daysOverdue}d overdue
+                      {/* Date & Due Date collapsed */}
+                      <TableCell className="py-2 px-3 text-xs whitespace-nowrap">
+                        <div className="flex flex-col leading-tight">
+                          <span className="font-medium text-slate-800 dark:text-slate-200">
+                            {formatDateDisplay(inv.dateReceived)}
+                          </span>
+                          {inv.dueDate ? (
+                            inv.isOverdue ? (
+                              <span className="text-[10px] text-rose-600 font-semibold inline-flex items-center gap-1 mt-0.5" title={`${inv.daysOverdue} days overdue`}>
+                                <span>Due {formatDateDisplay(inv.dueDate)}</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 font-bold">
+                                  {inv.daysOverdue}d
+                                </span>
                               </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-xs">No due date</span>
-                        )}
+                            ) : (
+                              <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                                Due {formatDateDisplay(inv.dueDate)}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[11px] text-slate-400/70 mt-0.5">No due date</span>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Total Amount */}
-                      <TableCell className="py-2 px-4 text-right font-medium text-xs text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                        ₦{fmt(inv.totalAmount)}
+                      <TableCell className="py-2 px-4 text-right whitespace-nowrap">
+                        <div className="font-semibold text-xs text-slate-900 dark:text-slate-100">
+                          ₦{fmt(inv.totalAmount)}
+                        </div>
+                        {inv.initialAmount && inv.initialAmount > inv.totalAmount && (
+                          <div
+                            className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold flex items-center justify-end gap-0.5"
+                            title={`Negotiated from ₦${fmt(inv.initialAmount)} (Saved ₦${fmt(inv.initialAmount - inv.totalAmount)})`}
+                          >
+                            <TrendingDown className="w-2.5 h-2.5" />
+                            <span>-₦{fmt(inv.initialAmount - inv.totalAmount)}</span>
+                          </div>
+                        )}
                       </TableCell>
 
                       {/* Paid Amount & Mini Progress */}
                       <TableCell className="py-2 px-4 text-right whitespace-nowrap">
                         <div className="flex flex-col items-end">
-                          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          <span className={`text-xs font-semibold ${
+                            inv.paidAmount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                          }`}>
                             ₦{fmt(inv.paidAmount)}
                           </span>
-                          <div className="w-16 h-1 bg-slate-100 dark:bg-slate-800 rounded-full mt-1 overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500 rounded-full transition-all"
-                              style={{ width: `${percentPaid}%` }}
-                            />
-                          </div>
+                          {inv.paidAmount > 0 && inv.balanceRemaining > 0 && (
+                            <div className="w-14 h-1 bg-slate-100 dark:bg-slate-800 rounded-full mt-1 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 rounded-full transition-all"
+                                style={{ width: `${percentPaid}%` }}
+                              />
+                            </div>
+                          )}
                         </div>
                       </TableCell>
 
                       {/* Balance Due */}
-                      <TableCell className="py-2 px-4 text-right whitespace-nowrap">
+                      <TableCell className="py-2 px-3 text-right whitespace-nowrap">
                         <span
                           className={`text-xs font-bold ${
                             inv.balanceRemaining > 0
@@ -1510,23 +2105,47 @@ export function VendorInvoices() {
                       </TableCell>
 
                       {/* Status */}
-                      <TableCell className="py-2 px-4 text-center whitespace-nowrap">
-                        <InvoiceStatusBadge status={inv.derivedStatus} isOverdue={inv.isOverdue} />
+                      <TableCell className="py-2 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <UnifiedInvoiceStatusBadge
+                          invoice={inv}
+                          onClickApproval={() => handleOpenApprovalReview(inv)}
+                        />
                       </TableCell>
 
                       {/* Actions */}
-                      <TableCell className="py-2 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="py-2 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           {inv.balanceRemaining > 0 && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleOpenRecordPayment(inv)}
-                              className="h-7 px-2.5 text-xs font-semibold border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-xs"
-                            >
-                              <CreditCard className="w-3 h-3 mr-1 text-blue-600 dark:text-blue-400" />
-                              Pay
-                            </Button>
+                            !isInvoiceApproved(inv) ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const reason =
+                                    inv.approvalStatus === 'pending_approval'
+                                      ? `awaiting approval from ${inv.approverName || 'an approver'}`
+                                      : inv.approvalStatus === 'rejected'
+                                        ? 'rejected'
+                                        : 'not approved';
+                                  toast.info(`Invoice #${inv.invoiceNumber} is ${reason}. Invoices must be approved before payments can be added.`);
+                                }}
+                                title={`Payment locked: invoice is ${inv.approvalStatus === 'pending_approval' ? 'awaiting approval' : inv.approvalStatus || 'not approved'}`}
+                                className="h-7 px-2.5 text-xs font-semibold border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 shadow-xs"
+                              >
+                                <Lock className="w-3 h-3 mr-1 text-amber-500" />
+                                Locked
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenRecordPayment(inv)}
+                                className="h-7 px-2.5 text-xs font-semibold border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-xs"
+                              >
+                                <CreditCard className="w-3 h-3 mr-1 text-blue-600 dark:text-blue-400" />
+                                Pay
+                              </Button>
+                            )
                           )}
 
                           <DropdownMenu>
@@ -1631,7 +2250,7 @@ export function VendorInvoices() {
 
       {/* ── 6. Dialog: Add / Edit Invoice ──────────────────────────────────── */}
       <Dialog open={isInvoiceModalOpen} onOpenChange={setIsInvoiceModalOpen}>
-        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+        <DialogContent className="max-w-xl sm:max-w-2xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
             <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <Receipt className="w-5 h-5 text-slate-600 dark:text-slate-300" />
@@ -1713,48 +2332,211 @@ export function VendorInvoices() {
               </div>
             </div>
 
-            {/* Total Amount & Due Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  Total Amount (₦) <span className="text-rose-500">*</span>
+            {/* ── Line Items ───────────────────────────────────────────────────── */}
+            <div>
+              {/* Section header */}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Line Items <span className="text-rose-500">*</span>
                 </label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={invAmount}
-                  onChange={(e) => setInvAmount(e.target.value)}
-                  className="text-xs h-9 font-semibold text-slate-900 dark:text-slate-100"
-                />
-                {invAmount && !isNaN(parseFloat(invAmount)) && (
-                  <span className="text-[11px] text-slate-500 mt-1 block">
-                    ₦{fmt(parseFloat(invAmount))}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {lineItemsTotal > 0 && (
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                      ₦{fmt(lineItemsTotal)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setShowBulkPaste((v) => !v); setBulkParseError(''); }}
+                    className={`text-[11px] px-2 py-0.5 rounded font-medium transition-colors border ${
+                      showBulkPaste
+                        ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/30 dark:border-amber-700 dark:text-amber-400'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-300 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+                    }`}
+                    title="Paste a bulk list and auto-parse into rows"
+                  >
+                    {showBulkPaste ? '✕ Close bulk paste' : '⚡ Bulk paste'}
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                  Payment Due Date (Optional)
-                </label>
-                <Input
-                  type="date"
-                  value={invDueDate}
-                  onChange={(e) => setInvDueDate(e.target.value)}
-                  className="text-xs h-9"
-                />
+              {/* ── Bulk Paste Panel ── */}
+              {showBulkPaste && (
+                <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 p-2.5 space-y-2">
+                  <textarea
+                    autoFocus
+                    rows={4}
+                    value={bulkText}
+                    onChange={(e) => { setBulkText(e.target.value); setBulkParseError(''); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        handleApplyBulkPaste();
+                      }
+                    }}
+                    placeholder={`Paste list here (supports WhatsApp, quotes, spreadsheets):\n1" Pipe — ₦2,200 × 4 pcs = ₦8,800\n1" Elbow — ₦300 × 11 pcs\nLabour — ₦15,000`}
+                    className="w-full text-xs font-mono p-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  {bulkParseError && (
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400">{bulkParseError}</p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">Ctrl+Enter to parse</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowBulkPaste(false)}
+                        className="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApplyBulkPaste}
+                        disabled={!bulkText.trim()}
+                        className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 transition-colors shadow-xs"
+                      >
+                        Convert to items
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Table Header */}
+              <div className="grid grid-cols-[1fr_56px_110px_90px_24px] gap-2 mb-1 px-1">
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Item / Description</span>
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center">Qty</span>
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-right">Price (₦)</span>
+                <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-right">Total (₦)</span>
+                <span />
+              </div>
+
+              {/* Table Rows */}
+              <div className="space-y-1.5">
+                {lineItems.map((li, idx) => {
+                  const q = parseFloat(li.qty) || 0;
+                  const r = parseAmountInput(li.rate);
+                  const lineTotal = q * r;
+
+                  return (
+                    <div key={li.id} className="grid grid-cols-[1fr_56px_110px_90px_24px] gap-2 items-center">
+                      <input
+                        data-linedesc
+                        placeholder={idx === 0 ? 'e.g. 1" Pipe or Labour' : 'Description'}
+                        value={li.desc}
+                        onChange={(e) => updateLine(li.id, 'desc', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); addLine(li.id); }
+                          if (e.key === 'Backspace' && li.desc === '' && lineItems.length > 1) {
+                            e.preventDefault();
+                            removeLine(li.id);
+                            setTimeout(() => {
+                              const all = document.querySelectorAll<HTMLInputElement>('[data-linedesc]');
+                              all[Math.max(0, idx - 1)]?.focus();
+                            }, 30);
+                          }
+                        }}
+                        onPaste={(e) => {
+                          const text = e.clipboardData.getData('text');
+                          if (text.includes('\n') && text.trim().split('\n').length > 1) {
+                            e.preventDefault();
+                            const parsed = parseBulkText(text);
+                            if (parsed.length > 0) {
+                              setLineItems((prev) => {
+                                const before = prev.slice(0, idx).filter((l) => l.desc.trim() || parseAmountInput(l.rate) > 0);
+                                const after = prev.slice(idx + 1).filter((l) => l.desc.trim() || parseAmountInput(l.rate) > 0);
+                                return [...before, ...parsed, ...after];
+                              });
+                            }
+                          }
+                        }}
+                        className="h-8 px-2 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                      />
+
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="1"
+                        value={li.qty}
+                        onChange={(e) => updateLine(li.id, 'qty', e.target.value.replace(/[^0-9.]/g, ''))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); addLine(li.id); }
+                        }}
+                        className="h-8 px-1 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-center font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                      />
+
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0"
+                        value={li.rate}
+                        onChange={(e) => updateLine(li.id, 'rate', formatAmountInput(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey && idx === lineItems.length - 1)) {
+                            e.preventDefault();
+                            addLine(li.id);
+                          }
+                        }}
+                        className="h-8 px-2 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                      />
+
+                      <div className="h-8 flex items-center justify-end px-1 text-xs font-mono font-medium text-slate-700 dark:text-slate-300 tabular-nums">
+                        {lineTotal > 0 ? (
+                          <span>₦{fmt(lineTotal)}</span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600">—</span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => removeLine(li.id)}
+                        disabled={lineItems.length === 1 && !li.desc && !li.rate}
+                        className="h-6 w-6 flex items-center justify-center rounded text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 disabled:opacity-0 transition-colors"
+                        title="Remove item"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer: Add item button & Live total summary */}
+              <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => addLine()}
+                  className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add line item
+                  <span className="ml-1 text-slate-400 text-[10px] font-normal">(or press Enter / Tab)</span>
+                </button>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    {lineItems.filter((l) => l.desc.trim() || parseAmountInput(l.rate) > 0).length} item{lineItems.length === 1 ? '' : 's'}
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700">·</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 font-mono tabular-nums">
+                    Total: ₦{fmt(lineItemsTotal)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Description / Service */}
+            {/* Due Date (moved here, removed manual amount — it's auto-calculated) */}
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                Description / Service Rendered <span className="text-rose-500">*</span>
+                Payment Due Date <span className="text-[11px] font-normal text-slate-400">(optional)</span>
               </label>
               <Input
-                placeholder="e.g. Generator diesel supply 1,000L or Office plumbing repairs"
-                value={invDescription}
-                onChange={(e) => setInvDescription(e.target.value)}
+                type="date"
+                value={invDueDate}
+                onChange={(e) => setInvDueDate(e.target.value)}
                 className="text-xs h-9"
               />
             </div>
@@ -1880,6 +2662,94 @@ export function VendorInvoices() {
             </div>
           </div>
 
+          {/* ── Approval Routing Section ── */}
+          <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Approval Routing</p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              {/* Route options */}
+              <div className="flex flex-wrap gap-1.5">
+                {canDirectApprove && (
+                  <button
+                    type="button"
+                    onClick={() => setInvApprovalAction('approve_direct')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      invApprovalAction === 'approve_direct'
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-emerald-400'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Approve Directly
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setInvApprovalAction('send_approval')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    invApprovalAction === 'send_approval'
+                      ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-amber-400'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Send for Approval
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInvApprovalAction('draft')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    invApprovalAction === 'draft'
+                      ? 'bg-slate-600 border-slate-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Save as Draft
+                </button>
+              </div>
+            </div>
+
+            {/* Approver picker */}
+            {invApprovalAction === 'send_approval' && (
+              <div className="space-y-2">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Select Approver <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={invApproverId}
+                  onChange={(e) => {
+                    const sel = activeUsers.find((u) => u.id === e.target.value);
+                    setInvApproverId(e.target.value);
+                    setInvApproverName(sel?.name || '');
+                  }}
+                  className="w-full text-xs h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 focus:ring-1 focus:ring-amber-500"
+                >
+                  <option value="">-- Choose approver --</option>
+                  {activeUsers.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}{u.role ? ` (${u.role})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Revision note (only when editing) */}
+            {editingInvoice && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Revision Note <span className="text-[11px] font-normal text-slate-400">(optional — auto-generated if blank)</span>
+                </label>
+                <Input
+                  placeholder="e.g. Price revised after negotiation"
+                  value={invVersionNote}
+                  onChange={(e) => setInvVersionNote(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+            )}
+          </div>
+
           <DialogFooter className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 flex items-center justify-end gap-2">
             <Button
               variant="outline"
@@ -1892,10 +2762,22 @@ export function VendorInvoices() {
             <Button
               size="sm"
               onClick={handleSaveInvoice}
-              className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white dark:bg-blue-600 dark:hover:bg-blue-500 dark:text-white text-xs h-9 px-5 font-bold shadow-sm transition-all flex items-center gap-1.5"
+              className={`text-xs h-9 px-5 font-bold shadow-sm transition-all flex items-center gap-1.5 text-white ${
+                invApprovalAction === 'approve_direct'
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : invApprovalAction === 'send_approval'
+                  ? 'bg-amber-500 hover:bg-amber-600'
+                  : 'bg-slate-600 hover:bg-slate-700'
+              }`}
             >
-              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-              {editingInvoice ? 'Save Changes' : 'Record Invoice'}
+              {invApprovalAction === 'approve_direct' && <ShieldCheck className="w-3.5 h-3.5 stroke-[2]" />}
+              {invApprovalAction === 'send_approval' && <Send className="w-3.5 h-3.5" />}
+              {invApprovalAction === 'draft' && <FileText className="w-3.5 h-3.5" />}
+              {invApprovalAction === 'approve_direct'
+                ? (editingInvoice ? 'Save & Approve' : 'Record & Approve')
+                : invApprovalAction === 'send_approval'
+                ? (editingInvoice ? 'Update & Send' : 'Record & Send')
+                : (editingInvoice ? 'Save Draft' : 'Save as Draft')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1930,6 +2812,14 @@ export function VendorInvoices() {
 
           {payingInvoice && (
             <div className="p-6 space-y-4">
+              {/* Approval status warning if somehow opened */}
+              {!isInvoiceApproved(payingInvoice) && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-200 font-medium">
+                  <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>This invoice is currently {payingInvoice.approvalStatus === 'pending_approval' ? 'awaiting approval' : (payingInvoice.approvalStatus || 'not approved')}. Payments cannot be recorded until it is approved.</span>
+                </div>
+              )}
+
               {/* Payment Amount */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -2120,8 +3010,9 @@ export function VendorInvoices() {
 
             <Button
               size="sm"
+              disabled={!isInvoiceApproved(payingInvoice)}
               onClick={handleSavePayment}
-              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white text-xs h-9 px-5 font-bold flex items-center justify-center gap-1.5 w-full sm:w-auto shadow-sm transition-all"
+              className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white text-xs h-9 px-5 font-bold flex items-center justify-center gap-1.5 w-full sm:w-auto shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
               Record Payment
@@ -2150,26 +3041,108 @@ export function VendorInvoices() {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
                       {detailInvoiceComputed.vendorName}
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">{detailInvoiceComputed.description}</p>
+                    {(() => {
+                      const items = loadLineItems(detailInvoiceComputed.lineItems, detailInvoiceComputed.description);
+                      const hasItems = items.some(i => i.desc.trim());
+                      const subtitle = hasItems
+                        ? `${items.filter(i => i.desc.trim()).length} line item${items.filter(i => i.desc.trim()).length !== 1 ? 's' : ''}`
+                        : (detailInvoiceComputed.description || '').split('\n')[0].slice(0, 80);
+                      return subtitle ? (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{subtitle}</p>
+                      ) : null;
+                    })()}
                   </div>
 
                   {detailInvoiceComputed.balanceRemaining > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setIsDetailModalOpen(false);
-                        handleOpenRecordPayment(detailInvoiceComputed);
-                      }}
-                      className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white text-xs h-8 px-3 font-bold shadow-sm"
-                    >
-                      <Plus className="w-3.5 h-3.5 mr-1" />
-                      Add Payment
-                    </Button>
+                    !isInvoiceApproved(detailInvoiceComputed) ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const reason =
+                            detailInvoiceComputed.approvalStatus === 'pending_approval'
+                              ? `awaiting approval from ${detailInvoiceComputed.approverName || 'an approver'}`
+                              : detailInvoiceComputed.approvalStatus === 'rejected'
+                                ? 'rejected'
+                                : 'not approved';
+                          toast.info(`Invoice #${detailInvoiceComputed.invoiceNumber} is ${reason}. Invoices must be approved before payments can be added.`);
+                        }}
+                        title={`Payment locked: invoice is ${detailInvoiceComputed.approvalStatus === 'pending_approval' ? 'awaiting approval' : detailInvoiceComputed.approvalStatus || 'not approved'}`}
+                        className="text-xs h-8 px-3 font-semibold border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/30 shadow-xs"
+                      >
+                        <Lock className="w-3.5 h-3.5 mr-1 text-amber-500" />
+                        Payment Locked
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setIsDetailModalOpen(false);
+                          handleOpenRecordPayment(detailInvoiceComputed);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white text-xs h-8 px-3 font-bold shadow-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Add Payment
+                      </Button>
+                    )
                   )}
                 </div>
               </DialogHeader>
 
               <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+                {/* Approval & Payment Status Alert Banner */}
+                {!isInvoiceApproved(detailInvoiceComputed) && (
+                  <div className={`p-3.5 rounded-xl border flex items-start justify-between gap-3 ${
+                    detailInvoiceComputed.approvalStatus === 'rejected'
+                      ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/70 text-rose-800 dark:text-rose-200'
+                      : 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/70 text-amber-800 dark:text-amber-200'
+                  }`}>
+                    <div className="flex items-start gap-2.5">
+                      <Lock className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div className="text-xs space-y-1">
+                        <p className="font-bold flex items-center gap-1.5">
+                          <span>
+                            {detailInvoiceComputed.approvalStatus === 'rejected'
+                              ? 'Invoice Rejected — Payments Locked'
+                              : 'Pending Approval — Payments Locked'}
+                          </span>
+                        </p>
+                        <p className="opacity-90 leading-relaxed text-[11px]">
+                          {detailInvoiceComputed.approvalStatus === 'rejected'
+                            ? `This invoice was rejected${detailInvoiceComputed.rejectionReason ? `: "${detailInvoiceComputed.rejectionReason}"` : ''}. Payments cannot be added until the invoice is revised and approved.`
+                            : `This invoice is awaiting review from ${detailInvoiceComputed.approverName || 'an approver'}. Only approved invoices are eligible for payment disbursements.`}
+                        </p>
+                      </div>
+                    </div>
+                    {/* Direct actions from banner */}
+                    {detailInvoiceComputed.approvalStatus === 'pending_approval' &&
+                     detailInvoiceComputed.approverId === (currentUser?.id || currentUser?.name) ? (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setIsDetailModalOpen(false);
+                          handleOpenApprovalReview(detailInvoiceComputed);
+                        }}
+                        className="h-7 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0 shadow-xs"
+                      >
+                        Review Now
+                      </Button>
+                    ) : detailInvoiceComputed.approvalStatus === 'rejected' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setIsDetailModalOpen(false);
+                          handleOpenEditInvoice(detailInvoiceComputed);
+                        }}
+                        className="h-7 px-2.5 text-xs border-rose-300 dark:border-rose-700 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-300 font-semibold shrink-0"
+                      >
+                        Revise Invoice
+                      </Button>
+                    ) : null}
+                  </div>
+                )}
                 {/* Financial Summary Card */}
                 <div className="grid grid-cols-3 gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/70 dark:border-slate-700">
                   <div>
@@ -2219,6 +3192,52 @@ export function VendorInvoices() {
                     </span>
                   </div>
                 </div>
+
+                {/* Line Items Breakdown */}
+                {(() => {
+                  const items = loadLineItems(detailInvoiceComputed.lineItems, detailInvoiceComputed.description);
+                  const hasStructured = items.some(i => i.desc.trim());
+                  if (!hasStructured) return null;
+                  const total = items.reduce((s, i) => s + (parseFloat(i.qty || '1') || 1) * (parseAmountInput(i.rate)), 0);
+                  return (
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700/60">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Line Items</span>
+                        <span className="text-[10px] text-slate-400">{items.filter(i => i.desc.trim()).length} item{items.filter(i => i.desc.trim()).length !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {items.filter(i => i.desc.trim()).map((item, idx) => {
+                          const qty = parseFloat(item.qty || '1') || 1;
+                          const rate = parseAmountInput(item.rate);
+                          const lineTotal = qty * rate;
+                          const hasQtyRate = rate > 0;
+                          return (
+                            <div key={item.id || idx} className="flex items-baseline justify-between gap-3 px-3 py-2 text-xs hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                              <div className="flex items-baseline gap-2 min-w-0 flex-1">
+                                <span className="text-[10px] text-slate-400 font-mono shrink-0 w-4 text-right">{idx + 1}.</span>
+                                <span className="text-slate-800 dark:text-slate-200 leading-snug">{item.desc}</span>
+                              </div>
+                              {hasQtyRate ? (
+                                <div className="flex items-baseline gap-3 shrink-0 text-right">
+                                  {qty !== 1 && (
+                                    <span className="text-[11px] text-slate-400 font-mono">{qty} × ₦{fmt(rate)}</span>
+                                  )}
+                                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 font-mono">₦{fmt(lineTotal)}</span>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {total > 0 && (
+                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700/60">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100 font-mono">₦{fmt(total)}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {detailInvoiceComputed.notes && (
                   <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-lg text-xs text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-800">
@@ -2363,8 +3382,16 @@ export function VendorInvoices() {
                   </div>
 
                   {detailPayments.length === 0 ? (
-                    <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 text-xs">
-                      No payments recorded yet for this invoice.
+                    <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-slate-400 text-xs flex flex-col items-center justify-center gap-1.5">
+                      {!isInvoiceApproved(detailInvoiceComputed) ? (
+                        <>
+                          <Lock className="w-5 h-5 text-amber-500 mb-0.5" />
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">Payments are currently locked</span>
+                          <span className="text-[11px] text-slate-400">This invoice must be approved before payments can be recorded.</span>
+                        </>
+                      ) : (
+                        <span>No payments recorded yet for this invoice.</span>
+                      )}
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/70 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
@@ -2928,148 +3955,404 @@ export function VendorInvoices() {
 
       {/* ── 10. Dialog: Add / Edit Vendor Modal ─────────────────────────────── */}
       <Dialog open={isVendorModalOpen} onOpenChange={setIsVendorModalOpen} className="!z-[10050]">
-        <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh]">
-          <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800/60 rounded-xl">
-                <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
-                  {editingVendorId ? 'Edit Vendor Profile' : 'Register New Vendor'}
-                </DialogTitle>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {editingVendorId
-                    ? 'Update profile details, contact information, settlement bank, and notes.'
-                    : 'Add a new vendor with settlement details to the directory.'}
-                </p>
-              </div>
+        <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center gap-2.5 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="p-1.5 bg-blue-50 dark:bg-blue-950/50 rounded-lg shrink-0">
+              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
-          </DialogHeader>
+            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-none">
+              {editingVendorId ? 'Edit Vendor' : 'New Vendor'}
+            </DialogTitle>
+          </div>
 
-          <div className="p-6 overflow-y-auto space-y-4 text-xs">
-            {/* Vendor Name & TIN */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                  Vendor / Company Name <span className="text-rose-500">*</span>
-                </label>
-                <Input
-                  placeholder="e.g. Amorsil Energy Ltd"
-                  value={vendorFormName}
-                  onChange={(e) => setVendorFormName(e.target.value)}
-                  className="h-9 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1">
-                  TIN Number <span className="text-slate-400 font-normal">(Tax ID)</span>
-                </label>
-                <Input
-                  placeholder="e.g. 10293847-0001"
-                  value={vendorFormTin}
-                  onChange={(e) => setVendorFormTin(e.target.value)}
-                  className="h-9 text-xs font-mono border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                />
-              </div>
+          {/* Body */}
+          <div
+            className="px-5 py-4 space-y-2.5"
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveVendorModal(); } }}
+          >
+            {/* Name */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Name</span>
+              <input
+                autoFocus
+                value={vendorFormName}
+                onChange={(e) => setVendorFormName(e.target.value)}
+                className="flex-1 text-xs font-medium text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Company name"
+              />
             </div>
 
-            {/* Phone Number & Address */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
-                  <Phone className="w-3 h-3 text-slate-400" /> Phone Number
-                </label>
-                <Input
-                  placeholder="e.g. +234 803 123 4567"
-                  value={vendorFormPhone}
-                  onChange={(e) => setVendorFormPhone(e.target.value)}
-                  className="h-9 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
-                  <MapPin className="w-3 h-3 text-slate-400" /> Address / Office Location
-                </label>
-                <Input
-                  placeholder="e.g. Plot 12 Commercial Ave, Lagos"
-                  value={vendorFormAddress}
-                  onChange={(e) => setVendorFormAddress(e.target.value)}
-                  className="h-9 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                />
-              </div>
+            {/* TIN */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">TIN</span>
+              <input
+                value={vendorFormTin}
+                onChange={(e) => setVendorFormTin(e.target.value)}
+                className="flex-1 text-xs font-mono text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Tax ID"
+              />
             </div>
 
-            {/* Account Details: Bank & Account Number */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 space-y-3">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                <Landmark className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Bank & Settlement Details
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Bank Name
-                  </label>
-                  <Input
-                    placeholder="e.g. Zenith Bank, Access Bank..."
-                    list="vendor-bank-suggestions"
-                    value={vendorFormBankName}
-                    onChange={(e) => setVendorFormBankName(e.target.value)}
-                    className="h-9 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  />
-                  <datalist id="vendor-bank-suggestions">
-                    {ledgerBanks.map((b) => (
-                      <option key={b.id} value={b.name} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Account Number
-                  </label>
-                  <Input
-                    placeholder="e.g. 0123456789"
-                    value={vendorFormAccountNumber}
-                    onChange={(e) => setVendorFormAccountNumber(e.target.value)}
-                    className="h-9 text-xs font-mono border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-              </div>
+            {/* Phone */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Phone</span>
+              <input
+                type="tel"
+                value={vendorFormPhone}
+                onChange={(e) => setVendorFormPhone(e.target.value)}
+                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Phone number"
+              />
+            </div>
+
+            {/* Address */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Address</span>
+              <input
+                value={vendorFormAddress}
+                onChange={(e) => setVendorFormAddress(e.target.value)}
+                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Office location"
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+              <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">Bank</span>
+              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+            </div>
+
+            {/* Bank Name */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Bank</span>
+              <input
+                list="vendor-bank-suggestions"
+                value={vendorFormBankName}
+                onChange={(e) => setVendorFormBankName(e.target.value)}
+                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Bank name"
+              />
+              <datalist id="vendor-bank-suggestions">
+                {ledgerBanks.map((b) => <option key={b.id} value={b.name} />)}
+              </datalist>
+            </div>
+
+            {/* Account Number */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Acct No.</span>
+              <input
+                value={vendorFormAccountNumber}
+                onChange={(e) => setVendorFormAccountNumber(e.target.value)}
+                className="flex-1 text-xs font-mono text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Account number"
+              />
             </div>
 
             {/* Notes */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1">
-                <FileText className="w-3 h-3 text-slate-400" /> Notes & Instructions
-              </label>
+            <div className="flex gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0 pt-0.5">Notes</span>
               <textarea
-                rows={3}
-                placeholder="Payment instructions, representative contacts, specific terms..."
+                rows={2}
                 value={vendorFormNotes}
                 onChange={(e) => setVendorFormNotes(e.target.value)}
-                className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Payment instructions, terms..."
               />
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/20 shrink-0 flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsVendorModalOpen(false)}
-              className="text-xs h-8 px-4 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSaveVendorModal}
-              className="text-xs h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
-            >
-              {editingVendorId ? 'Save Changes' : 'Create Vendor'}
-            </Button>
-          </DialogFooter>
+          {/* Footer */}
+          <div className="flex items-center justify-between px-5 pb-5 pt-1 gap-2">
+            <span className="text-[10px] text-slate-400 dark:text-slate-600">↵ Enter to save</span>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsVendorModalOpen(false)}
+                className="text-xs h-8 px-3 text-slate-500 hover:text-slate-700 dark:text-slate-400"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveVendorModal}
+                className="text-xs h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
+              >
+                {editingVendorId ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 11. Approval Review Modal ─────────────────────────────────────────── */}
+      <Dialog
+        open={isApprovalReviewModalOpen}
+        onOpenChange={(open) => {
+          setIsApprovalReviewModalOpen(open);
+          if (!open) { setRejectReason(''); setIsRejectingOpen(false); }
+        }}
+      >
+        <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          {reviewingInvoice && (
+            <>
+              {/* Header */}
+              <DialogHeader className="px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 bg-amber-50/60 dark:bg-amber-950/20">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-xl shrink-0">
+                    <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                      Invoice Approval Required
+                    </DialogTitle>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Submitted by <strong>{reviewingInvoice.enteredBy}</strong> · Awaiting your decision
+                    </p>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              {/* Body */}
+              <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
+                {/* Invoice summary card */}
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">
+                        #{reviewingInvoice.invoiceNumber}
+                      </span>
+                      <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                        {reviewingInvoice.vendorName}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-lg font-black text-slate-900 dark:text-slate-100">₦{fmt(reviewingInvoice.totalAmount)}</span>
+                      {reviewingInvoice.dueDate && (
+                        <p className={`text-[10px] mt-0.5 ${reviewingInvoice.isOverdue ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>
+                          Due {formatDateDisplay(reviewingInvoice.dueDate)}{reviewingInvoice.isOverdue ? ' · OVERDUE' : ''}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="px-4 py-2 text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700/60">
+                    <span>Received: {formatDateDisplay(reviewingInvoice.dateReceived)}</span>
+                    <span>·</span>
+                    <span>By {reviewingInvoice.enteredBy}</span>
+                  </div>
+
+                  {/* Per-Line-Item Review */}
+                  {(() => {
+                    const items = loadLineItems(reviewingInvoice.lineItems, reviewingInvoice.description);
+                    const hasItems = items.some(i => i.desc.trim());
+                    if (!hasItems) {
+                      return (
+                        <div className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                          {reviewingInvoice.description || 'No description provided.'}
+                        </div>
+                      );
+                    }
+                    const flaggedCount = Object.values(lineItemDecisions).filter(d => d === 'flagged').length;
+                    const approvedCount = Object.values(lineItemDecisions).filter(d => d === 'approved').length;
+                    return (
+                      <div>
+                        <div className="flex items-center justify-between px-4 py-1.5 bg-slate-100/60 dark:bg-slate-800/60">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Line Items — Review Each</span>
+                          <div className="flex items-center gap-2 text-[10px]">
+                            {approvedCount > 0 && <span className="text-emerald-600 font-semibold">{approvedCount} ✓</span>}
+                            {flaggedCount > 0 && <span className="text-rose-500 font-semibold">{flaggedCount} flagged</span>}
+                          </div>
+                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {items.filter(i => i.desc.trim()).map((item) => {
+                            const decision = lineItemDecisions[item.id] || 'pending';
+                            const rate = parseAmountInput(item.rate);
+                            const qty = parseFloat(item.qty || '1') || 1;
+                            return (
+                              <div key={item.id} className={`flex items-center justify-between gap-2 px-4 py-2 transition-colors ${
+                                decision === 'approved' ? 'bg-emerald-50/40 dark:bg-emerald-950/20'
+                                : decision === 'flagged' ? 'bg-rose-50/40 dark:bg-rose-950/20'
+                                : ''
+                              }`}>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs text-slate-800 dark:text-slate-200 leading-snug">{item.desc}</p>
+                                  {rate > 0 && (
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                      {qty !== 1 ? `${qty} × ` : ''}₦{fmt(rate * qty)}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    title="Approve this item"
+                                    onClick={() => setLineItemDecisions(prev => ({ ...prev, [item.id]: 'approved' }))}
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all text-xs font-bold ${
+                                      decision === 'approved'
+                                        ? 'bg-emerald-500 border-emerald-500 text-white'
+                                        : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-emerald-400 hover:text-emerald-500'
+                                    }`}
+                                  >✓</button>
+                                  <button
+                                    type="button"
+                                    title="Flag this item for revision"
+                                    onClick={() => setLineItemDecisions(prev => ({ ...prev, [item.id]: 'flagged' }))}
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all text-xs font-bold ${
+                                      decision === 'flagged'
+                                        ? 'bg-rose-500 border-rose-500 text-white'
+                                        : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-rose-400 hover:text-rose-500'
+                                    }`}
+                                  >✗</button>
+                                  <button
+                                    type="button"
+                                    title="Leave pending"
+                                    onClick={() => setLineItemDecisions(prev => ({ ...prev, [item.id]: 'pending' }))}
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center border transition-all text-xs ${
+                                      decision === 'pending'
+                                        ? 'bg-amber-400 border-amber-400 text-white font-bold'
+                                        : 'border-slate-300 dark:border-slate-600 text-slate-400 hover:border-amber-400 hover:text-amber-500'
+                                    }`}
+                                  >~</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {flaggedCount > 0 && (
+                          <div className="px-4 py-2 bg-rose-50/60 dark:bg-rose-950/20 border-t border-rose-100 dark:border-rose-900/40">
+                            <p className="text-[11px] text-rose-600 dark:text-rose-400">
+                              ⚠ {flaggedCount} item{flaggedCount !== 1 ? 's' : ''} flagged — consider rejecting with a note so the submitter can revise.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Negotiated savings indicator */}
+                  {reviewingInvoice.initialAmount && reviewingInvoice.initialAmount > reviewingInvoice.totalAmount && (
+                    <div className="flex items-center gap-1.5 mx-4 mb-3 p-2 bg-teal-50 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/60 rounded-lg">
+                      <TrendingDown className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                      <span className="text-xs text-teal-700 dark:text-teal-300 font-semibold">
+                        Negotiated down from ₦{fmt(reviewingInvoice.initialAmount)} — saving ₦{fmt(reviewingInvoice.initialAmount - reviewingInvoice.totalAmount)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Version history (if any) */}
+                {reviewingInvoice.versions && reviewingInvoice.versions.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Revision History</p>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                      {[...reviewingInvoice.versions].reverse().map((v, i) => (
+                        <div key={i} className="px-3 py-2 text-xs bg-white dark:bg-slate-900 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-700 dark:text-slate-200 truncate">{v.note}</p>
+                            <p className="text-slate-400 text-[11px] mt-0.5">
+                              v{v.version} · {v.editedBy} · {formatDateDisplay(v.editedAt)}
+                            </p>
+                          </div>
+                          <span className="font-mono font-bold text-slate-600 dark:text-slate-300 shrink-0">₦{fmt(v.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejection reason input */}
+                {isRejectingOpen && (
+                  <div className="space-y-1.5 pt-1">
+                    <label className="block text-xs font-semibold text-rose-600 dark:text-rose-400">
+                      Reason for Rejection <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      autoFocus
+                      rows={3}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="Explain what needs to be revised..."
+                      className="w-full text-xs p-2.5 border border-rose-200 dark:border-rose-800/60 rounded-lg bg-rose-50/40 dark:bg-rose-950/20 text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-1 focus:ring-rose-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20">
+                {/* Pending badge showing queue info */}
+                {myPendingApprovals.length > 1 && (
+                  <p className="text-[11px] text-slate-400 mb-3 text-center">
+                    {myPendingApprovals.length} invoices awaiting your approval — reviewing 1 of {myPendingApprovals.length}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-2 justify-end">
+                  {!isRejectingOpen ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsApprovalReviewModalOpen(false)}
+                        className="text-xs h-9 px-4 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                      >
+                        Review Later
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (reviewingInvoice && !rejectReason.trim()) {
+                            const items = loadLineItems(reviewingInvoice.lineItems, reviewingInvoice.description);
+                            const flaggedItems = items.filter(i => lineItemDecisions[i.id] === 'flagged');
+                            if (flaggedItems.length > 0) {
+                              setRejectReason(`Please revise: ${flaggedItems.map(i => i.desc).join(', ')}`);
+                            }
+                          }
+                          setIsRejectingOpen(true);
+                        }}
+                        className="text-xs h-9 px-4 border-rose-200 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-semibold"
+                      >
+                        <ThumbsDown className="w-3.5 h-3.5 mr-1.5" />
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleApproveInvoice}
+                        className="text-xs h-9 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+                      >
+                        <ThumbsUp className="w-3.5 h-3.5 mr-1.5" />
+                        Approve
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsRejectingOpen(false)}
+                        className="text-xs h-9 px-4 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                      >
+                        Back
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleRejectInvoice}
+                        disabled={!rejectReason.trim()}
+                        className="text-xs h-9 px-5 bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-sm disabled:opacity-50"
+                      >
+                        <ThumbsDown className="w-3.5 h-3.5 mr-1.5" />
+                        Confirm Rejection
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

@@ -117,6 +117,7 @@ export const navigation: NavCategory[] = [
       { name: 'Task Reminders', href: '/tasks/reminders', icon: Bell, privKey: 'tasks', privField: 'canViewReminders' },
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Daily Journals', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
+      { name: 'Minutes', href: '/minutes', icon: FileText, privKey: 'minute', privField: 'canView' },
     ],
   },
   {

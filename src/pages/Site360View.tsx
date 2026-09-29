@@ -787,7 +787,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
   const tabs = useMemo(() => [
     { id: 'timeline', label: 'Timeline', show: canViewTimelineTab },
-    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(data.totalBilled).toLocaleString()}` : undefined, show: canViewFinancialsTab },
+    { id: 'financials', label: 'Financials', show: canViewFinancialsTab },
     { id: 'operations', label: 'Operations', count: data.machinesOnSiteCount + data.pumpsOnSite.length, show: canViewOperationsTab },
     { id: 'maintenance', label: 'Maintenance', count: data.siteMaintAssets.length, show: canViewMaintenanceTab },
     { id: 'comms', label: 'Comms', count: data.siteComms.length, show: canViewCommsTab },
@@ -796,8 +796,6 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; count?: number | string }[], [
     canViewTimelineTab,
     canViewFinancialsTab,
-    currentUser?.privileges?.billing?.canViewAmounts,
-    data.totalBilled,
     canViewOperationsTab,
     data.machinesOnSiteCount,
     data.pumpsOnSite.length,

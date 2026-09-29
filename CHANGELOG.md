@@ -2,6 +2,82 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.5] - 2026-09-28
+
+### Features & Enhancements
+
+- **Executive Meeting Minutes Module:**
+  - Added dedicated Executive Meeting Minutes page (`/minutes`) with comprehensive minute authoring, editing, and archiving.
+  - Upgraded dashboard overview with `MetricHeroCard` matching corporate operational standards (Total Minutes, Action Items with sparklines, Converted to Tasks execution rate, and Draft status indicators).
+  - Multi-engine AI synthesis supporting:
+    - **Google Gemini**: Direct multimodal audio processing and transcript structuring.
+    - **Groq**: Ultra-low latency Groq Whisper audio transcription paired with Llama 3.3 70B Versatile and Mixtral LLMs.
+    - **Gladia AI**: High-accuracy audio speech-to-text with multi-speaker diarization and automated executive structuring.
+    - **NotebookLM**: Bridge protocol for deep studio research and transcript synthesis.
+  - **Dynamic AI Settings Key & Model Picker:** The creation modal connects directly to the workspace `api_keys` table in Supabase, displaying saved keys with badges, multi-key selectors, and live model selection (e.g. `gemini-2.0-flash`, `gemini-2.5-flash`, `llama-3.3-70b-versatile`, `gladia accurate`, or custom model IDs).
+  - **Chairperson Combobox:** Supports selecting from company employee roster with avatar initials or freely typing external chairpersons.
+  - **Task Conversion Engine:** Converts minute action items directly into assigned, trackable corporate HR tasks.
+  - **Executive Print / PDF Preview:** Includes configurable print layout with corporate watermark, signatures, and attendance roster.
+
+- **AI Settings Provider Expansion:**
+  - Added Gladia (`gladia`) to supported AI providers and models list in `Settings.tsx`, enabling secure storage and validation of Gladia API keys.
+
+- **Vendor Invoice Notes & Itemization:**
+  - Added dedicated invoice notes and structured line item breakdown to Invoice Detail and Form modals.
+
+### Database Migrations
+
+- `20260928160000_add_notes_and_line_items_to_invoices.sql` — Adds notes and line items schema support to invoices.
+- `20260923160000_merge_ototo_community_2_into_abeokuta.sql` — Merges Ototo Community 2 site records into Abeokuta site.
+
+---
+
+## [2.1.3] - 2026-09-24
+
+### Bug Fixes
+
+- **Vendor Edit Persistence (Critical Fix):**
+  - Fixed a regression where editing a vendor's extended profile fields (`address`, `phone`, `bank name`, `account number`, `notes`) would appear to save but immediately revert to blank on screen.
+  - **Root Cause:** The Supabase realtime subscription handler for `ledger_vendors` in `useDataLoader.ts` only mapped `id`, `name`, and `tin_number` when re-hydrating the store after a database UPDATE event — discarding all other fields. The Supabase DB record was correct, but the in-memory store was overwritten with partial data.
+  - **Fix:** The `INSERT` and `UPDATE` realtime handlers now use `dbToLedgerVendor(newRow)` — the same mapper used during initial data load — ensuring all extended fields are consistently mapped.
+
+### Features
+
+- **Vendor Invoice Line Items & Fast Bulk Parsing:**
+  - Added structured itemized breakdown with auto-calculating quantity, unit rate, and total, with formatted currency inputs.
+  - Implemented fast bulk paste parser supporting natural text and WhatsApp quotes (e.g., `1" Pipe — ₦2,200 × 4 pcs = ₦8,800`, `Labour — ₦15,000`) with instant conversion into itemized rows.
+
+- **Negotiation Tracking & Version History:**
+  - Full revision version control tracking initial quoted amounts, subsequent negotiations, editor identity, and revision timestamps.
+  - Highlights negotiated cost savings (e.g. initial amount vs negotiated final amount) directly in invoice details and review cards.
+
+- **Multi-User Invoice Approval Workflow & Permissions:**
+  - Configurable `canDirectApprove` ledger permission: authorized users can directly create approved invoices, while users without this permission must submit invoices to an approver.
+  - Auto-prompting approval review modal for pending invoices assigned to the active user upon logging in or navigating to Vendor Invoices.
+  - Interactive approval actions (Approve / Reject with required rationale) and real-time status badges across invoice views.
+  - Dedicated "Approvals" filter tab with animated pending count badge.
+  - **Payment Gating for Unapproved Invoices:** Payments cannot be recorded for invoices that are pending approval or rejected. All legacy/existing recorded invoices automatically default to approved status. Interactive "Locked" buttons, status alert banners, and direct "Review Now" / "Revise" shortcuts provide clear guidance.
+
+- **Invoice Document Deletion with Server Purge:**
+  - When removing a document from a vendor invoice (in both the Add/Edit Invoice modal and the Invoice Detail view), the user is now prompted with a confirmation dialog before deletion.
+  - On confirmation, the file is permanently deleted from the media server via `delete.php`.
+  - Includes fallback media ID resolution via `list.php` for older invoices without a stored `document_id`.
+  - Deleting an entire invoice also triggers cleanup for any attached document on the media server.
+
+- **Vendor Edit Modal:**
+  - Vendor editing now opens a full modal dialog with all extended profile fields: Vendor Name, TIN Number, Phone Number, Address, Bank Name, Account Number, and Notes.
+
+- **Invoice Image Upload Support:**
+  - Invoice documents now accept image formats (`.png`, `.jpg`, `.jpeg`, `.webp`) in addition to `.pdf`, `.doc`, `.docx`.
+  - Image previews are displayed above the file bar inside the invoice modal for immediate visual confirmation.
+  - Redesigned `DocPreviewModal.tsx`: replaced full-screen dark overlay with a centered dialog that respects both light and dark themes.
+
+### Database Migrations
+
+- `20260923120001_add_fields_to_ledger_vendors.sql` — Adds `address`, `phone`, `account_number`, `bank_name`, `notes` columns to `public.ledger_vendors`.
+- `20260923130000_add_document_id_to_vendor_invoices.sql` — Adds `document_id TEXT` to `public.vendor_invoices` for reliable media server file deletion.
+- `20260924100000_add_approval_workflow_to_vendor_invoices.sql` — Adds `approval_status`, `approver_id`, `approver_name`, `approval_requested_at`, `approved_at`, `rejected_at`, `rejection_reason`, `versions`, `initial_amount`, and `line_items` to `public.vendor_invoices`.
+
 ---
 
 ## [2.1.1] - 2026-09-18

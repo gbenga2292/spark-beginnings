@@ -119,6 +119,14 @@ export function useSetPageTitle(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, title, subtitle, Array.isArray(deps) ? deps.length : 0, ...deps]);
+
+  // Keep headerButtons continuously synchronized so interactive callbacks/modals never go stale
+  useEffect(() => {
+    if (!dispatch || title === null) return;
+    if (_generation === generationRef.current) {
+      dispatch.setHeaderButtons(buttons);
+    }
+  }, [dispatch, buttons, title]);
 }
 
 /**

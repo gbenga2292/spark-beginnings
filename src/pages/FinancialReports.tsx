@@ -8,7 +8,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
   PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard,
-  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin, Receipt
+  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin, Receipt, Clock
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { Checkbox } from '@/src/components/ui/checkbox';
@@ -30,6 +30,8 @@ import { fetchInvoicesData, fetchLedgerData, fetchEmployeesData } from '@/src/li
 import { SiteSummary } from './SiteSummary';
 import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
+import { OwedServicesReport } from '@/src/components/financial/OwedServicesReport';
+import { cn } from '@/src/lib/utils';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#0284c7', '#0d9488'];
 
@@ -319,12 +321,13 @@ export function FinancialReports() {
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('none');
-  const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat'>('client-account');
+  const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat' | 'owed-services'>('client-account');
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [fullScreenTable, setFullScreenTable] = useState<'ledger' | 'payroll' | 'ledger-breakdown' | null>(null);
+  const [showVatForensics, setShowVatForensics] = useState(false);
 
   useEffect(() => {
     if (rawInvoices.length === 0) {
@@ -393,6 +396,10 @@ export function FinancialReports() {
     'expenses-vat': {
       title: 'Expenses VAT Analysis & Reconciliation',
       subtitle: 'Categorized monthly report of vatable expenses, accumulated VAT, and payment remittances.'
+    },
+    'owed-services': {
+      title: 'Owed Services & Machinery Credit',
+      subtitle: 'Real-time reconciliation of billed machine duration vs. actual logged operational days and credit balances.'
     }
   };
 
@@ -2090,6 +2097,7 @@ export function FinancialReports() {
           <div className="flex gap-1">
             {[
               { id: 'client-account', label: 'Client Account', icon: Landmark },
+              { id: 'owed-services', label: 'Owed Services', icon: Clock },
               { id: 'payroll-summary', label: 'Payroll Summary', icon: Wallet },
               { id: 'site-summary', label: 'Site Summary', icon: Activity, priv: sitesPriv.canViewClientSummary },
               { id: 'ledger-summary', label: 'Ledger Summary', icon: BarChart3 },
@@ -2673,75 +2681,113 @@ export function FinancialReports() {
             </div>
           );
         })()
+      ) : mainTab === 'owed-services' ? (
+        <OwedServicesReport />
       ) : mainTab === 'client-account' ? (
         <>
       {/* Top Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-slate-200">
-          <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Billed</p>
-                <h3 className="text-2xl font-bold font-mono text-slate-800">{formatCurrCompact(globalStats.totalBilled)}</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Total Billed */}
+        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Total Billed</p>
+                <h3 className="text-lg sm:text-2xl font-bold font-mono text-slate-800 dark:text-slate-100 truncate">{formatCurrCompact(globalStats.totalBilled)}</h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100"><ReceiptText className="w-5 h-5" /></div>
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
+                <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start truncate max-w-full">
               Across {invoices.length} invoices
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200">
-          <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Total Collections</p>
-                <h3 className="text-2xl font-bold font-mono text-emerald-600">{formatCurrCompact(globalStats.totalCollectedCash)}</h3>
+        {/* Total Collections */}
+        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Total Collections</p>
+                <h3 className="text-lg sm:text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">{formatCurrCompact(globalStats.totalCollectedCash)}</h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600"><Wallet className="w-5 h-5" /></div>
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800 shrink-0">
+                <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start truncate max-w-full">
               + {formatCurrCompact(globalStats.totalWHT)} WHT
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 border-l-4 border-l-amber-500">
-          <CardContent className="p-5 flex flex-col justify-between h-full relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">Balance Due</p>
-                <h3 className="text-2xl font-bold font-mono text-amber-600">{formatCurrCompact(summaryData.reduce((sum, r) => sum + (r.balance || 0), 0))}</h3>
+        {/* Balance Due */}
+        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Balance Due</p>
+                <h3 className="text-lg sm:text-2xl font-bold font-mono text-amber-600 dark:text-amber-400 truncate">{formatCurrCompact(summaryData.reduce((sum, r) => sum + (r.balance || 0), 0))}</h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600"><Activity className="w-5 h-5" /></div>
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800 shrink-0">
+                <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-              <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${100 - collectionRate}%` }}></div>
+            <div className="w-full">
+              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div className="bg-amber-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, collectionRate))}%` }}></div>
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase mt-1 tracking-wide truncate">{collectionRate}% Collection Eff.</div>
             </div>
-            <div className="text-[10px] text-slate-400 font-semibold uppercase mt-1 tracking-wide">{collectionRate}% Collection Efficiency</div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 border-l-4 border-l-rose-500 relative group overflow-visible">
-          <CardContent className="p-5 flex flex-col justify-between h-full relative cursor-help">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">VAT Liability</p>
-                <h3 className={`text-2xl font-bold font-mono ${globalStats.vatDeficit < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+        {/* VAT Liability */}
+        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-rose-500 relative group overflow-visible shadow-xs hover:shadow-sm transition-all">
+          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative cursor-help">
+            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">VAT Liability</p>
+                <h3 className={`text-lg sm:text-2xl font-bold font-mono truncate ${globalStats.vatDeficit < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                   {globalStats.vatDeficit < 0 ? `(${formatCurrCompact(Math.abs(globalStats.vatDeficit))})` : formatCurrCompact(globalStats.vatDeficit)}
                 </h3>
               </div>
-              <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600"><Landmark className="w-5 h-5" /></div>
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 shrink-0">
+                <Landmark className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-1 rounded-md inline-flex items-center gap-1 self-start border border-dashed border-rose-200">
-              Hover for Forensic Breakdown
-            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowVatForensics(!showVatForensics);
+              }}
+              className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start border border-dashed border-rose-200 dark:border-rose-800 transition-colors truncate max-w-full text-left"
+            >
+              <span className="hidden sm:inline">Hover</span>
+              <span className="sm:hidden inline">Tap</span> for Breakdown
+            </button>
             
-            {/* Hover tooltip for forensic breakdown */}
-            <div className="absolute top-full mt-3 right-0 w-64 bg-slate-900 border border-slate-800 text-slate-100 p-4 rounded-md shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none origin-top-right">
+            {/* Tooltip / Tap popover for forensic breakdown */}
+            <div className={cn(
+              "absolute top-full mt-2 right-0 w-72 sm:w-64 max-w-[calc(100vw-2rem)] bg-slate-900 border border-slate-800 text-slate-100 p-3.5 sm:p-4 rounded-xl shadow-2xl transition-all duration-200 z-[100] origin-top-right",
+              showVatForensics 
+                ? "opacity-100 visible pointer-events-auto" 
+                : "opacity-0 invisible pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto"
+            )}>
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> VAT Forensics</span>
+                    {showVatForensics && (
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.stopPropagation(); setShowVatForensics(false); }}
+                        className="text-slate-400 hover:text-white text-xs px-1 rounded sm:hidden"
+                      >
+                        ✕
+                      </button>
+                    )}
                 </div>
                 
                 <div className="space-y-2 mb-3 max-h-[120px] overflow-y-auto no-scrollbar pr-1">
@@ -2778,20 +2824,33 @@ export function FinancialReports() {
 
       {/* FINANCIAL SUMMARY Ledger - Featured at top */}
       <Card className={`border-slate-200 rounded-md overflow-hidden ${fullScreenTable === 'ledger' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
-        <CardHeader className={`bg-slate-50/50 border-b border-slate-100 pb-0 pt-4 px-0 shrink-0 ${fullScreenTable === 'ledger' ? 'hidden' : ''}`}>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 pb-3">
-            <div className="flex items-center gap-2">
-              <ReceiptText className="w-5 h-5 text-blue-600" />
-              <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Financial Summary Ledger</CardTitle>
+        <CardHeader className={`bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 pb-0 pt-3.5 sm:pt-4 px-0 shrink-0 ${fullScreenTable === 'ledger' ? 'hidden' : ''}`}>
+          <div className="flex flex-row items-center justify-between px-3.5 sm:px-5 pb-3 gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 shrink-0" />
+              <CardTitle className="text-xs sm:text-sm text-slate-800 dark:text-slate-100 uppercase tracking-wide truncate">Financial Summary Ledger</CardTitle>
             </div>
-            <div className="flex items-center gap-2 mt-2 sm:mt-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {priv.canExport && (
-                <Button variant="outline" size="sm" className="gap-2 border-red-200 text-red-700 hover:bg-red-50" onClick={exportLedgerPdf}>
-                  <FileText className="h-4 w-4" /> Export PDF
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-1.5 sm:gap-2 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30 px-2 sm:px-3 h-8" 
+                  onClick={exportLedgerPdf}
+                  title="Export PDF"
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">Export PDF</span>
                 </Button>
               )}
-              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100" onClick={() => toggleFullScreen('ledger')}>
-                <Maximize2 className="h-4 w-4" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1.5 sm:gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 px-2 sm:px-3 h-8" 
+                onClick={() => toggleFullScreen('ledger')}
+                title="Full Screen"
+              >
+                <Maximize2 className="h-4 w-4 shrink-0" />
                 <span className="hidden sm:inline">Full Screen</span>
               </Button>
             </div>

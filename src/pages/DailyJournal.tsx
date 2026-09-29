@@ -674,7 +674,8 @@ export function DailyJournal() {
   const [selectedSiteId, setSelectedSiteId] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'journal' | 'entry' } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchDate, setSearchDate] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [pdfDataUri, setPdfDataUri] = useState('');
   const [pdfExportDate, setPdfExportDate] = useState('');
@@ -745,12 +746,13 @@ export function DailyJournal() {
     return Object.keys(groups)
       .filter(d => {
         const matchesTerm = !searchTerm || d.includes(searchTerm) || groups[d].some(j => j.loggedBy.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesDate = !searchDate || d === searchDate;
-        return matchesTerm && matchesDate;
+        const matchesFrom = !dateFrom || d >= dateFrom;
+        const matchesTo   = !dateTo   || d <= dateTo;
+        return matchesTerm && matchesFrom && matchesTo;
       })
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
       .map(d => ({ date: d, journals: groups[d] }));
-  }, [combinedJournals, searchTerm, searchDate]);
+  }, [combinedJournals, searchTerm, dateFrom, dateTo]);
 
   // Logic to find journals matching the advanced export filters
   const matchingExportJournals = useMemo(() => {
@@ -1486,23 +1488,92 @@ export function DailyJournal() {
           </Button>
         )}
       </div>
-      {/* Search & Filter */}
-      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-2xl">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input placeholder="Search by author or keywords..." className="pl-9 h-10 text-sm border-slate-200 bg-white shadow-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 p-1 rounded-full hover:bg-slate-100"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+      {/* Search & Date-Range Filter */}
+      <div className="flex flex-col gap-2.5 w-full">
+        {/* Row 1: Search */}
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder="Search by author or keywords..."
+              className="pl-9 pr-9 h-10 text-sm border-slate-200 bg-white dark:bg-slate-900 shadow-sm"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="h-3.5 w-3.5 text-slate-400" />
+              </button>
+            )}
+          </div>
+
+          {/* Date range pill group */}
+          <div className="flex items-center gap-0 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden shrink-0">
+            {/* From */}
+            <div className="relative flex items-center px-3 h-full border-r border-slate-200 dark:border-slate-700 min-w-[148px]">
+              <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0 mr-2 pointer-events-none" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1.5 shrink-0 pointer-events-none">From</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)}
+                className="flex-1 min-w-0 text-sm font-medium text-slate-700 dark:text-slate-200 bg-transparent focus:outline-none cursor-pointer"
+              />
+            </div>
+            {/* Separator arrow */}
+            <div className="px-2 text-slate-300 dark:text-slate-600 text-xs font-bold select-none shrink-0">→</div>
+            {/* To */}
+            <div className="relative flex items-center px-3 h-full border-l border-slate-200 dark:border-slate-700 min-w-[148px]">
+              <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0 mr-2 pointer-events-none" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1.5 shrink-0 pointer-events-none">To</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={e => setDateTo(e.target.value)}
+                className="flex-1 min-w-0 text-sm font-medium text-slate-700 dark:text-slate-200 bg-transparent focus:outline-none cursor-pointer"
+              />
+            </div>
+            {/* Clear range button — only shown when at least one date is set */}
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); }}
+                title="Clear date range"
+                className="flex items-center justify-center px-3 h-full border-l border-slate-200 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
-        <div className="relative w-full sm:w-[200px] shrink-0">
-          <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <Input 
-            type="date" 
-            className="pl-9 pr-9 h-10 text-sm border-slate-200 bg-white shadow-sm text-slate-600" 
-            value={searchDate} 
-            onChange={e => setSearchDate(e.target.value)} 
-          />
-          {searchDate && <button onClick={() => setSearchDate('')} className="absolute right-1 top-1.5 p-1.5 rounded-full hover:bg-slate-100 bg-white"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
-        </div>
+
+        {/* Active filter hint */}
+        {(dateFrom || dateTo || searchTerm) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Showing <strong className="text-slate-700 dark:text-slate-200">{grouped.length}</strong> result{grouped.length !== 1 ? 's' : ''}
+              {(dateFrom || dateTo) && (
+                <span className="ml-1">
+                  for{' '}
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">
+                    {dateFrom ? format(new Date(dateFrom + 'T00:00:00'), 'dd MMM yyyy') : '…'}
+                    {' → '}
+                    {dateTo ? format(new Date(dateTo + 'T00:00:00'), 'dd MMM yyyy') : '…'}
+                  </span>
+                </span>
+              )}
+            </span>
+            <button
+              onClick={() => { setSearchTerm(''); setDateFrom(''); setDateTo(''); }}
+              className="text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-red-500 transition-colors flex items-center gap-0.5"
+            >
+              <X className="h-3 w-3" /> Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* List View */}

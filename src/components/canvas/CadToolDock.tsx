@@ -308,7 +308,7 @@ export function CadToolDock({
 
   return (
     <aside
-      className={`photoshop-flyout-container relative flex-shrink-0 flex flex-col items-center bg-white border-r border-slate-200 select-none z-50 shadow-sm transition-all duration-150 overflow-visible ${
+      className={`photoshop-flyout-container relative flex-shrink-0 flex flex-col items-center bg-white border-r border-slate-200 select-none z-20 shadow-sm transition-all duration-150 overflow-visible ${
         isDoubleColumn ? 'w-[82px]' : 'w-11'
       }`}
     >
@@ -390,7 +390,7 @@ export function CadToolDock({
                 {/* ── Photoshop-Style Flyout Popout Submenu ── */}
                 {isFlyoutOpen && hasMultiple && (
                   <div
-                    className="absolute left-full top-0 ml-2 z-[100] bg-white border border-slate-200 rounded-lg shadow-2xl py-1 px-1 min-w-[215px] animate-in fade-in zoom-in-95 duration-100 pointer-events-auto"
+                    className="absolute left-full top-0 ml-2 z-30 bg-white border border-slate-200 rounded-lg shadow-2xl py-1 px-1 min-w-[215px] animate-in fade-in zoom-in-95 duration-100 pointer-events-auto"
                     style={{ filter: 'drop-shadow(0 14px 28px rgba(0,0,0,0.22))' }}
                   >
                     <div className="px-2 py-1 border-b border-slate-100 mb-1 flex items-center justify-between">

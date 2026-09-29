@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import { useAppStore, Invoice, Site } from '@/src/store/appStore';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { normalizeDate } from '@/src/lib/dateUtils';
+import { useNetworkStore } from '@/src/store/networkStore';
 
 export interface ActiveSiteInvoiceMachineDetail {
   id: string;
@@ -103,6 +104,7 @@ export const checkIsInvoiceAuxOnly = (inv: Invoice): boolean => {
 export function useActiveSiteInvoices() {
   const { sites = [], invoices = [], pendingSites = [] } = useAppStore();
   const { dailyMachineLogs = [], siteHoldPeriods = [], sitePumpDates = [], maintenanceAssets = [] } = useOperations();
+  const isOffline = useNetworkStore(s => s.connectionStatus === 'offline');
 
   // Helper to determine if a site is a dewatering project
   const isDewateringSite = useCallback((s: Site) => {
@@ -216,12 +218,11 @@ export function useActiveSiteInvoices() {
 
       // Find all invoices for this site (both paid and unpaid, to track cycle continuity)
       const allSiteInvoices = invoices.filter(inv => {
+        if (inv.siteId) {
+          return inv.siteId === siteId;
+        }
         const invSiteName = (inv.siteName || inv.project || '').trim().toLowerCase();
-        const matchesSite = inv.siteId === siteId || 
-          (siteNameLower && invSiteName === siteNameLower) ||
-          (siteNameLower && siteNameLower.length > 3 && invSiteName.includes(siteNameLower)) ||
-          (siteNameLower && invSiteName.length > 3 && siteNameLower.includes(invSiteName));
-        return matchesSite;
+        return Boolean(siteNameLower && invSiteName === siteNameLower);
       });
 
       // Collect machine IDs for this site from maintenanceAssets and sitePumpDates
@@ -275,6 +276,13 @@ export function useActiveSiteInvoices() {
             const sharesItem = invAuxNames.some(n => otherAuxNames.some(on => on.includes(n) || n.includes(on)));
             if (!sharesItem) return false;
           }
+
+          // A continuous chain requires continuity without a prolonged shutdown gap (> 14 days)
+          // between the current invoice's scheduled end and the subsequent invoice's start.
+          // A gap > 14 days indicates a demobilization / shutdown followed by a restart phase.
+          const gapMs = new Date(otherStart).getTime() - new Date(scheduledEndDate).getTime();
+          const gapDays = gapMs / (1000 * 60 * 60 * 24);
+          if (gapDays > 14) return false;
 
           return true;
         });
@@ -460,11 +468,20 @@ export function useActiveSiteInvoices() {
           totalContractedDays = machineCount * duration;
         }
 
-        // Check for stopped/swapped machines from sitePumpDates
+        // Check for stopped/swapped machines from sitePumpDates.
+        // A pump may have multiple records on the same site (e.g. Phase 1 stopped, Phase 2 active
+        // after returning from the warehouse). Always prefer the ACTIVE record (no pumpStopDate)
+        // so the pump is not incorrectly labelled "Swapped Out".
         const enrichedMachines = siteMachinesArray.map(m => {
-          const pumpDateRec = (sitePumpDates || []).find(pd => 
+          const allPumpDateRecs = (sitePumpDates || []).filter(pd =>
             pd.siteId === siteId && pd.assetId === m.id
           );
+          // Prefer active (no stop date); fall back to most-recently-started stopped record
+          const pumpDateRec =
+            allPumpDateRecs.find(pd => !pd.pumpStopDate) ||
+            allPumpDateRecs.sort((a, b) =>
+              (b.pumpStartDate || '').localeCompare(a.pumpStartDate || '')
+            )[0];
           const isStopped = Boolean(pumpDateRec?.pumpStopDate);
           const stopDate = pumpDateRec?.pumpStopDate || undefined;
           return { ...m, isStopped, stopDate };
@@ -492,7 +509,12 @@ export function useActiveSiteInvoices() {
           // Calculate unlogged past days between machine/invoice start and yesterday.
           // Unlogged days are assumed active (1.0 day/day) unless explicitly logged otherwise or on hold.
           // Note: Auxiliary items (e.g. Sedimentation Tank) are passive rentals, not active pump engines.
-          const pumpDateRec = (sitePumpDates || []).find(pd => pd.siteId === siteId && pd.assetId === m.id);
+          // Use the ACTIVE pump date record (no stop date) so we don't use a Phase-1 start date for
+          // a pump that returned to site in a later phase.
+          const allPDRecs = (sitePumpDates || []).filter(pd => pd.siteId === siteId && pd.assetId === m.id);
+          const pumpDateRec =
+            allPDRecs.find(pd => !pd.pumpStopDate) ||
+            allPDRecs.sort((a, b) => (b.pumpStartDate || '').localeCompare(a.pumpStartDate || ''))[0];
           const mStartStr = pumpDateRec?.pumpStartDate ? normalizeDate(pumpDateRec.pumpStartDate) : startDateStr;
           const mEffectiveStart = mStartStr > startDateStr ? mStartStr : startDateStr;
           const mStopStr = m.stopDate ? normalizeDate(m.stopDate) : undefined;
@@ -500,7 +522,9 @@ export function useActiveSiteInvoices() {
           let mUnloggedDays = 0;
           const mUnloggedDates: string[] = [];
 
-          if (!isInvAuxOnly && !isAuxiliaryAsset(m) && !m.isStopped && mEffectiveStart <= yesterdayStr) {
+          // Skip unlogged-days scan when offline: dailyMachineLogs may be partially
+          // empty if the cache hasn't been seeded yet, causing false "N unlogged days".
+          if (!isOffline && !isInvAuxOnly && !isAuxiliaryAsset(m) && !m.isStopped && mEffectiveStart <= yesterdayStr) {
             const iterDate = new Date(mEffectiveStart);
             let limit = 0;
             while (limit < 365) {
@@ -699,6 +723,33 @@ export function useActiveSiteInvoices() {
         ];
       }
 
+      // If there are currently active/live invoices (daysRemaining >= 0):
+      // The active running pool should only include invoices belonging to the CURRENT deployment phase.
+      // Prior phase invoices (separated by a gap > 14 days before the current phase) must not be lumped
+      // into the active operations pool.
+      const hasLiveInvoices = runningInvoices.some(d => d.daysRemaining >= 0);
+      if (hasLiveInvoices) {
+        const liveInvoices = runningInvoices.filter(d => d.daysRemaining >= 0);
+        const liveChainIds = new Set<string>(liveInvoices.map(d => d.invoice.id));
+        let added = true;
+        while (added) {
+          added = false;
+          runningInvoices.forEach(d => {
+            if (!liveChainIds.has(d.invoice.id) && d.nextInvoiceNumber) {
+              const targetsLive = Array.from(liveChainIds).some(id => {
+                const targetInv = runningInvoices.find(x => x.invoice.id === id);
+                return targetInv?.invoiceNumber === d.nextInvoiceNumber;
+              });
+              if (targetsLive) {
+                liveChainIds.add(d.invoice.id);
+                added = true;
+              }
+            }
+          });
+        }
+        runningInvoices = runningInvoices.filter(d => liveChainIds.has(d.invoice.id));
+      }
+
       // Sort running invoices: lapsed/overdue first, then by daysRemaining
       runningInvoices.sort((a, b) => {
         if (a.isLapsed && !b.isLapsed) return -1;
@@ -838,7 +889,11 @@ export function useActiveSiteInvoices() {
           const stopDate = stoppedM.stopDate;
           const pairedActive = activePumps.find(activeM => {
             if (activeM.predecessors && activeM.predecessors.length > 0) return false;
-            const pumpDateRec = (sitePumpDates || []).find(p => p.siteId === siteId && p.assetId === activeM.id);
+            // Prefer the active pump date record for start-date comparison
+            const allActiveRecs = (sitePumpDates || []).filter(p => p.siteId === siteId && p.assetId === activeM.id);
+            const pumpDateRec =
+              allActiveRecs.find(p => !p.pumpStopDate) ||
+              allActiveRecs.sort((a, b) => (b.pumpStartDate || '').localeCompare(a.pumpStartDate || ''))[0];
             const startD = pumpDateRec?.pumpStartDate;
             if (stopDate && startD) {
               return startD >= stopDate;

@@ -13,6 +13,8 @@ import { useSetPageTitle } from './PageContext';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { isInternalSite } from '@/src/lib/siteUtils';
+import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
+import { useNetworkStore } from '@/src/store/networkStore';
 
 export function parseLedgerLinks(rawIds?: string[] | null): { ids: string[]; amounts?: Record<string, number> } {
   if (!rawIds || rawIds.length === 0) return { ids: [] };
@@ -127,7 +129,7 @@ interface OperationsContextType {
   logDailyActivitiesBulk: (logs: Omit<DailyMachineLog, 'id' | 'created_at'>[]) => Promise<void>;
   deleteDailyLog: (logId: string) => Promise<void>;
   sitePumpDates: AssetPumpDate[];
-  persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null, replacedAssetId?: string | null, swapReason?: string | null) => Promise<void>;
+  persistSitePumpDates: (assetId: string, siteId: string, pumpStartDate: string, pumpStopDate: string | null, replacedAssetId?: string | null, swapReason?: string | null, recordId?: string | null) => Promise<void>;
   swapSiteMachine: (params: {
     siteId: string;
     siteName: string;
@@ -406,6 +408,31 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const fetchData = async () => {
+      const networkStatus = useNetworkStore.getState().connectionStatus;
+
+      // ── Offline path: restore from IndexedDB cache ──────────────────
+      if (networkStatus === 'offline') {
+        console.log('[OperationsContext] Offline – restoring from cache');
+        try {
+          const cached = await cacheGet<{
+            dailyMachineLogs: DailyMachineLog[];
+            sitePumpDates: AssetPumpDate[];
+            siteHoldPeriods: SiteHoldPeriod[];
+          }>('operationsData');
+          if (cached?.data) {
+            if (cached.data.dailyMachineLogs?.length) setDailyMachineLogs(cached.data.dailyMachineLogs);
+            if (cached.data.sitePumpDates?.length) setSitePumpDates(cached.data.sitePumpDates);
+            if (cached.data.siteHoldPeriods?.length) setSiteHoldPeriods(cached.data.siteHoldPeriods);
+            console.log('[OperationsContext] Restored operations data from cache (last updated:', cached.lastUpdated, ')');
+          }
+        } catch (err) {
+          console.error('[OperationsContext] Failed to restore from cache:', err);
+        } finally {
+          setIsLoaded(true);
+        }
+        return;
+      }
+
       try {
         // Helper to fetch all rows from operations_daily_logs (bypassing Supabase's default 1,000 row PostgREST limit)
         const fetchAllDailyLogs = async () => {
@@ -537,8 +564,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           setAssetMovements(dedupedMovements);
         }
 
+        let mappedPumpDates: AssetPumpDate[] = [];
         if (dbPumpDates) {
-          setSitePumpDates(dbPumpDates.map((p: any) => ({
+          mappedPumpDates = dbPumpDates.map((p: any) => ({
             id: p.id,
             assetId: p.asset_id,
             siteId: p.site_id,
@@ -547,11 +575,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             replacedAssetId: p.replaced_asset_id || null,
             swapReason: p.swap_reason || null,
             created_at: p.created_at
-          })));
+          }));
+          setSitePumpDates(mappedPumpDates);
         }
 
+        let mappedHoldPeriods: SiteHoldPeriod[] = [];
         if (dbHoldPeriods) {
-          setSiteHoldPeriods(dbHoldPeriods.map((h: any) => ({
+          mappedHoldPeriods = dbHoldPeriods.map((h: any) => ({
             id: h.id,
             siteId: h.site_id,
             siteName: h.site_name,
@@ -564,7 +594,8 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             resumedBy: h.resumed_by,
             createdAt: h.created_at,
             updatedAt: h.updated_at,
-          })));
+          }));
+          setSiteHoldPeriods(mappedHoldPeriods);
         }
 
         if (dbWaybills) {
@@ -602,8 +633,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           })));
         }
 
+        let mappedDailyLogs: DailyMachineLog[] = [];
         if (dbDailyLogs) {
-          setDailyMachineLogs(dbDailyLogs.map(mapDbRowToDailyMachineLog));
+          mappedDailyLogs = dbDailyLogs.map(mapDbRowToDailyMachineLog);
+          setDailyMachineLogs(mappedDailyLogs);
         }
 
         if (dbMaintenance) {
@@ -656,8 +689,34 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             updated_at: r.updated_at,
           })));
         }
+
+        // ── Persist the unlogged-days-critical datasets to IndexedDB so they
+        //    survive an offline session without showing false "unlogged days". ──
+        cacheSet('operationsData', {
+          dailyMachineLogs: mappedDailyLogs,
+          sitePumpDates: mappedPumpDates,
+          siteHoldPeriods: mappedHoldPeriods,
+        }).catch(err => console.warn('[OperationsContext] Failed to persist operationsData cache:', err));
+
       } catch (error) {
         console.error("Error fetching operations data:", error);
+
+        // ── Network failed mid-session: fall back to cache ───────────────
+        try {
+          const cached = await cacheGet<{
+            dailyMachineLogs: DailyMachineLog[];
+            sitePumpDates: AssetPumpDate[];
+            siteHoldPeriods: SiteHoldPeriod[];
+          }>('operationsData');
+          if (cached?.data) {
+            if (cached.data.dailyMachineLogs?.length) setDailyMachineLogs(cached.data.dailyMachineLogs);
+            if (cached.data.sitePumpDates?.length) setSitePumpDates(cached.data.sitePumpDates);
+            if (cached.data.siteHoldPeriods?.length) setSiteHoldPeriods(cached.data.siteHoldPeriods);
+            console.log('[OperationsContext] Fallback: restored operationsData from cache');
+          }
+        } catch (cacheErr) {
+          console.error('[OperationsContext] Cache fallback also failed:', cacheErr);
+        }
       } finally {
         setIsLoaded(true);
       }
@@ -666,6 +725,80 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       fetchData();
     }
   }, [user]);
+
+  // ── Re-fetch operations data when the app comes back online ────────────────
+  useEffect(() => {
+    const unsub = useNetworkStore.subscribe((state, prev) => {
+      if (
+        user &&
+        state.connectionStatus === 'online' &&
+        (prev as any).connectionStatus !== 'online'
+      ) {
+        console.log('[OperationsContext] Back online – re-fetching operations data…');
+        setIsLoaded(false);
+        // Trigger re-run by forcing the effect: re-call fetchData inline
+        const refetch = async () => {
+          try {
+            const fetchAllDailyLogs = async () => {
+              const PAGE_SIZE = 1000;
+              let allRows: any[] = [];
+              let from = 0;
+              while (true) {
+                const { data, error } = await supabase
+                  .from('operations_daily_logs').select('*')
+                  .order('date', { ascending: false })
+                  .range(from, from + PAGE_SIZE - 1);
+                if (error || !data || data.length === 0) break;
+                allRows.push(...data);
+                if (data.length < PAGE_SIZE) break;
+                from += PAGE_SIZE;
+              }
+              return allRows;
+            };
+            const [
+              { data: dbPumpDates },
+              dbDailyLogs,
+              { data: dbHoldPeriods },
+            ] = await Promise.all([
+              supabase.from('operations_site_pump_dates').select('*'),
+              fetchAllDailyLogs(),
+              supabase.from('site_hold_periods').select('*').order('created_at', { ascending: false }),
+            ]);
+            const mappedLogs: DailyMachineLog[] = dbDailyLogs?.map(mapDbRowToDailyMachineLog) ?? [];
+            const mappedPumps: AssetPumpDate[] = dbPumpDates?.map((p: any) => ({
+              id: p.id, assetId: p.asset_id, siteId: p.site_id,
+              pumpStartDate: p.pump_start_date, pumpStopDate: p.pump_stop_date,
+              replacedAssetId: p.replaced_asset_id || null, swapReason: p.swap_reason || null,
+              created_at: p.created_at
+            })) ?? [];
+            const mappedHolds: SiteHoldPeriod[] = dbHoldPeriods?.map((h: any) => ({
+              id: h.id, siteId: h.site_id, siteName: h.site_name,
+              holdStart: h.hold_start, holdEnd: h.hold_end, holdDays: h.hold_days,
+              holdNote: h.hold_note, resumeNote: h.resume_note,
+              createdBy: h.created_by, resumedBy: h.resumed_by,
+              createdAt: h.created_at, updatedAt: h.updated_at,
+            })) ?? [];
+            setDailyMachineLogs(mappedLogs);
+            setSitePumpDates(mappedPumps);
+            setSiteHoldPeriods(mappedHolds);
+            cacheSet('operationsData', {
+              dailyMachineLogs: mappedLogs,
+              sitePumpDates: mappedPumps,
+              siteHoldPeriods: mappedHolds,
+            }).catch(() => {});
+          } catch (err) {
+            console.error('[OperationsContext] Re-fetch on reconnect failed:', err);
+          } finally {
+            setIsLoaded(true);
+          }
+        };
+        refetch();
+      }
+    });
+    return unsub;
+  }, [user]);
+
+
 
   useEffect(() => {
     const fetchCertificates = async () => {
@@ -2503,11 +2636,15 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     pumpStartDate: string,
     pumpStopDate: string | null,
     replacedAssetId?: string | null,
-    swapReason?: string | null
+    swapReason?: string | null,
+    recordId?: string | null
   ) => {
     try {
-      const existing = sitePumpDates.find(p => p.assetId === assetId && p.siteId === siteId);
-      const id = existing?.id || crypto.randomUUID();
+      const matching = sitePumpDates.filter(p => p.assetId === assetId && p.siteId === siteId);
+      const existing = (recordId ? sitePumpDates.find(p => p.id === recordId) : null) ||
+        matching.find(p => !p.pumpStopDate) ||
+        [...matching].sort((a, b) => (b.pumpStartDate || '').localeCompare(a.pumpStartDate || ''))[0];
+      const id = recordId || existing?.id || crypto.randomUUID();
 
       const payload: Record<string, any> = {
         id,
@@ -2531,7 +2668,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
       const { data, error } = await supabase
         .from('operations_site_pump_dates')
-        .upsert(payload, { onConflict: 'asset_id,site_id' })
+        .upsert(payload, { onConflict: 'id' })
         .select()
         .single();
 
@@ -2549,7 +2686,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       };
 
       setSitePumpDates(prev => {
-        const index = prev.findIndex(p => p.assetId === assetId && p.siteId === siteId);
+        const index = prev.findIndex(p => p.id === data.id);
         if (index >= 0) {
           const updated = [...prev];
           updated[index] = newDateRecord;

@@ -86,13 +86,17 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
   // States for configuring pump dates
   const [isConfiguringPumpDates, setIsConfiguringPumpDates] = useState(false);
   const [configuringMachine, setConfiguringMachine] = useState<{ id: string, name: string } | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [modalStartDate, setModalStartDate] = useState('');
   const [modalStopDate, setModalStopDate] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
 
   const handleOpenPumpDatesModal = (machine: { id: string, name: string }) => {
-    const existing = sitePumpDates?.find(p => p.assetId === machine.id && p.siteId === site.id);
+    const matching = (sitePumpDates || []).filter(p => p.assetId === machine.id && p.siteId === site.id);
+    const existing = matching.find(p => !p.pumpStopDate) ||
+      [...matching].sort((a, b) => (b.pumpStartDate || '').localeCompare(a.pumpStartDate || ''))[0];
     setConfiguringMachine(machine);
+    setSelectedRecordId(existing?.id || null);
     setModalStartDate(existing?.pumpStartDate || '');
     setModalStopDate(existing?.pumpStopDate || '');
     setModalError(null);
@@ -128,10 +132,14 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
         configuringMachine.id,
         site.id,
         modalStartDate,
-        modalStopDate || null
+        modalStopDate || null,
+        undefined,
+        undefined,
+        selectedRecordId
       );
       setIsConfiguringPumpDates(false);
       setConfiguringMachine(null);
+      setSelectedRecordId(null);
     } catch (err) {
       // Error handled in persistSitePumpDates
     }
@@ -141,7 +149,9 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
 
   // Helper to compute machine lineage stats (individual asset vs unbroken slot continuity)
   const getMachineLineageStats = (machineId: string) => {
-    const configured = sitePumpDates?.find(p => p.assetId === machineId && p.siteId === site.id);
+    const matching = (sitePumpDates || []).filter(p => p.assetId === machineId && p.siteId === site.id);
+    const configured = matching.find(p => !p.pumpStopDate) ||
+      [...matching].sort((a, b) => (b.pumpStartDate || '').localeCompare(a.pumpStartDate || ''))[0];
     const thisLogs = dailyMachineLogs.filter(l => l.assetId === machineId && l.siteId === site.id);
     
     const thisActiveDays = thisLogs.reduce((acc, l) => {
@@ -185,11 +195,26 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
       ? assets.find(a => a.id === successorRecord.assetId) || maintenanceAssets.find(ma => ma.id === successorRecord.assetId)
       : null;
 
+    // Calculate metrics for current active stint
+    const currentStintLogs = configured?.pumpStartDate
+      ? thisLogs.filter(l => l.date >= configured.pumpStartDate!)
+      : thisLogs;
+
+    const currentStintActiveDays = currentStintLogs.reduce((acc, l) => {
+      const day = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+      return acc + (day === 'full' ? 1 : day === 'half' ? 0.5 : 0);
+    }, 0);
+
+    const currentStintDiesel = currentStintLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0);
+
     return {
       thisLogCount: thisLogs.length,
       thisActiveDays,
       thisOffDays,
       thisDiesel,
+      currentStintActiveDays,
+      currentStintDiesel,
+      stintCount: matching.length,
       hasPredecessor: predecessorIds.length > 0,
       predecessorName: immediatePredecessor?.name,
       predecessorActiveDays: predActiveDays,
@@ -623,7 +648,9 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                             const inventoryItem = allItems.find(i => i.assetId === machine.id);
                             const isPendingReturn = inventoryItem?.pendingReturnQuantity && inventoryItem.pendingReturnQuantity > 0;
 
-                            const configured = sitePumpDates?.find(p => p.assetId === machine.id && p.siteId === site.id);
+                            const matchingPumps = (sitePumpDates || []).filter(p => p.assetId === machine.id && p.siteId === site.id);
+                            const configured = matchingPumps.find(p => !p.pumpStopDate) ||
+                              [...matchingPumps].sort((a, b) => (b.pumpStartDate || '').localeCompare(a.pumpStartDate || ''))[0];
                             const machineLogs = dailyMachineLogs.filter(l => l.assetId === machine.id && l.siteId === site.id);
                             const earliestLogDate = machineLogs.length > 0
                               ? machineLogs.reduce((acc, log) => log.date < acc ? log.date : acc, machineLogs[0].date)
@@ -636,14 +663,23 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                             const pumpStop = configured?.pumpStopDate || null;
 
                             const formattedRangeText = pumpStart
-                              ? `${formatDisplayDate(pumpStart)} ${pumpStop ? `to ${formatDisplayDate(pumpStop)}` : '(No Stop Date)'}`
+                              ? `${formatDisplayDate(pumpStart)} ${pumpStop ? `to ${formatDisplayDate(pumpStop)}` : '(No Stop Date)'}${matchingPumps.length > 1 ? ` · (${matchingPumps.length} stints)` : ''}`
                               : 'Not configured';
 
-                            // Warn if historical logs exist outside this range
+                            // Warn if historical logs exist outside ALL configured stints on this site
                             const hasLogsOutsideRange = machineLogs.some(log => {
-                              if (pumpStart && log.date < pumpStart) return true;
-                              if (pumpStop && log.date > pumpStop) return true;
-                              return false;
+                              if (matchingPumps.length === 0) {
+                                if (pumpStart && log.date < pumpStart) return true;
+                                if (pumpStop && log.date > pumpStop) return true;
+                                return false;
+                              }
+                              const fallsInAnyStint = matchingPumps.some(p => {
+                                if (!p.pumpStartDate) return false;
+                                if (log.date < p.pumpStartDate) return false;
+                                if (p.pumpStopDate && log.date > p.pumpStopDate) return false;
+                                return true;
+                              });
+                              return !fallsInAnyStint;
                             });
 
                             return (
@@ -711,20 +747,20 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Asset Days</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums" title={`Individual machine active days on site`}>
-                                        {lineage.thisActiveDays}d
+                                      <p className="text-[11px] sm:text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums" title={lineage.stintCount > 1 ? `Current stint: ${lineage.currentStintActiveDays}d · All-time on site: ${lineage.thisActiveDays}d` : `Individual machine active days on site`}>
+                                        {lineage.stintCount > 1 ? `${lineage.currentStintActiveDays}d` : `${lineage.thisActiveDays}d`}
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Slot Total</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums" title={`Continuous site operational days across replacements`}>
-                                        {lineage.cumulativeActiveDays}d
+                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums" title={lineage.stintCount > 1 ? `Current stint: ${lineage.currentStintActiveDays}d · All-time slot: ${lineage.cumulativeActiveDays}d` : `Continuous site operational days across replacements`}>
+                                        {lineage.stintCount > 1 ? `${lineage.currentStintActiveDays}d` : `${lineage.cumulativeActiveDays}d`}
                                       </p>
                                     </div>
                                     <div className="flex flex-col items-center justify-center px-1">
                                       <p className="text-[10px] sm:text-[11px] text-slate-500 mb-1 whitespace-nowrap">Diesel</p>
-                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums" title={`Machine: ${lineage.thisDiesel}L · Slot Total: ${lineage.cumulativeDiesel}L`}>
-                                        {lineage.thisDiesel}L
+                                      <p className="text-[11px] sm:text-xs font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums" title={lineage.stintCount > 1 ? `Current stint: ${lineage.currentStintDiesel}L · All-time on site: ${lineage.thisDiesel}L` : `Machine: ${lineage.thisDiesel}L · Slot Total: ${lineage.cumulativeDiesel}L`}>
+                                        {lineage.stintCount > 1 ? `${lineage.currentStintDiesel}L` : `${lineage.thisDiesel}L`}
                                       </p>
                                     </div>
                                   </div>
@@ -1117,6 +1153,84 @@ export function SiteInventoryView({ site, questionnaire, onBack, onSiteChange, i
                 {modalError}
               </div>
             )}
+
+            {/* List all stints on this site */}
+            {(() => {
+              const machineStints = (sitePumpDates || [])
+                .filter(p => p.assetId === configuringMachine?.id && p.siteId === site.id)
+                .sort((a, b) => (a.pumpStartDate || '').localeCompare(b.pumpStartDate || ''));
+
+              if (machineStints.length === 0) return null;
+
+              return (
+                <div className="space-y-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Deployment Stints ({machineStints.length})
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRecordId(null);
+                        setModalStartDate(new Date().toISOString().split('T')[0]);
+                        setModalStopDate('');
+                        setModalError(null);
+                      }}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 cursor-pointer"
+                    >
+                      + Add New Stint
+                    </button>
+                  </div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {machineStints.map((stint, idx) => {
+                      const isSelected = selectedRecordId === stint.id;
+                      const isOngoing = !stint.pumpStopDate;
+                      return (
+                        <div
+                          key={stint.id}
+                          onClick={() => {
+                            setSelectedRecordId(stint.id);
+                            setModalStartDate(stint.pumpStartDate || '');
+                            setModalStopDate(stint.pumpStopDate || '');
+                            setModalError(null);
+                          }}
+                          className={cn(
+                            "flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-colors",
+                            isSelected
+                              ? "bg-blue-50/90 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700 ring-1 ring-blue-400/30"
+                              : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 hover:bg-slate-100/70"
+                          )}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">
+                              Stint {idx + 1}:
+                            </span>
+                            <span className="font-mono text-slate-600 dark:text-slate-300">
+                              {formatDisplayDate(stint.pumpStartDate)} → {stint.pumpStopDate ? formatDisplayDate(stint.pumpStopDate) : 'Present'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn(
+                              "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                              isOngoing
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                : "bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                            )}>
+                              {isOngoing ? 'Active' : 'Ended'}
+                            </span>
+                            {isSelected && (
+                              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                                Editing
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">

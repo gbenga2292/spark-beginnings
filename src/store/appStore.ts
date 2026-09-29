@@ -205,6 +205,19 @@ export interface CompanyExpense {
 }
 
 // ─── Vendor Invoice & Payments ───────────────────────────────────────────────
+export interface InvoiceVersion {
+  version: number;
+  amount: number;
+  totalAmount?: number;
+  createdAt?: string;
+  createdBy?: string;
+  editedAt: string;
+  editedBy: string;
+  lineItems?: string;
+  description?: string;
+  note?: string;
+}
+
 export interface VendorInvoice {
   id: string;
   workspaceId: string;
@@ -216,10 +229,20 @@ export interface VendorInvoice {
   description: string;
   totalAmount: number;
   status: 'unpaid' | 'partial' | 'paid';
+  approvalStatus?: 'approved' | 'pending_approval' | 'rejected' | 'draft';
+  approverId?: string;
+  approverName?: string;
+  approvalRequestedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  versions?: InvoiceVersion[];
+  initialAmount?: number; // Original v1 amount before negotiation
   notes?: string;
   documentUrl?: string;
   documentName?: string;
   documentId?: string;
+  lineItems?: string; // JSON: Array<{desc:string;qty:number;rate:number}>
   enteredBy: string;
   createdAt: string;
 }
@@ -717,6 +740,17 @@ export interface PendingInvoice {
   technicianAccommodationCountSameAsDay?: boolean;
   technicianAccommodationDuration?: number;
   technicianAccommodationDurationSameAsDay?: boolean;
+  internalNotes?: string;
+  showNotesAsLineItems?: boolean;
+  noteLineItems?: InvoiceNoteLineItem[];
+}
+
+export interface InvoiceNoteLineItem {
+  id: string;
+  desc: string;
+  qty: string | number;
+  rate: string | number;
+  total?: number;
 }
 
 export interface Invoice {
@@ -776,6 +810,9 @@ export interface Invoice {
   technicianAccommodationCountSameAsDay?: boolean;
   technicianAccommodationDuration?: number;
   technicianAccommodationDurationSameAsDay?: boolean;
+  internalNotes?: string;
+  showNotesAsLineItems?: boolean;
+  noteLineItems?: InvoiceNoteLineItem[];
 }
 
 export interface SalaryAdvance {

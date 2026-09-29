@@ -39,7 +39,7 @@ interface DailyLogManagerProps {
 }
 
 export function DailyLogManager({ assetId, assetName, siteId, siteName, initialDate, isEmbedded, onBack }: DailyLogManagerProps) {
-  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates, assets, maintenanceAssets } = useOperations();
+  const { dailyMachineLogs, logDailyActivity, deleteDailyLog, waybills, sitePumpDates, assets, maintenanceAssets, dieselRefills } = useOperations();
   const { employees, attendanceRecords, sites, siteJournalEntries, dailyJournals, updateSite, addDailyJournal, updateDailyJournal, setDailyLogFormDirty } = useAppStore();
   const currentSite = useMemo(() => sites.find(s => s.id === siteId || s.name.toLowerCase().trim() === siteName.toLowerCase().trim()), [sites, siteId, siteName]);
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
@@ -84,6 +84,8 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   const isActive = operationalDay !== 'none';
   const [dieselUsage, setDieselUsage] = useState<string>(selectedLog ? selectedLog.dieselUsage.toString() : '0');
   const [dipstickLevel, setDipstickLevel] = useState<string>(selectedLog?.dipstickLevelLitres != null ? selectedLog.dipstickLevelLitres.toString() : '');
+  /** true = user has manually typed a value; false = field is showing the auto-calculated estimate */
+  const [dipstickIsManual, setDipstickIsManual] = useState<boolean>(selectedLog?.dipstickLevelLitres != null);
   const [isTankFilledToFull, setIsTankFilledToFull] = useState<boolean>(!!selectedLog?.isTankFilledToFull);
   const [supervisorOnSite, setSupervisorOnSite] = useState(selectedLog?.supervisorOnSite || '');
   const [siteStage, setSiteStage] = useState<DewateringStage | ''>('');
@@ -347,6 +349,50 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [dailyMachineLogs, assetId, siteId]);
 
+  /**
+   * Auto-estimate dipstick: last known dipstick reading + refill allocated to this machine today.
+   * Returns null when not enough data to compute.
+   */
+  const estimatedDipstick = useMemo(() => {
+    // Only compute for new logs (not editing an existing one)
+    if (selectedLog) return null;
+
+    // 1. Find the most recent prior log that has a dipstick reading
+    const priorLog = logs
+      .filter(l => l.date < date && l.dipstickLevelLitres != null)
+      .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+    const priorLevel = priorLog?.dipstickLevelLitres ?? null;
+    if (priorLevel == null) return null;
+
+    // 2. Look for a diesel refill allocation for this asset on the selected date
+    const refillToday = (dieselRefills || [])
+      .filter(r => r.date === date && r.siteId === siteId)
+      .flatMap(r => r.machineAllocations)
+      .filter(a => a.assetId === assetId)
+      .reduce((sum, a) => sum + (a.allocatedLitres || 0), 0);
+
+    // 3. Fall back to the diesel usage the operator has entered if no formal refill record exists
+    const refillUsed = refillToday > 0 ? refillToday : (Number(dieselUsage) || 0);
+
+    if (refillUsed <= 0) return null;
+
+    const calculated = priorLevel + refillUsed;
+    // Cap at tank capacity if known
+    return ratedTankCapacity > 0 ? Math.min(calculated, ratedTankCapacity) : calculated;
+  }, [selectedLog, logs, date, siteId, assetId, dieselRefills, dieselUsage, ratedTankCapacity]);
+
+  // Auto-fill dipstick when estimated value changes and operator hasn't typed manually
+  useEffect(() => {
+    if (dipstickIsManual) return;
+    if (estimatedDipstick != null) {
+      setDipstickLevel(estimatedDipstick.toFixed(1));
+    } else {
+      // Reset to blank when switching to a date with no computable estimate
+      setDipstickLevel('');
+    }
+  }, [estimatedDipstick, dipstickIsManual]);
+
   // Background Auto-sync for historical logs with missing supervisor when attendance becomes available
   React.useEffect(() => {
     if (!logs.length || !attendanceRecords.length || !employees.length) return;
@@ -380,18 +426,48 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
   }, [logs, attendanceRecords, employees, findAutoSupervisorForDate, logDailyActivity]);
 
   // Derive effective pump start/stop dates
-  // Configured pump dates override the automatic fallback from earliest log
+  // Supports multi-phase/multi-stint deployments of the same machine on a site
   const pumpDateConfig = useMemo(() => {
-    const configured = sitePumpDates?.find(p => p.assetId === assetId && p.siteId === siteId);
+    const allStints = (sitePumpDates || [])
+      .filter(p => p.assetId === assetId && p.siteId === siteId)
+      .sort((a, b) => (a.pumpStartDate || '').localeCompare(b.pumpStartDate || ''));
+
+    // Prefer currently active stint (no stop date), or most recent stint
+    const activeStint = allStints.find(p => !p.pumpStopDate) || allStints[allStints.length - 1];
+    const isCurrentlyActive = allStints.some(p => !p.pumpStopDate);
+
     const earliestLogDate = logs.length > 0
       ? logs.reduce((acc, log) => log.date < acc ? log.date : acc, logs[0].date)
       : null;
 
-    const effectiveStart = configured?.pumpStartDate || earliestLogDate || null;
-    const effectiveStop = configured?.pumpStopDate || null;
-    const isConfigured = !!configured?.pumpStartDate;
+    const effectiveStart = allStints[0]?.pumpStartDate || activeStint?.pumpStartDate || earliestLogDate || null;
+    // If machine has an active stint without a stop date, effectiveStop is null (still running)
+    const effectiveStop = isCurrentlyActive ? null : (activeStint?.pumpStopDate || null);
+    const isConfigured = allStints.length > 0;
 
-    return { effectiveStart, effectiveStop, isConfigured, configured };
+    // Check if a given date falls inside any valid deployment stint for this site
+    const isDateWithinStints = (dStr: string) => {
+      if (allStints.length === 0) {
+        return !earliestLogDate || dStr >= earliestLogDate;
+      }
+      return allStints.some(s => {
+        if (!s.pumpStartDate) return false;
+        if (dStr < s.pumpStartDate) return false;
+        if (s.pumpStopDate && dStr > s.pumpStopDate) return false;
+        return true;
+      });
+    };
+
+    return {
+      effectiveStart,
+      effectiveStop,
+      isConfigured,
+      configured: activeStint,
+      allStints,
+      activeStint,
+      isCurrentlyActive,
+      isDateWithinStints
+    };
   }, [sitePumpDates, assetId, siteId, logs]);
 
   const lineageInfo = useMemo(() => {
@@ -790,18 +866,17 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
         return;
       }
 
-      // Validate against configured pump date range
-      if (pumpDateConfig.effectiveStart) {
+      // Validate against configured pump date range (supports multi-phase stints)
+      if (pumpDateConfig.isConfigured) {
+        const outOfRange = datesToLog.filter(d => !pumpDateConfig.isDateWithinStints(d));
+        if (outOfRange.length > 0) {
+          toast.error(`Selected date(s) ${outOfRange.slice(0, 2).join(', ')}${outOfRange.length > 2 ? '...' : ''} fall outside the machine's active on-site deployment dates.`);
+          return;
+        }
+      } else if (pumpDateConfig.effectiveStart) {
         const beforeRange = datesToLog.filter(d => d < pumpDateConfig.effectiveStart!);
         if (beforeRange.length > 0) {
           toast.error(`Cannot log before pump start date (${new Date(pumpDateConfig.effectiveStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}).`);
-          return;
-        }
-      }
-      if (pumpDateConfig.effectiveStop) {
-        const afterRange = datesToLog.filter(d => d > pumpDateConfig.effectiveStop!);
-        if (afterRange.length > 0) {
-          toast.error(`Cannot log after pump stop date (${new Date(pumpDateConfig.effectiveStop).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}).`);
           return;
         }
       }
@@ -964,6 +1039,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setOperationalDay('full');
     setDieselUsage('0');
     setDipstickLevel('');
+    setDipstickIsManual(false);
     setIsTankFilledToFull(false);
     setSupervisorOnSite('');
     setClientFeedback('');
@@ -985,6 +1061,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
     setOperationalDay(deriveOpDay(log));
     setDieselUsage(log.dieselUsage.toString());
     setDipstickLevel(log.dipstickLevelLitres != null ? log.dipstickLevelLitres.toString() : '');
+    setDipstickIsManual(log.dipstickLevelLitres != null);
     setIsTankFilledToFull(!!log.isTankFilledToFull);
     setSupervisorOnSite(log.supervisorOnSite || '');
     setClientFeedback(log.clientFeedback || '');
@@ -1426,14 +1503,25 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                     <Calendar className={cn("h-3.5 w-3.5 shrink-0", pumpDateConfig.isConfigured ? "text-blue-500" : "text-amber-500")} />
                     <div className="flex-1 min-w-0">
                       <span className={cn("font-semibold", pumpDateConfig.isConfigured ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300")}>
-                        {pumpDateConfig.isConfigured ? 'Configured Pump Range: ' : 'Auto-detected Range: '}
+                        {pumpDateConfig.isConfigured
+                          ? (pumpDateConfig.allStints.length > 1
+                              ? (pumpDateConfig.isCurrentlyActive ? 'Current Deployment (Active): ' : 'Latest Deployment: ')
+                              : 'Configured Pump Range: ')
+                          : 'Auto-detected Range: '}
                       </span>
                       <span className="font-medium text-slate-700 dark:text-slate-300">
-                        {new Date(pumpDateConfig.effectiveStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {pumpDateConfig.activeStint?.pumpStartDate
+                          ? new Date(pumpDateConfig.activeStint.pumpStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : new Date(pumpDateConfig.effectiveStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                         {pumpDateConfig.effectiveStop
                           ? ` — ${new Date(pumpDateConfig.effectiveStop).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
                           : ' — Ongoing'}
                       </span>
+                      {pumpDateConfig.allStints.length > 1 && (
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 ml-2 font-normal">
+                          (Phase {pumpDateConfig.allStints.length} of {pumpDateConfig.allStints.length} stints on site)
+                        </span>
+                      )}
                     </div>
                     {!pumpDateConfig.isConfigured && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200/50 text-[9px] font-bold px-1.5 py-0 rounded shrink-0">
@@ -1469,6 +1557,7 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                             setOperationalDay(deriveOpDay(existingForNewDate));
                             setDieselUsage(existingForNewDate.dieselUsage.toString());
                             setDipstickLevel(existingForNewDate.dipstickLevelLitres != null ? existingForNewDate.dipstickLevelLitres.toString() : '');
+                            setDipstickIsManual(existingForNewDate.dipstickLevelLitres != null);
                             setIsTankFilledToFull(!!existingForNewDate.isTankFilledToFull);
                             setSupervisorOnSite(existingForNewDate.supervisorOnSite || '');
                             setClientFeedback(existingForNewDate.clientFeedback || '');
@@ -1695,18 +1784,34 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                             <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                               Dipstick Reading (L Remaining)
                             </label>
-                            {ratedTankCapacity > 0 && dipstickLevel && !isNaN(Number(dipstickLevel)) && (
-                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                                {Math.round((Number(dipstickLevel) / ratedTankCapacity) * 100)}% Tank
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              {ratedTankCapacity > 0 && dipstickLevel && !isNaN(Number(dipstickLevel)) && (
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                  {Math.round((Number(dipstickLevel) / ratedTankCapacity) * 100)}% Tank
+                                </span>
+                              )}
+                              {/* Auto-calculated badge */}
+                              {estimatedDipstick != null && !dipstickIsManual && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border border-sky-200 dark:border-sky-700">
+                                  ⚡ Calculated
+                                </span>
+                              )}
+                              {dipstickIsManual && estimatedDipstick != null && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700">
+                                  ✓ Manual
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <Input 
                             type="number" 
                             value={dipstickLevel} 
                             onChange={e => {
-                              setDipstickLevel(e.target.value);
-                              if (ratedTankCapacity > 0 && Number(e.target.value) >= ratedTankCapacity) {
+                              const val = e.target.value;
+                              setDipstickLevel(val);
+                              // Mark as manually entered; suppress auto-fill
+                              setDipstickIsManual(val.trim() !== '');
+                              if (ratedTankCapacity > 0 && Number(val) >= ratedTankCapacity) {
                                 setIsTankFilledToFull(true);
                               } else {
                                 setIsTankFilledToFull(false);
@@ -1715,7 +1820,27 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                             className="h-10 border-slate-200 dark:border-slate-700 rounded-md focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-900 text-xs"
                             placeholder={ratedTankCapacity > 0 ? `e.g. ${ratedTankCapacity * 0.5} (optional)` : 'e.g. 45 (optional)'}
                           />
-                          <p className="text-[10px] text-slate-400 font-medium italic">ground-truth level dipped at end of day</p>
+                          {estimatedDipstick != null && !dipstickIsManual && (
+                            <p className="text-[10px] text-sky-600 dark:text-sky-400 font-medium">
+                              Auto-estimated: prev. reading + today's refill ({estimatedDipstick.toFixed(1)} L). Override by typing.
+                            </p>
+                          )}
+                          {(estimatedDipstick == null || dipstickIsManual) && (
+                            <p className="text-[10px] text-slate-400 font-medium italic">ground-truth level dipped at end of day</p>
+                          )}
+                          {/* Reset to auto-calculated if user wants to revert */}
+                          {dipstickIsManual && estimatedDipstick != null && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDipstickIsManual(false);
+                                setDipstickLevel(estimatedDipstick.toFixed(1));
+                              }}
+                              className="text-[10px] text-sky-600 dark:text-sky-400 hover:underline font-medium"
+                            >
+                              ↩ Reset to calculated ({estimatedDipstick.toFixed(1)} L)
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -2067,8 +2192,9 @@ export function DailyLogManager({ assetId, assetName, siteId, siteName, initialD
                     const opDay = hasLog ? (hasLog.operationalDay ?? (hasLog.isActive ? 'full' : 'none')) : null;
                     const todayStr = new Date().toISOString().split('T')[0];
                     const isFuture = dateStr > todayStr;
-                    const isOutsidePumpRange = !!((pumpDateConfig.effectiveStart && dateStr < pumpDateConfig.effectiveStart) ||
-                                                (pumpDateConfig.effectiveStop && dateStr > pumpDateConfig.effectiveStop));
+                    const isOutsidePumpRange = pumpDateConfig.isConfigured
+                      ? !pumpDateConfig.isDateWithinStints(dateStr)
+                      : !!(pumpDateConfig.effectiveStart && dateStr < pumpDateConfig.effectiveStart);
                     const isDisabled = isFuture || isOutsidePumpRange;
 
                     days.push(

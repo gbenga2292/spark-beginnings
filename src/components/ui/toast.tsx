@@ -35,7 +35,10 @@ type Listener = (toast: Toast) => void;
 const listeners: Listener[] = [];
 
 function emit(toast: Toast) {
-    listeners.forEach(l => l(toast));
+    // Dispatch asynchronously to prevent "Cannot update a component (`ToastContainer`) while rendering a different component"
+    setTimeout(() => {
+        listeners.forEach(l => l(toast));
+    }, 0);
 }
 
 function makeId() {

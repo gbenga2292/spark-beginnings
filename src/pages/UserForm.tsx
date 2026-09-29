@@ -134,6 +134,15 @@ const PRIV_GROUPS: PG[] = [
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Invite' }, { key: 'canEdit', label: 'Conduct/Score' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canConductInterview', label: 'Conduct Interview', special: true }, { key: 'canRecordVerdict', label: 'Record Verdict', special: true }, { key: 'canForwardToOnboarding', label: 'Forward to Onboarding', special: true }] },
       { key: 'disciplinary', label: 'Performance & Conduct', parentKey: 'disciplinary', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }] },
+      { key: 'minute', label: 'Meeting Minutes (Minute)', parentKey: 'minute', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Minutes' },
+          { key: 'canAdd', label: 'Generate / Transcribe' },
+          { key: 'canEdit', label: 'Edit Minutes' },
+          { key: 'canDelete', label: 'Delete Minutes', danger: true },
+          { key: 'canConvertTasks', label: 'Convert to Tasks', special: true },
+          { key: 'canExport', label: 'Export / Print' },
+        ] },
     ],
   },
   {

@@ -495,9 +495,14 @@ export function ActiveSiteAnalytics() {
         });
       });
 
-    // 2. Equipment with pump dates configured
+    // 2. Equipment with pump dates configured (process stopped records first, active records last so active state wins)
     (sitePumpDates || [])
       .filter(pd => pd.siteId === currentSite.id)
+      .sort((a, b) => {
+        if (a.pumpStopDate && !b.pumpStopDate) return -1;
+        if (!a.pumpStopDate && b.pumpStopDate) return 1;
+        return (a.pumpStartDate || '').localeCompare(b.pumpStartDate || '');
+      })
       .forEach(pd => {
         const asset = (assets || []).find(a => a.id === pd.assetId) || (maintenanceAssets || []).find(m => m.id === pd.assetId);
         const name = asset?.name || 'Unknown Pump';

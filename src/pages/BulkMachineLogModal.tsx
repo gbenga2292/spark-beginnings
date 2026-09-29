@@ -24,7 +24,7 @@ interface BulkMachineLogModalProps {
 }
 
 export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machines, date, defaultStartDate, defaultEndDate }: BulkMachineLogModalProps) {
-  const { logDailyActivity, dailyMachineLogs, sitePumpDates, assets } = useOperations();
+  const { logDailyActivity, dailyMachineLogs, sitePumpDates, assets, dieselRefills } = useOperations();
   const { employees, attendanceRecords } = useAppStore();
 
   const dewateringStaff = employees.filter(e => 
@@ -194,6 +194,8 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
     if (isOpen) {
       setStartDate(defaultStartDate || date);
       setEndDate(defaultEndDate || date);
+      const targetDate = defaultStartDate || date;
+
       const initData: Record<string, { 
         operationalDay: OperationalDay; 
         dieselUsage: string;
@@ -201,9 +203,41 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
         isTankFilledToFull: boolean;
         downtimeEntries?: DowntimeEntry[];
       }> = {};
+
       machines.forEach(m => {
-        initData[m.id] = { operationalDay: 'full', dieselUsage: '', dipstickLevel: '', isTankFilledToFull: false, downtimeEntries: [] };
+        // Find the most recent prior log with a dipstick reading for this machine on this site
+        const priorLog = dailyMachineLogs
+          .filter(l => l.assetId === m.id && l.siteId === siteId && l.date < targetDate && l.dipstickLevelLitres != null)
+          .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+        const priorLevel = priorLog?.dipstickLevelLitres ?? null;
+
+        // Find any diesel refill allocation for this machine on the target date
+        const refillAlloc = (dieselRefills || [])
+          .filter(r => r.date === targetDate && r.siteId === siteId)
+          .flatMap(r => r.machineAllocations)
+          .filter(a => a.assetId === m.id)
+          .reduce((sum, a) => sum + (a.allocatedLitres || 0), 0);
+
+        const asset = (assets || []).find(a => a.id === m.id);
+        const tankCap = Number(asset?.tankCapacityLitres) || 0;
+
+        let autoDipstick = '';
+        if (priorLevel != null && refillAlloc > 0) {
+          const calc = priorLevel + refillAlloc;
+          const capped = tankCap > 0 ? Math.min(calc, tankCap) : calc;
+          autoDipstick = capped.toFixed(1);
+        }
+
+        initData[m.id] = { 
+          operationalDay: 'full', 
+          dieselUsage: '', 
+          dipstickLevel: autoDipstick, 
+          isTankFilledToFull: false, 
+          downtimeEntries: [] 
+        };
       });
+
       setMachineData(initData);
       const autoSelected = findAutoSupervisorForDate(defaultStartDate || date);
       setSupervisorOnSite(autoSelected || '');
@@ -389,11 +423,16 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
 
       const promises = datesToLog.flatMap(logDate => {
         return machines.flatMap(m => {
-          // Skip if date is outside the configured pump date range
-          const pd = sitePumpDates?.find(p => p.assetId === m.id && p.siteId === siteId);
-          if (pd && pd.pumpStartDate) {
-            if (logDate < pd.pumpStartDate) return [];
-            if (pd.pumpStopDate && logDate > pd.pumpStopDate) return [];
+          // Skip if date is outside all configured pump date stints on this site
+          const pds = (sitePumpDates || []).filter(p => p.assetId === m.id && p.siteId === siteId);
+          if (pds.length > 0) {
+            const isWithinAnyStint = pds.some(pd => {
+              if (!pd.pumpStartDate) return false;
+              if (logDate < pd.pumpStartDate) return false;
+              if (pd.pumpStopDate && logDate > pd.pumpStopDate) return false;
+              return true;
+            });
+            if (!isWithinAnyStint) return [];
           }
 
           const data = machineData[m.id] || { 
@@ -534,8 +573,22 @@ export function BulkMachineLogModal({ isOpen, onClose, siteId, siteName, machine
                             <p className="text-[9px] text-slate-400 mt-1 font-medium text-center italic">Refill (L)</p>
                           </div>
                           <div className="w-20 shrink-0 flex flex-col">
-                            <Input type="number" min="0" step="0.1" value={data.dipstickLevel} onChange={e => handleDipstickChange(m.id, e.target.value)} placeholder="0" className="h-8 text-xs font-semibold text-right text-cyan-600 dark:text-cyan-400 font-mono" />
-                            <p className="text-[9px] text-slate-400 mt-1 font-medium text-center italic">Dipstick (L)</p>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.1" 
+                              value={data.dipstickLevel} 
+                              onChange={e => handleDipstickChange(m.id, e.target.value)} 
+                              placeholder="0" 
+                              className="h-8 text-xs font-semibold text-right text-cyan-600 dark:text-cyan-400 font-mono" 
+                            />
+                            <p className="text-[9px] mt-1 font-medium text-center italic"
+                              style={{ color: data.dipstickLevel !== '' && (dailyMachineLogs.some(l => l.assetId === m.id && l.siteId === siteId && l.dipstickLevelLitres != null)) ? 'rgb(14 165 233)' : 'rgb(148 163 184)' }}
+                            >
+                              {data.dipstickLevel !== '' && (dailyMachineLogs.some(l => l.assetId === m.id && l.siteId === siteId && l.date < startDate && l.dipstickLevelLitres != null))
+                                ? '⚡ est.'
+                                : 'Dipstick (L)'}
+                            </p>
                           </div>
                           <div className="shrink-0 flex flex-col justify-start">
                             <button

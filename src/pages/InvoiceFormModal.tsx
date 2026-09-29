@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections, AuxiliaryEquipmentItem } from '@/src/store/appStore';
+import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections, AuxiliaryEquipmentItem, InvoiceNoteLineItem } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import {
   ArrowLeft, FileText, Layers, Users, Truck, Settings,
-  CheckCircle, Plus, Trash2, Calendar, History, Info, Mail
+  CheckCircle, Plus, Trash2, Calendar, History, Info, Mail,
+  ChevronDown, StickyNote, X as XIcon, Zap
 } from 'lucide-react';
 import { Input } from '@/src/components/ui/input';
 import { Button } from '@/src/components/ui/button';
@@ -82,6 +83,9 @@ export const initialInvoiceForm = {
   vatScope: 'per_section' as 'overall' | 'per_section',
   auxiliaryEquipment: [] as AuxiliaryEquipmentItem[],
   vatableSections: defaultVatableSectionsDefault,
+  internalNotes: '',
+  showNotesAsLineItems: false,
+  noteLineItems: [] as InvoiceNoteLineItem[],
 };
 
 export function InvoiceFormModal({
@@ -180,6 +184,9 @@ export function InvoiceFormModal({
         vatScope: inv.vatScope || 'per_section',
         auxiliaryEquipment: inv.auxiliaryEquipment ? [...inv.auxiliaryEquipment] : [],
         vatableSections: inv.vatableSections || defaultVatableSections || defaultVatableSectionsDefault,
+        internalNotes: (inv as any).internalNotes || '',
+        showNotesAsLineItems: (inv as any).showNotesAsLineItems || false,
+        noteLineItems: (inv as any).noteLineItems ? [...(inv as any).noteLineItems] : [],
       });
 
       if (initialConfigs && initialConfigs.length > 0) {
@@ -442,6 +449,130 @@ export function InvoiceFormModal({
       auxiliaryEquipment: (prev.auxiliaryEquipment || []).filter((item) => item.id !== id),
     }));
   };
+
+  const [showNoteBulkPaste, setShowNoteBulkPaste] = useState(false);
+  const [noteBulkText, setNoteBulkText] = useState('');
+  const [noteBulkParseError, setNoteBulkParseError] = useState('');
+
+  const handleAddNoteLineItem = () => {
+    const newItem: InvoiceNoteLineItem = {
+      id: generateId(),
+      desc: '',
+      qty: 1,
+      rate: '',
+      total: 0,
+    };
+    setForm((prev) => ({
+      ...prev,
+      showNotesAsLineItems: true,
+      noteLineItems: [...(prev.noteLineItems || []), newItem],
+    }));
+  };
+
+  const handleUpdateNoteLineItem = (id: string, updates: Partial<InvoiceNoteLineItem>) => {
+    setForm((prev) => {
+      const list = (prev.noteLineItems || []).map((item) => {
+        if (item.id !== id) return item;
+        const updated = { ...item, ...updates };
+        const q = parseFloat(String(updated.qty)) || 0;
+        const r = parseFloat(String(updated.rate).replace(/,/g, '')) || 0;
+        updated.total = q * r;
+        return updated;
+      });
+      return { ...prev, noteLineItems: list };
+    });
+  };
+
+  const handleRemoveNoteLineItem = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      noteLineItems: (prev.noteLineItems || []).filter((item) => item.id !== id),
+    }));
+  };
+
+  const handleApplyNoteBulkPaste = () => {
+    const raw = noteBulkText.trim();
+    if (!raw) return;
+    const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const parsed: InvoiceNoteLineItem[] = [];
+
+    for (const line of lines) {
+      const cleanNum = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0;
+
+      // Pattern A: "desc — ₦rate × qty = ₦total"
+      const pA = line.match(/^(.+?)\s*[\u2014\-]{1,2}\s*[₦#]?([\d,\.]+)\s*[×x\*]\s*([\d,\.]+)/i);
+      if (pA) {
+        const desc = pA[1].trim();
+        const rate = cleanNum(pA[2]);
+        const qty = cleanNum(pA[3]) || 1;
+        if (desc && rate > 0) {
+          parsed.push({ id: generateId(), desc, qty, rate, total: qty * rate });
+          continue;
+        }
+      }
+
+      // Pattern B: "desc — ₦rate"
+      const pB = line.match(/^(.+?)\s*[\u2014\-]{1,2}\s*[₦#]?([\d,\.]+)\s*$/i);
+      if (pB) {
+        const desc = pB[1].trim();
+        const rate = cleanNum(pB[2]);
+        if (desc && rate > 0) {
+          parsed.push({ id: generateId(), desc, qty: 1, rate, total: rate });
+          continue;
+        }
+      }
+
+      // Pattern C: "desc: rate" or "desc: rate x qty"
+      const pC = line.match(/^(.+?):\s*[₦#]?([\d,\.]+)(?:\s*[×x\*]\s*([\d,\.]+))?\s*$/i);
+      if (pC) {
+        const desc = pC[1].trim();
+        const rate = cleanNum(pC[2]);
+        const qty = pC[3] ? cleanNum(pC[3]) : 1;
+        if (desc && rate > 0) {
+          parsed.push({ id: generateId(), desc, qty, rate, total: qty * rate });
+          continue;
+        }
+      }
+
+      // Pattern D: tab/space separated: "desc  rate  qty"
+      const parts = line.split(/\t|  +/);
+      if (parts.length >= 2) {
+        const desc = parts[0].trim();
+        const rate = cleanNum(parts[1]);
+        const qty = parts[2] ? cleanNum(parts[2]) : 1;
+        if (desc && rate > 0) {
+          parsed.push({ id: generateId(), desc, qty, rate, total: qty * rate });
+          continue;
+        }
+      }
+
+      // Fallback
+      parsed.push({ id: generateId(), desc: line, qty: 1, rate: 0, total: 0 });
+    }
+
+    if (parsed.length === 0) {
+      setNoteBulkParseError('Could not parse items. Format: Description — ₦rate × qty');
+      return;
+    }
+
+    setNoteBulkParseError('');
+    setForm((prev) => ({
+      ...prev,
+      showNotesAsLineItems: true,
+      noteLineItems: [...(prev.noteLineItems || []), ...parsed],
+    }));
+    setNoteBulkText('');
+    setShowNoteBulkPaste(false);
+  };
+
+  const noteItemsTotal = useMemo(() => {
+    if (!form.showNotesAsLineItems || !form.noteLineItems) return 0;
+    return form.noteLineItems.reduce((acc, item) => {
+      const q = parseFloat(String(item.qty)) || 0;
+      const r = parseFloat(String(item.rate).replace(/,/g, '')) || 0;
+      return acc + q * r;
+    }, 0);
+  }, [form.showNotesAsLineItems, form.noteLineItems]);
 
   const isFormDirty = useMemo(() => {
     if (!open) return false;
@@ -861,6 +992,9 @@ export function InvoiceFormModal({
       technicianAccommodationCountSameAsDay: isAccomCountSame,
       technicianAccommodationDuration: isAccomDurationSame ? undefined : (parseFloat(input.technicianAccommodationDuration) || 0),
       technicianAccommodationDurationSameAsDay: isAccomDurationSame,
+      internalNotes: input.internalNotes,
+      showNotesAsLineItems: input.showNotesAsLineItems,
+      noteLineItems: input.noteLineItems,
     };
   };
 
@@ -943,6 +1077,9 @@ export function InvoiceFormModal({
         technicianAccommodationCountSameAsDay: data.technicianAccommodationCountSameAsDay,
         technicianAccommodationDuration: data.technicianAccommodationDuration,
         technicianAccommodationDurationSameAsDay: data.technicianAccommodationDurationSameAsDay,
+        internalNotes: form.internalNotes || undefined,
+        showNotesAsLineItems: form.showNotesAsLineItems || undefined,
+        noteLineItems: form.showNotesAsLineItems && form.noteLineItems.length > 0 ? form.noteLineItems : undefined,
       };
 
       if (movingFromQuotationToActive) {
@@ -2195,6 +2332,220 @@ export function InvoiceFormModal({
                     </label>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Section 6: Notes & Specifications */}
+            <div className="bg-white dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <div className="bg-slate-50/50 dark:bg-slate-900/50 px-6 py-4 border-b border-slate-155 dark:border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-655 dark:text-slate-350">
+                    <StickyNote className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">
+                      Invoice Notes &amp; Specifications
+                    </h3>
+                    <p className="text-[10px] text-slate-400">Add custom details, instructions, remarks, or itemized note items.</p>
+                  </div>
+                </div>
+
+                {/* Switch toggle for Itemized Line Items */}
+                <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 select-none">
+                    Itemized Breakdown
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.showNotesAsLineItems}
+                    onClick={() => {
+                      const next = !form.showNotesAsLineItems;
+                      setForm((f) => ({
+                        ...f,
+                        showNotesAsLineItems: next,
+                        noteLineItems:
+                          next && (!f.noteLineItems || f.noteLineItems.length === 0)
+                            ? [{ id: generateId(), desc: '', qty: 1, rate: '', total: 0 }]
+                            : f.noteLineItems,
+                      }));
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      form.showNotesAsLineItems ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        form.showNotesAsLineItems ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Note Text Input Field */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Notes / Remarks
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={form.internalNotes || ''}
+                    onChange={(e) => handleChange('internalNotes', e.target.value)}
+                    placeholder="Enter custom invoice details, operational remarks, or instructions..."
+                    className="w-full text-xs p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
+                  />
+                </div>
+
+                {/* If showNotesAsLineItems is toggled on: Line Items Table */}
+                {form.showNotesAsLineItems && (
+                  <div className="pt-2 border-t border-slate-150 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                          Itemized Note Items
+                        </label>
+                        <Badge variant="outline" className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                          {form.noteLineItems?.length || 0} {(form.noteLineItems?.length || 0) === 1 ? 'item' : 'items'}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {noteItemsTotal > 0 && (
+                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                            ₦{noteItemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setShowNoteBulkPaste((v) => !v); setNoteBulkParseError(''); }}
+                          className={`text-[11px] px-2.5 py-1 rounded font-medium transition-colors border ${
+                            showNoteBulkPaste
+                              ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-950/30 dark:border-amber-700 dark:text-amber-400'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-300 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300'
+                          }`}
+                          title="Paste a bulk list and auto-parse into rows"
+                        >
+                          {showNoteBulkPaste ? '✕ Close bulk paste' : '⚡ Bulk paste'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bulk Paste Box */}
+                    {showNoteBulkPaste && (
+                      <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 p-3 space-y-2">
+                        <textarea
+                          autoFocus
+                          rows={3}
+                          value={noteBulkText}
+                          onChange={(e) => { setNoteBulkText(e.target.value); setNoteBulkParseError(''); }}
+                          placeholder={`Paste item list here (e.g. from WhatsApp, quotes or spreadsheets):\n1" Pipe — ₦2,200 × 4 pcs\nElbow — ₦300 × 11 pcs\nLabour — ₦15,000`}
+                          className="w-full text-xs font-mono p-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 resize-y focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                        {noteBulkParseError && (
+                          <p className="text-[11px] text-rose-600 dark:text-rose-400">{noteBulkParseError}</p>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400">Ctrl+Enter to parse</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setShowNoteBulkPaste(false)}
+                              className="px-2.5 py-1 text-xs rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleApplyNoteBulkPaste}
+                              disabled={!noteBulkText.trim()}
+                              className="px-3 py-1 text-xs font-semibold rounded-md bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 transition-colors shadow-xs"
+                            >
+                              Convert to items
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Table Header */}
+                    <div className="grid grid-cols-[1fr_70px_120px_110px_32px] gap-2 mb-1.5 px-1">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Item / Description</span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-center">Qty</span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-right">Price (₦)</span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-right">Total (₦)</span>
+                      <span />
+                    </div>
+
+                    {/* Table Rows */}
+                    <div className="space-y-2">
+                      {(form.noteLineItems || []).map((li, idx) => {
+                        const q = parseFloat(String(li.qty)) || 0;
+                        const r = parseFloat(String(li.rate).replace(/,/g, '')) || 0;
+                        const lineTotal = q * r;
+
+                        return (
+                          <div key={li.id || idx} className="grid grid-cols-[1fr_70px_120px_110px_32px] gap-2 items-center">
+                            <Input
+                              placeholder={idx === 0 ? 'e.g. 1" Pipe or Labour' : 'Description'}
+                              value={li.desc}
+                              onChange={(e) => handleUpdateNoteLineItem(li.id, { desc: e.target.value })}
+                              className="text-xs h-9"
+                            />
+                            <Input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={li.qty}
+                              onChange={(e) => handleUpdateNoteLineItem(li.id, { qty: e.target.value })}
+                              className="text-xs h-9 text-center font-mono"
+                            />
+                            <NumericFormat
+                              customInput={Input}
+                              thousandSeparator
+                              decimalScale={2}
+                              value={li.rate}
+                              onValueChange={(vals) => handleUpdateNoteLineItem(li.id, { rate: vals.value })}
+                              placeholder="0.00"
+                              className="text-xs h-9 text-right font-mono"
+                            />
+                            <div className="text-right font-mono text-xs font-semibold text-slate-700 dark:text-slate-300 pr-1">
+                              {lineTotal > 0 ? `₦${lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveNoteLineItem(li.id)}
+                              className="h-8 w-8 p-0 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Add Line item button */}
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddNoteLineItem}
+                        className="text-xs text-blue-600 dark:text-blue-400 border-dashed border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 gap-1.5 h-8 font-medium"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add line item
+                      </Button>
+                      {noteItemsTotal > 0 && (
+                        <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          Total: <span className="font-mono text-emerald-600 dark:text-emerald-400">₦{noteItemsTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

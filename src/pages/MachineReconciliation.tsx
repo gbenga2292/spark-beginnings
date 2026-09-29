@@ -1121,9 +1121,19 @@ export function MachineReconciliation() {
           siteMap.set(log.siteId, existing);
         });
 
-        const pumpDateMap = Object.fromEntries(
-          sitePumpDates.filter(pd => pd.assetId === machine.id).map(pd => [pd.siteId, pd])
-        );
+        const pumpDateMap: Record<string, any> = {};
+        sitePumpDates
+          .filter(pd => pd.assetId === machine.id)
+          .forEach(pd => {
+            const existing = pumpDateMap[pd.siteId];
+            if (!existing) {
+              pumpDateMap[pd.siteId] = pd;
+            } else if (existing.pumpStopDate && !pd.pumpStopDate) {
+              pumpDateMap[pd.siteId] = pd;
+            } else if ((pd.pumpStartDate || '') > (existing.pumpStartDate || '')) {
+              pumpDateMap[pd.siteId] = pd;
+            }
+          });
 
         const siteHistory = Array.from(siteMap.values())
           .map(s => ({

@@ -151,7 +151,7 @@ export function DesktopFloatingCalendar() {
     <>
       <div ref={constraintsRef} className="fixed inset-y-8 right-0 w-16 pointer-events-none z-[240]" />
       
-      {/* Minimal edge-docked tab — expands on hover */}
+      {/* Minimal edge-docked tab — expands on hover (desktop) / compact on mobile */}
       <motion.button
         drag="y"
         dragConstraints={constraintsRef}
@@ -161,17 +161,19 @@ export function DesktopFloatingCalendar() {
         onClick={() => setOpen(true)}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className={`pointer-events-auto fixed top-[calc(50vh-22px)] right-0 z-[250] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing ${isDark
-          ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
-          : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+        className={`pointer-events-auto fixed right-0 z-[250] flex items-center gap-2 overflow-hidden rounded-l-xl border border-r-0 shadow-lg backdrop-blur-sm cursor-grab active:cursor-grabbing
+          top-[calc(50vh-18px)] md:top-[calc(50vh-22px)]
+          ${isDark
+            ? 'bg-slate-800/90 border-slate-700 text-slate-300 hover:bg-slate-700/90 hover:text-white'
+            : 'bg-white/90 border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
           }`}
         animate={{ width: hovered ? 116 : 44, paddingRight: hovered ? 14 : 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
         title="Drag up/down, click to open Calendar"
         style={{ height: 44, touchAction: "none" }}
       >
-        <div className="flex items-center justify-center w-[44px] h-[44px] shrink-0">
-          <CalendarIcon className="w-[18px] h-[18px]" />
+        <div className="flex items-center justify-center w-[36px] h-[36px] md:w-[44px] md:h-[44px] shrink-0">
+          <CalendarIcon className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" />
         </div>
         <AnimatePresence>
           {hovered && (
@@ -180,7 +182,7 @@ export function DesktopFloatingCalendar() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
+              className="hidden md:flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
             >
               <span>Calendar</span>
             </motion.div>

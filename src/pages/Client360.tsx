@@ -2920,7 +2920,7 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                   {[
                     { id: 'timeline', label: 'Timeline & History', show: canViewTimelineTab },
                     { id: 'overview', label: 'Overview', show: canViewOverviewTab },
-                    { id: 'financials', label: 'Financials', count: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : undefined, show: canViewFinancialsTab },
+                    { id: 'financials', label: 'Financials', show: canViewFinancialsTab },
                     { id: 'report', label: 'Client Statement', show: canViewStatementTab },
                     { id: 'operations', label: 'Site 360', count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: canViewOperationsTab },
                     { id: 'contacts', label: 'Contacts', count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: canViewContactsTab },

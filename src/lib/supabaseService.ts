@@ -141,6 +141,9 @@ export function dbToInvoice(r: any): Invoice {
     technicianAccommodationCountSameAsDay: r.technician_accommodation_count_same_as_day ?? true,
     technicianAccommodationDuration: r.technician_accommodation_duration != null ? Number(r.technician_accommodation_duration) : undefined,
     technicianAccommodationDurationSameAsDay: r.technician_accommodation_duration_same_as_day ?? true,
+    internalNotes: r.internal_notes || undefined,
+    showNotesAsLineItems: r.show_notes_as_line_items ?? false,
+    noteLineItems: r.note_line_items || [],
   };
 }
 
@@ -181,6 +184,9 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     technicianAccommodationCountSameAsDay: r.technician_accommodation_count_same_as_day ?? true,
     technicianAccommodationDuration: r.technician_accommodation_duration != null ? Number(r.technician_accommodation_duration) : undefined,
     technicianAccommodationDurationSameAsDay: r.technician_accommodation_duration_same_as_day ?? true,
+    internalNotes: r.internal_notes || undefined,
+    showNotesAsLineItems: r.show_notes_as_line_items ?? false,
+    noteLineItems: r.note_line_items || [],
   };
 }
 
@@ -381,10 +387,23 @@ export function dbToVendorInvoice(r: any): VendorInvoice {
     description: r.description,
     totalAmount: Number(r.total_amount),
     status: r.status as VendorInvoice['status'],
+    approvalStatus: (r.approval_status || 'approved') as VendorInvoice['approvalStatus'],
+    approverId: r.approver_id || undefined,
+    approverName: r.approver_name || undefined,
+    approvalRequestedAt: r.approval_requested_at || undefined,
+    approvedAt: r.approved_at || undefined,
+    rejectedAt: r.rejected_at || undefined,
+    versions: Array.isArray(r.versions)
+      ? r.versions
+      : (typeof r.versions === 'string'
+          ? (() => { try { const p = JSON.parse(r.versions); return Array.isArray(p) ? p : undefined; } catch { return undefined; } })()
+          : undefined),
+    initialAmount: r.initial_amount !== null && r.initial_amount !== undefined ? Number(r.initial_amount) : undefined,
     notes: r.notes || undefined,
     documentUrl: r.document_url || undefined,
     documentName: r.document_name || undefined,
     documentId: r.document_id || undefined,
+    lineItems: r.line_items || undefined,
     enteredBy: r.entered_by,
     createdAt: r.created_at,
   };
@@ -851,6 +870,9 @@ function invoiceToDb(i: Invoice) {
     technician_accommodation_count_same_as_day: i.technicianAccommodationCountSameAsDay ?? true,
     technician_accommodation_duration: i.technicianAccommodationDuration,
     technician_accommodation_duration_same_as_day: i.technicianAccommodationDurationSameAsDay ?? true,
+    internal_notes: i.internalNotes || null,
+    show_notes_as_line_items: i.showNotesAsLineItems ?? false,
+    note_line_items: i.noteLineItems || [],
   };
 }
 
@@ -891,6 +913,9 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     technician_accommodation_count_same_as_day: p.technicianAccommodationCountSameAsDay ?? true,
     technician_accommodation_duration: p.technicianAccommodationDuration != null ? p.technicianAccommodationDuration : null,
     technician_accommodation_duration_same_as_day: p.technicianAccommodationDurationSameAsDay ?? true,
+    internal_notes: p.internalNotes || null,
+    show_notes_as_line_items: p.showNotesAsLineItems ?? false,
+    note_line_items: p.noteLineItems || [],
   };
 }
 
@@ -1961,7 +1986,10 @@ export const db = {
       technicianAccommodationDuration: 'technician_accommodation_duration',
       technicianAccommodationDurationSameAsDay: 'technician_accommodation_duration_same_as_day',
       auxiliaryCost: 'auxiliary_cost',
-      auxiliaryEquipment: 'auxiliary_equipment'
+      auxiliaryEquipment: 'auxiliary_equipment',
+      internalNotes: 'internal_notes',
+      showNotesAsLineItems: 'show_notes_as_line_items',
+      noteLineItems: 'note_line_items'
     };
     const validDbColumns = new Set(Object.values(map));
     const update: any = {};
@@ -2033,7 +2061,10 @@ export const db = {
       noOfTechnicianAccommodation: 'no_of_technician_accommodation',
       technicianAccommodationCountSameAsDay: 'technician_accommodation_count_same_as_day',
       technicianAccommodationDuration: 'technician_accommodation_duration',
-      technicianAccommodationDurationSameAsDay: 'technician_accommodation_duration_same_as_day'
+      technicianAccommodationDurationSameAsDay: 'technician_accommodation_duration_same_as_day',
+      internalNotes: 'internal_notes',
+      showNotesAsLineItems: 'show_notes_as_line_items',
+      noteLineItems: 'note_line_items'
     };
     const validDbColumns = new Set(Object.values(map));
     const update: any = {};
@@ -2530,26 +2561,47 @@ export const db = {
       vendor_id: v.vendorId || null, vendor_name: v.vendorName,
       date_received: v.dateReceived, due_date: v.dueDate || null,
       description: v.description, total_amount: v.totalAmount,
-      status: v.status, notes: v.notes || null, entered_by: v.enteredBy,
+      status: v.status,
+      approval_status: v.approvalStatus || 'approved',
+      approver_id: v.approverId || null,
+      approver_name: v.approverName || null,
+      approval_requested_at: v.approvalRequestedAt || null,
+      approved_at: v.approvedAt || null,
+      rejected_at: v.rejectedAt || null,
+      rejection_reason: v.rejectionReason || null,
+      versions: v.versions ? JSON.stringify(v.versions) : null,
+      initial_amount: v.initialAmount !== undefined ? v.initialAmount : null,
+      notes: v.notes || null, entered_by: v.enteredBy,
       document_url: v.documentUrl || null, document_name: v.documentName || null,
       document_id: v.documentId || null,
+      line_items: v.lineItems || null,
     });
     if (error) { console.error('Database error:', error); throw error; }
   },
   async updateVendorInvoice(id: string, v: Partial<VendorInvoice>) {
     const update: any = {};
-    if (v.invoiceNumber !== undefined) update.invoice_number = v.invoiceNumber;
-    if (v.vendorId !== undefined) update.vendor_id = v.vendorId || null;
-    if (v.vendorName !== undefined) update.vendor_name = v.vendorName;
-    if (v.dateReceived !== undefined) update.date_received = v.dateReceived;
-    if (v.dueDate !== undefined) update.due_date = v.dueDate || null;
-    if (v.description !== undefined) update.description = v.description;
-    if (v.totalAmount !== undefined) update.total_amount = v.totalAmount;
-    if (v.status !== undefined) update.status = v.status;
-    if (v.notes !== undefined) update.notes = v.notes || null;
-    if (v.documentUrl !== undefined) update.document_url = v.documentUrl || null;
-    if (v.documentName !== undefined) update.document_name = v.documentName || null;
-    if (v.documentId !== undefined) update.document_id = v.documentId || null;
+    if ('invoiceNumber' in v && v.invoiceNumber !== undefined) update.invoice_number = v.invoiceNumber;
+    if ('vendorId' in v) update.vendor_id = v.vendorId || null;
+    if ('vendorName' in v && v.vendorName !== undefined) update.vendor_name = v.vendorName;
+    if ('dateReceived' in v && v.dateReceived !== undefined) update.date_received = v.dateReceived;
+    if ('dueDate' in v) update.due_date = v.dueDate || null;
+    if ('description' in v && v.description !== undefined) update.description = v.description;
+    if ('totalAmount' in v && v.totalAmount !== undefined) update.total_amount = v.totalAmount;
+    if ('status' in v && v.status !== undefined) update.status = v.status;
+    if ('approvalStatus' in v) update.approval_status = v.approvalStatus || 'approved';
+    if ('approverId' in v) update.approver_id = v.approverId || null;
+    if ('approverName' in v) update.approver_name = v.approverName || null;
+    if ('approvalRequestedAt' in v) update.approval_requested_at = v.approvalRequestedAt || null;
+    if ('approvedAt' in v) update.approved_at = v.approvedAt || null;
+    if ('rejectedAt' in v) update.rejected_at = v.rejectedAt || null;
+    if ('rejectionReason' in v) update.rejection_reason = v.rejectionReason || null;
+    if ('versions' in v) update.versions = v.versions ? JSON.stringify(v.versions) : null;
+    if ('initialAmount' in v) update.initial_amount = v.initialAmount !== undefined ? v.initialAmount : null;
+    if ('notes' in v) update.notes = v.notes || null;
+    if ('documentUrl' in v) update.document_url = v.documentUrl || null;
+    if ('documentName' in v) update.document_name = v.documentName || null;
+    if ('documentId' in v) update.document_id = v.documentId || null;
+    if ('lineItems' in v) update.line_items = v.lineItems || null;
     const { error } = await supabase.from('vendor_invoices').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
@@ -2573,13 +2625,13 @@ export const db = {
   },
   async updateVendorInvoicePayment(id: string, p: Partial<VendorInvoicePayment>) {
     const update: any = {};
-    if (p.paymentDate !== undefined) update.payment_date = p.paymentDate;
-    if (p.amountPaid !== undefined) update.amount_paid = p.amountPaid;
-    if (p.paidFromBank !== undefined) update.paid_from_bank = p.paidFromBank;
-    if (p.paidToBankName !== undefined) update.paid_to_bank_name = p.paidToBankName || null;
-    if (p.paidToAccountNo !== undefined) update.paid_to_account_no = p.paidToAccountNo || null;
-    if (p.ledgerEntryId !== undefined) update.ledger_entry_id = p.ledgerEntryId || null;
-    if (p.notes !== undefined) update.notes = p.notes || null;
+    if ('paymentDate' in p && p.paymentDate !== undefined) update.payment_date = p.paymentDate;
+    if ('amountPaid' in p && p.amountPaid !== undefined) update.amount_paid = p.amountPaid;
+    if ('paidFromBank' in p && p.paidFromBank !== undefined) update.paid_from_bank = p.paidFromBank;
+    if ('paidToBankName' in p) update.paid_to_bank_name = p.paidToBankName || null;
+    if ('paidToAccountNo' in p) update.paid_to_account_no = p.paidToAccountNo || null;
+    if ('ledgerEntryId' in p) update.ledger_entry_id = p.ledgerEntryId || null;
+    if ('notes' in p) update.notes = p.notes || null;
     const { error } = await supabase.from('vendor_invoice_payments').update(update).eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },

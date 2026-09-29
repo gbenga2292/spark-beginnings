@@ -75,11 +75,12 @@ interface ApiKey {
   defaultModel?: string;
 }
 
-const AI_PROVIDERS = ['gemini', 'groq', 'openai', 'xai', 'anthropic', 'cohere', 'mistral'];
+const AI_PROVIDERS = ['gemini', 'groq', 'gladia', 'openai', 'xai', 'anthropic', 'cohere', 'mistral'];
 
 const PROVIDER_MODELS: Record<string, string[]> = {
-  gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-pro-exp-02-05'],
-  groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+  gemini: ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-3.1-flash-lite', 'gemini-3.7-flash'],
+  groq: ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'whisper-large-v3', 'allam-2-7b'],
+  gladia: ['accurate', 'fast', 'solaria', 'default'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'o1-mini', 'gpt-4-turbo'],
   xai: ['grok-2', 'grok-beta'],
   anthropic: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest'],
@@ -90,6 +91,7 @@ const PROVIDER_MODELS: Record<string, string[]> = {
 function detectProvider(key: string): string {
   if (key.startsWith('AIza') || key.startsWith('AQ.')) return 'gemini';
   if (key.startsWith('gsk_')) return 'groq';
+  if (key.toLowerCase().startsWith('gladia') || (key.length === 36 && key.includes('-'))) return 'gladia';
   if (key.startsWith('sk-ant')) return 'anthropic';
   if (key.startsWith('sk-')) return 'openai';
   if (key.startsWith('xai-')) return 'xai';
@@ -182,7 +184,10 @@ export function Settings() {
     return () => clearTimeout(delayDebounce);
   }, [newKeyValue, newKeyProvider]);
 
-  const modelsList = fetchedModels.length > 0 ? fetchedModels : activeProviderModels;
+  const baseModels = fetchedModels.length > 0 ? fetchedModels : activeProviderModels;
+  const modelsList = newKeyDefaultModel && !baseModels.includes(newKeyDefaultModel)
+    ? [newKeyDefaultModel, ...baseModels]
+    : baseModels;
 
   /* ── Company info state ─────────────────────────────────────── */
   const [isEditing, setIsEditing] = useState(false);
@@ -335,6 +340,13 @@ export function Settings() {
       } else if (provider === 'groq') {
         const res = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${newKeyValue}` } });
         res.ok ? toast.success('Groq key is valid! ✓') : toast.error('Groq key rejected.');
+      } else if (provider === 'gladia') {
+        const res = await fetch('https://api.gladia.io/v2/pre-recorded', { headers: { 'x-gladia-key': newKeyValue } }).catch(() => null);
+        if (res && res.status !== 401 && res.status !== 403) {
+          toast.success('Gladia key is valid! ✓');
+        } else {
+          toast.error('Gladia key rejected.');
+        }
       } else {
         toast.info('Key format looks OK — live test not available for this provider yet.');
       }

@@ -298,9 +298,11 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
                     {siteMachines.map((a, idx) => {
                       const machineLogs = relevantLogs.filter(l => l.assetId === a.id);
                       const machineConsumed = machineLogs.reduce((s, l) => s + dayValue(l), 0);
-                      const pumpDateRec = (sitePumpDates || []).find(pd => 
+                      const allPDs = (sitePumpDates || []).filter(pd => 
                         (!invoice.siteId || pd.siteId === invoice.siteId) && pd.assetId === a.id
                       );
+                      const pumpDateRec = allPDs.find(pd => !pd.pumpStopDate) ||
+                        [...allPDs].sort((x, y) => (y.pumpStartDate || '').localeCompare(x.pumpStartDate || ''))[0];
                       const isStopped = Boolean(pumpDateRec?.pumpStopDate);
                       const invoicedCount = invoice.noOfMachine || machineConfigs.length || 1;
                       const hasSwaps = siteMachines.length > invoicedCount || isStopped;

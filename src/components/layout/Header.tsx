@@ -244,12 +244,14 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mobileOverflowOpen, setMobileOverflowOpen] = useState(false);
+  const [mobileQuickToolsOpen, setMobileQuickToolsOpen] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const handleBellToggle = () => {
     const nextState = !notifOpen;
     setNotifOpen(nextState);
     setIsProfileOpen(false);
+    setMobileQuickToolsOpen(false);
 
     if (nextState) {
       // ONLY announce if voice is NOT muted!
@@ -332,6 +334,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const overflowRef = useRef<HTMLDivElement>(null);
+  const quickToolsRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -340,6 +343,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setIsProfileOpen(false);
       if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) setMobileOverflowOpen(false);
+      if (quickToolsRef.current && !quickToolsRef.current.contains(e.target as Node)) setMobileQuickToolsOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -351,8 +355,24 @@ export function Header({ onMenuClick }: HeaderProps) {
     setNotifOpen(false);
     setIsProfileOpen(false);
     setMobileOverflowOpen(false);
+    setMobileQuickToolsOpen(false);
     setSearchQuery('');
   }, [location.pathname]);
+
+  const handleModuleNavigation = async () => {
+    const { isDailyLogFormDirty, setDailyLogFormDirty } = useAppStore.getState();
+    if (isDailyLogFormDirty) {
+      const ok = await showConfirm('You have unsaved changes in this machine log. Do you want to discard them and leave?', {
+        title: 'Unsaved Changes',
+        confirmLabel: 'Discard & Leave',
+        cancelLabel: 'Keep Editing',
+        variant: 'danger'
+      });
+      if (!ok) return;
+      setDailyLogFormDirty(false);
+    }
+    navigate('/home');
+  };
 
   const handleLogout = async () => {
     try {
@@ -482,6 +502,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 setMobileOverflowOpen(v => !v);
                 setNotifOpen(false);
                 setIsProfileOpen(false);
+                setMobileQuickToolsOpen(false);
               }}
               className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
                 mobileOverflowOpen
@@ -552,55 +573,177 @@ export function Header({ onMenuClick }: HeaderProps) {
         <StatusIndicator />
         <div className={`h-6 w-px hidden sm:block ${isDark ? 'bg-slate-700' : 'bg-slate-200'} mx-1`} />
 
-        {/* Module Button */}
-        <button
-          onClick={async () => {
-            const { isDailyLogFormDirty, setDailyLogFormDirty } = useAppStore.getState();
-            if (isDailyLogFormDirty) {
-              const ok = await showConfirm('You have unsaved changes in this machine log. Do you want to discard them and leave?', {
-                title: 'Unsaved Changes',
-                confirmLabel: 'Discard & Leave',
-                cancelLabel: 'Keep Editing',
-                variant: 'danger'
-              });
-              if (!ok) return;
-              setDailyLogFormDirty(false);
-            }
-            navigate('/home');
-          }}
-          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
-            isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
-          }`}
-          title="Module"
-        >
-          <Blocks className="h-4 w-4" />
-        </button>
+        {/* ── Desktop Quick Utility Buttons ── */}
+        <div className="hidden sm:flex items-center gap-1.5">
+          {/* Module Button */}
+          <button
+            onClick={handleModuleNavigation}
+            className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+              isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'
+            }`}
+            title="Module Launchpad"
+          >
+            <Blocks className="h-4 w-4" />
+          </button>
 
-        {/* Quick Voice Mute / Unmute Toggle */}
-        <button
-          onClick={toggleVoiceMute}
-          className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
-            voiceEnabled
-              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
-              : (isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')
-          }`}
-          title={voiceEnabled ? 'Voice Alerts: Active (Click to mute)' : 'Voice Alerts: Muted (Click to enable)'}
-          aria-label={voiceEnabled ? 'Mute voice alerts' : 'Enable voice alerts'}
-        >
-          {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-        </button>
+          {/* Quick Voice Mute / Unmute Toggle */}
+          <button
+            onClick={toggleVoiceMute}
+            className={`h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
+              voiceEnabled
+                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+                : (isDark ? 'text-slate-500 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-100')
+            }`}
+            title={voiceEnabled ? 'Voice Alerts: Active (Click to mute)' : 'Voice Alerts: Muted (Click to enable)'}
+            aria-label={voiceEnabled ? 'Mute voice alerts' : 'Enable voice alerts'}
+          >
+            {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
 
-        {/* Daily Priority & Approvals Briefing Modal Trigger */}
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent('open-daily-briefing'))}
-          className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
-            isDark ? 'text-amber-400 hover:bg-slate-800 hover:text-amber-300' : 'text-amber-600 hover:bg-slate-100 hover:text-amber-700'
-          }`}
-          title="Daily Priority & Approvals Briefing"
-          aria-label="Open Daily Priority & Approvals Briefing"
-        >
-          <Flame className="h-4 w-4 text-amber-500 hover:animate-pulse" />
-        </button>
+          {/* Daily Priority & Approvals Briefing Modal Trigger */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('open-daily-briefing'))}
+            className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
+              isDark ? 'text-amber-400 hover:bg-slate-800 hover:text-amber-300' : 'text-amber-600 hover:bg-slate-100 hover:text-amber-700'
+            }`}
+            title="Daily Priority & Approvals Briefing"
+            aria-label="Open Daily Priority & Approvals Briefing"
+          >
+            <Flame className="h-4 w-4 text-amber-500 hover:animate-pulse" />
+          </button>
+        </div>
+
+        {/* ── Mobile Quick Tools Dropdown Menu ── */}
+        <div ref={quickToolsRef} className="relative sm:hidden">
+          <button
+            onClick={() => {
+              setMobileQuickToolsOpen(v => !v);
+              setNotifOpen(false);
+              setIsProfileOpen(false);
+              setMobileOverflowOpen(false);
+            }}
+            className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition-all ${
+              mobileQuickToolsOpen
+                ? (isDark ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-900')
+                : (isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100')
+            }`}
+            title="Quick Tools"
+            aria-label="Quick tools and utilities"
+            aria-expanded={mobileQuickToolsOpen}
+          >
+            <Blocks className="h-4 w-4" />
+          </button>
+
+          {mobileQuickToolsOpen && (
+            <>
+              {/* Backdrop */}
+              <div
+                className="fixed inset-0 z-[58]"
+                onClick={() => setMobileQuickToolsOpen(false)}
+              />
+
+              {/* Dropdown Menu */}
+              <div
+                className={`fixed left-2 right-2 top-[57px] z-[59] rounded-2xl border shadow-2xl overflow-hidden transition-all duration-150 animate-in fade-in-0 zoom-in-95 ${
+                  isDark
+                    ? 'bg-slate-900 border-slate-700/80 shadow-black/70'
+                    : 'bg-white border-slate-200 shadow-slate-300/60'
+                }`}
+              >
+                {/* Header */}
+                <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
+                  isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-100'
+                }`}>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>Quick Tools & Actions</span>
+                  <button
+                    onClick={() => setMobileQuickToolsOpen(false)}
+                    className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${
+                      isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                    }`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Items */}
+                <div className="p-2 flex flex-col gap-1">
+                  {/* 1. Launchpad / Module */}
+                  <button
+                    onClick={async () => {
+                      setMobileQuickToolsOpen(false);
+                      await handleModuleNavigation();
+                    }}
+                    className={`flex items-center gap-3 w-full p-2.5 rounded-xl text-left transition-colors ${
+                      isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                      <Blocks className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold">Launchpad & Modules</div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Go to main app directory</div>
+                    </div>
+                  </button>
+
+                  {/* 2. Daily Briefing */}
+                  <button
+                    onClick={() => {
+                      setMobileQuickToolsOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-daily-briefing'));
+                    }}
+                    className={`flex items-center gap-3 w-full p-2.5 rounded-xl text-left transition-colors ${
+                      isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className="h-9 w-9 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                      <Flame className="h-4 w-4 text-amber-500 animate-pulse" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold">Daily Priority Briefing</div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">Review urgent tasks & approvals</div>
+                    </div>
+                  </button>
+
+                  {/* 3. Voice Alerts Toggle */}
+                  <button
+                    onClick={() => {
+                      toggleVoiceMute();
+                    }}
+                    className={`flex items-center gap-3 w-full p-2.5 rounded-xl text-left transition-colors ${
+                      isDark ? 'hover:bg-slate-800 text-slate-200' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      voiceEnabled 
+                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                    }`}>
+                      {voiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold">Voice Alerts</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                          voiceEnabled 
+                            ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' 
+                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                        }`}>
+                          {voiceEnabled ? 'ACTIVE' : 'MUTED'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                        {voiceEnabled ? 'Audio announcements enabled' : 'Click to turn voice on'}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Notification Bell */}
         <div ref={notifRef} className="relative">
