@@ -5,6 +5,7 @@ export type PartPaymentMethod = 'prorated' | 'vat_first' | 'principal_first';
 export interface VatableSectionFlags {
   equipment: boolean;
   technicians: boolean;
+  accommodation: boolean;
   diesel: boolean;
   mobDemob: boolean;
   installation: boolean;
@@ -42,6 +43,7 @@ export interface VatCalculatorParams {
   technicianDailyRate: number;
   technicianDuration: number;
   techniciansCost: number;
+  accommodationCost?: number;
 
   // Diesel Breakdown
   dailyDieselUsage: number;
@@ -117,6 +119,7 @@ export interface PartPaymentComputationResult {
 export const DEFAULT_VATABLE_SECTIONS: VatableSectionFlags = {
   equipment: true,
   technicians: false,
+  accommodation: false,
   diesel: true,
   mobDemob: true,
   installation: true,
@@ -145,6 +148,7 @@ export function computeInvoiceVat(params: VatCalculatorParams): InvoiceVatComput
     technicianDailyRate,
     technicianDuration,
     techniciansCost,
+    accommodationCost,
     dailyDieselUsage,
     dieselCostPerLtr,
     dieselDuration,
@@ -209,6 +213,8 @@ export function computeInvoiceVat(params: VatCalculatorParams): InvoiceVatComput
     ? noOfTechnician * technicianDailyRate * technicianDuration
     : (techniciansCost || 0);
 
+  const effectiveAccommodation = accommodationCost || 0;
+
   const effectiveDiesel = (dailyDieselUsage > 0 && dieselCostPerLtr > 0 && dieselDuration > 0)
     ? dailyDieselUsage * dieselCostPerLtr * dieselDuration
     : (dieselCost || 0);
@@ -218,6 +224,7 @@ export function computeInvoiceVat(params: VatCalculatorParams): InvoiceVatComput
     totalEquipment +
     effectiveDiesel +
     effectiveTechnicians +
+    effectiveAccommodation +
     (mobDemob || 0) +
     (installation || 0) +
     (damages || 0);
@@ -234,7 +241,8 @@ export function computeInvoiceVat(params: VatCalculatorParams): InvoiceVatComput
 
   const sectionRaw: { id: keyof VatableSectionFlags; label: string; amount: number; isVatable: boolean }[] = [
     { id: 'equipment', label: 'Equipment & Auxiliary Rental', amount: totalEquipment, isVatable: vatScope === 'overall' ? true : !!vatableSections.equipment },
-    { id: 'technicians', label: 'Technicians Crew & Welfare', amount: effectiveTechnicians, isVatable: vatScope === 'overall' ? true : !!vatableSections.technicians },
+    { id: 'technicians', label: 'Technicians Crew & Personnel', amount: effectiveTechnicians, isVatable: vatScope === 'overall' ? true : !!vatableSections.technicians },
+    { id: 'accommodation', label: 'Crew Accommodation & Lodging', amount: effectiveAccommodation, isVatable: vatScope === 'overall' ? true : !!vatableSections.accommodation },
     { id: 'diesel', label: 'Diesel Fuel Consumption', amount: effectiveDiesel, isVatable: vatScope === 'overall' ? true : !!vatableSections.diesel },
     { id: 'mobDemob', label: 'Mobilization & Demobilization', amount: mobDemob || 0, isVatable: vatScope === 'overall' ? true : !!vatableSections.mobDemob },
     { id: 'installation', label: 'Site Installation Services', amount: installation || 0, isVatable: vatScope === 'overall' ? true : !!vatableSections.installation },

@@ -1137,7 +1137,7 @@ export function Beneficiaries() {
                 .sort((a, b) => new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime());
 
               const totalTaken = empLeaves.filter(l => l.status !== 'Cancelled').reduce((acc, l) => acc + l.duration, 0);
-              const entitlement = emp.yearlyLeave || 20;
+              const entitlement = emp.yearlyLeave || 14;
               const remaining = entitlement - totalTaken;
 
               return (

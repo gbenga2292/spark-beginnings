@@ -158,12 +158,14 @@ export function OwedServicesReport() {
       const startDateStr = (inv as any).startDate || inv.date || '';
       const endDateStr = (inv as any).endDate || inv.dueDate || '';
       const relevantLogs = (dailyMachineLogs || []).filter(l => {
-        const matchesSiteId = siteId && l.siteId === siteId;
+        const logSiteId = (l.siteId || (l as any).site_id || '').trim().toLowerCase();
         const logSite = (l.siteName || (l as any).site_name || '').trim().toLowerCase();
-        const matchesSiteName = logSite && (logSite === normalizedSiteName || (logSite.length > 3 && normalizedSiteName.includes(logSite)) || (normalizedSiteName.length > 3 && logSite.includes(normalizedSiteName)));
+        const matchesSite = (siteId && logSiteId)
+          ? logSiteId === siteId.toLowerCase()
+          : (normalizedSiteName && logSite === normalizedSiteName);
         const matchesDate = startDateStr ? (l.date >= startDateStr && l.date <= todayStr) : (l.date <= todayStr);
         const matchesAsset = linkedAssetIds.length === 0 || linkedAssetIds.includes(l.assetId);
-        return (matchesSiteId || matchesSiteName) && matchesDate && matchesAsset;
+        return matchesSite && matchesDate && matchesAsset;
       });
 
       let loggedDays = 0;

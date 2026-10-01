@@ -89,7 +89,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
     const clientName = (invoice.client || '').trim();
     const realSite = sites.find(s => s.name === siteName && s.client === clientName) || 
                      sites.find(s => s.name === clientName && s.client === siteName);
-    const siteId = realSite?.id;
+    const siteId = invoice.siteId || realSite?.id;
 
     if (!siteId) {
       const startCopy = new Date(start);
@@ -146,16 +146,16 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
     (invoice?.auxiliaryEquipment || []).map(a => (a.name || '').trim().toLowerCase()).filter(Boolean)
   , [invoice?.auxiliaryEquipment]);
 
-  // -- Match logs by site name directly or flexibly (most reliable)
+  // -- Match logs strictly by siteId first or exact site name
   const relevantLogs = useMemo(() => {
-    if (!invoiceSiteName || !invoiceStartDate || !invoice) return [];
+    if ((!invoiceSiteName && !invoiceSiteId) || !invoiceStartDate || !invoice) return [];
     return dailyMachineLogs
       .filter(l => {
         const logSite = (l.siteName || (l as any).site_name || '').trim().toLowerCase();
-        const isSiteMatch = logSite === invoiceSiteName || 
-                            logSite === invoiceSiteId || 
-                            (logSite.length > 3 && invoiceSiteName.includes(logSite)) || 
-                            (invoiceSiteName.length > 3 && logSite.includes(invoiceSiteName));
+        const logSiteId = (l.siteId || (l as any).site_id || '').trim().toLowerCase();
+        const isSiteMatch = (invoiceSiteId && logSiteId)
+          ? logSiteId === invoiceSiteId
+          : (invoiceSiteName && logSite === invoiceSiteName);
         if (!isSiteMatch || l.date < invoiceStartDate) return false;
 
         const assetNameLower = (l.assetName || '').trim().toLowerCase();
@@ -191,10 +191,10 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
     // 1. Get all machines currently assigned to this site in Operations
     (maintenanceAssets || []).forEach(a => {
       const aSite = (a.site || '').trim().toLowerCase();
-      const match = aSite === invoiceSiteName || 
-             aSite === invoiceSiteId || 
-             (aSite.length > 3 && invoiceSiteName.includes(aSite)) || 
-             (invoiceSiteName.length > 3 && aSite.includes(invoiceSiteName));
+      const aSiteId = ((a as any).siteId || (a as any).site_id || '').trim().toLowerCase();
+      const match = (invoiceSiteId && aSiteId)
+        ? aSiteId === invoiceSiteId
+        : (invoiceSiteName && aSite === invoiceSiteName);
       if (match) {
         seen.set(a.id, { id: a.id, name: a.name, serialNumber: a.serialNumber });
       }
@@ -203,11 +203,11 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
     // 2. Get machines assigned via Waybills (the source of truth for Site Inventory)
     const siteWaybills = (waybills || []).filter(w => {
       const wSite = (w.siteName || '').trim().toLowerCase();
-      return (wSite === invoiceSiteName || 
-              w.siteId === invoiceSiteId ||
-              (wSite.length > 3 && invoiceSiteName.includes(wSite)) ||
-              (invoiceSiteName.length > 3 && wSite.includes(invoiceSiteName))) && 
-             w.status !== 'outstanding';
+      const wSiteId = (w.siteId || (w as any).site_id || '').trim().toLowerCase();
+      const match = (invoiceSiteId && wSiteId)
+        ? wSiteId === invoiceSiteId
+        : (invoiceSiteName && wSite === invoiceSiteName);
+      return match && w.status !== 'outstanding';
     });
 
     const inventoryMap = new Map<string, number>();

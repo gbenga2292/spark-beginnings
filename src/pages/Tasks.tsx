@@ -1517,6 +1517,22 @@ function AdminTasksView() {
             </div>
           ) : (
             <div className="space-y-2">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 mb-3 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                    {pendingApprovalSubs.length} {pendingApprovalSubs.length === 1 ? 'task needs' : 'tasks need'} review & approval
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-pending-approvals'))}
+                  className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold cursor-pointer"
+                >
+                  Open Approval Popup
+                </Button>
+              </div>
               {[...pendingApprovalSubs].sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()).map((sub, i) => {
                 const submitter = users.find(u => u.id === sub.assignedTo?.split(',')[0]);
                 const parentTask = mainTasks.find(mt => mt.id === sub.mainTaskId);

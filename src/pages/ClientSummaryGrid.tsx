@@ -333,12 +333,14 @@ export function ClientSummaryGrid() {
       const normalizedSiteName = siteName.toLowerCase();
       const linkedAssets = inv.linkedAssetIds || [];
       const relevantLogs = dailyMachineLogs.filter(l => {
-        const matchesSiteId = siteId && l.siteId === siteId;
+        const logSiteId = (l.siteId || (l as any).site_id || '').trim().toLowerCase();
         const logSite = (l.siteName || (l as any).site_name || '').trim().toLowerCase();
-        const matchesSiteName = logSite && (logSite === normalizedSiteName || (logSite.length > 3 && normalizedSiteName.includes(logSite)) || (normalizedSiteName.length > 3 && logSite.includes(normalizedSiteName)));
+        const matchesSite = (siteId && logSiteId)
+          ? logSiteId === siteId.toLowerCase()
+          : (normalizedSiteName && logSite === normalizedSiteName);
         const matchesDate = startDateStr ? (l.date >= startDateStr && l.date <= todayStr) : (l.date <= todayStr);
         const matchesAsset = linkedAssets.length === 0 || linkedAssets.includes(l.assetId);
-        return (matchesSiteId || matchesSiteName) && matchesDate && matchesAsset;
+        return matchesSite && matchesDate && matchesAsset;
       });
 
       let consumedDays = 0;

@@ -202,7 +202,7 @@ export function Leaves() {
     return internalEmployees.map(emp => {
       const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status !== 'Cancelled');
       const totalTaken = empLeaves.reduce((s, l) => s + l.duration, 0);
-      const entitlement = emp.yearlyLeave || 20;
+      const entitlement = emp.yearlyLeave || 14;
       const remaining = entitlement - totalTaken;
       const isCurrentlyOnLeave = empLeaves.some(l => isOnLeave(l, new Date()));
       return { emp, totalTaken, remaining, entitlement, isCurrentlyOnLeave };
@@ -870,9 +870,7 @@ export function Leaves() {
               <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase text-[11px] tracking-wider font-semibold">
                 <th className="px-5 py-4 whitespace-nowrap">Name</th>
                 <th className="px-5 py-4 whitespace-nowrap">Leave Type</th>
-                <th className="px-5 py-4 whitespace-nowrap">Start</th>
-                <th className="px-5 py-4 whitespace-nowrap">Days</th>
-                <th className="px-5 py-4 whitespace-nowrap">Expected End</th>
+                <th className="px-5 py-4 whitespace-nowrap">Period & Days</th>
                 <th className="px-5 py-4 whitespace-nowrap hidden md:table-cell">Returned</th>
                 <th className="px-5 py-4 min-w-[200px] hidden sm:table-cell">Reason</th>
                 <th className="px-5 py-4 whitespace-nowrap text-center hidden md:table-cell">Contact</th>
@@ -904,12 +902,17 @@ export function Leaves() {
                         {leave.leaveType || '—'}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}
-                    </td>
-                    <td className="px-5 py-4 font-semibold tabular-nums text-slate-700 dark:text-slate-200">{leave.duration}</td>
-                    <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                      {leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200 text-xs">
+                          <span>{leave.startDate ? format(parseISO(leave.startDate), 'dd-MMM-yy') : '—'}</span>
+                          <span className="text-slate-400">→</span>
+                          <span>{leave.expectedEndDate ? format(parseISO(leave.expectedEndDate), 'dd-MMM-yy') : '—'}</span>
+                        </div>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                          {leave.duration} {Number(leave.duration) === 1 ? 'day' : 'days'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap hidden md:table-cell">
                       {leave.dateReturned ? format(parseISO(leave.dateReturned), 'dd-MMM-yy') : '—'}

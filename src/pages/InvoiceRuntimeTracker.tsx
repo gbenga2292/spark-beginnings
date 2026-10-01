@@ -71,8 +71,10 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
     if (ids.size === 0 && isAuxOnly && auxNames.length > 0) {
       maintenanceAssets.forEach(a => {
         const aSite = (a.site || '').trim().toLowerCase();
-        const matchSite = aSite === invoiceSiteId || aSite === invoiceSiteName ||
-          (invoiceSiteName && aSite.includes(invoiceSiteName)) || (invoiceSiteName && invoiceSiteName.includes(aSite));
+        const aSiteId = ((a as any).siteId || (a as any).site_id || '').trim().toLowerCase();
+        const matchSite = (invoiceSiteId && aSiteId)
+          ? aSiteId === invoiceSiteId
+          : (invoiceSiteName && aSite === invoiceSiteName);
         if (matchSite) {
           const aName = (a.name || '').toLowerCase();
           if (auxNames.some(aux => aName.includes(aux) || aux.includes(aName))) {
@@ -89,12 +91,11 @@ export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTr
   const relevantLogs = useMemo(() => {
     if (!effectiveLinkedIds.length || !invoiceStartDate) return [];
     return allMachineLogs.filter(l => {
-      const lSiteId = (l.siteId || '').trim().toLowerCase();
+      const lSiteId = (l.siteId || (l as any).site_id || '').trim().toLowerCase();
       const lSiteName = (l.siteName || (l as any).site_name || '').trim().toLowerCase();
-      const matchSite = (lSiteId && (lSiteId === invoiceSiteId)) ||
-        (invoiceSiteName && lSiteName === invoiceSiteName) ||
-        (invoiceSiteName && invoiceSiteName.length > 3 && lSiteName.includes(invoiceSiteName)) ||
-        (invoiceSiteName && lSiteName.length > 3 && invoiceSiteName.includes(lSiteName));
+      const matchSite = (invoiceSiteId && lSiteId)
+        ? lSiteId === invoiceSiteId
+        : (invoiceSiteName && lSiteName === invoiceSiteName);
       if (!matchSite) return false;
 
       return effectiveLinkedIds.includes(l.assetId) && l.date >= invoiceStartDate;

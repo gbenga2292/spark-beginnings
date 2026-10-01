@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  CheckCircle2, Flame, ArrowRight, X, Calendar, Hourglass, ExternalLink, AlertCircle,
+  CheckCircle2, Flame, ArrowRight, X, Calendar, ExternalLink, AlertCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -149,26 +149,6 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
     return m;
   }, [users]);
 
-  // ── Pending approvals ────────────────────────────────────────────────────────
-  const pendingApprovals = useMemo(() => {
-    if (!user?.id || !subtasks) return [];
-    const uid = user.id;
-    return subtasks.filter(sub => {
-      if (sub.status !== 'pending_approval') return false;
-      if ((sub as any).isDeleted || (sub as any).is_deleted || (sub as any).deleted_at) return false;
-      if ((sub.status as string) === 'archived' || (sub as any).is_archived) return false;
-      const pid = sub.mainTaskId || (sub as any).main_task_id;
-      if (pid) {
-        const p = mainTasksById.get(pid);
-        if (p && (p.isDeleted || (p as any).is_deleted || (p as any).status === 'completed' || (p as any).status === 'archived')) return false;
-      }
-      const isApprover  = sub.approverId === uid;
-      const isCreator   = sub.createdBy  === uid || (sub as any).created_by === uid;
-      const isAdmin     = (user as any)?.role === 'admin' || (user as any)?.role === 'co-admin' || currentUser?.role === 'admin';
-      return isApprover || (isAdmin && !sub.approverId) || isCreator;
-    });
-  }, [subtasks, mainTasksById, user, currentUser]);
-
   // ── Active urgent tasks ──────────────────────────────────────────────────────
   const myUrgentTasks = useMemo(() => {
     if (!user?.id || !subtasks) return [];
@@ -268,13 +248,7 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
     });
   }, [myUrgentTasks, mainTasksById, usersById, user, currentUser]);
 
-  const enrichedApprovals = useMemo(() =>
-    pendingApprovals.map(sub => ({
-      sub,
-      parentTitle: mainTasksById.get(sub.mainTaskId || (sub as any).main_task_id)?.title,
-      creatorName: usersById.get(sub.createdBy || (sub as any).created_by) || 'Team',
-    })),
-  [pendingApprovals, mainTasksById, usersById]);
+
 
   // ── Session trigger ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -305,7 +279,7 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
 
   if (!isOpen) return null;
 
-  const totalCount = pendingApprovals.length + myUrgentTasks.length;
+  const totalCount = myUrgentTasks.length;
   const highTotal  = urgencyAnalytics.critical.count + urgencyAnalytics.high.count;
   const medCount   = urgencyAnalytics.medium.count;
   const lowCount   = urgencyAnalytics.low.count;
@@ -396,58 +370,7 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
               </div>
             )}
 
-            {/* Pending Approvals */}
-            {enrichedApprovals.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-1.5">
-                    <Hourglass className="w-3.5 h-3.5 text-amber-500" />
-                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                      Approvals Awaiting Review ({enrichedApprovals.length})
-                    </h3>
-                  </div>
-                  <span className="text-[11px] text-zinc-400">Sorted by Priority</span>
-                </div>
-                <div className="space-y-2">
-                  {enrichedApprovals.map(({ sub, parentTitle, creatorName }) => (
-                    <div
-                      key={sub.id}
-                      className={`relative rounded-xl border overflow-hidden flex items-center justify-between gap-3 p-3 transition-all ${
-                        isDark ? 'bg-amber-950/10 border-amber-900/50 hover:border-amber-700/60' : 'bg-amber-50/40 border-amber-200 hover:border-amber-300'
-                      }`}
-                    >
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-xl" />
-                      <div className="min-w-0 flex-1 pl-2">
-                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-                            Approval
-                          </span>
-                          {parentTitle && (
-                            <span className="text-[11px] text-zinc-400 truncate max-w-[190px]">{parentTitle}</span>
-                          )}
-                        </div>
-                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">{sub.title}</p>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500">
-                          <span>Requested by <strong>{creatorName}</strong></span>
-                          {sub.budgetRequested && (
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                              ₦{Number(sub.budgetRequested).toLocaleString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleNavigateToTask(sub)}
-                        className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-sm"
-                      >
-                        Review Now <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+
 
             {/* Active tasks */}
             {enrichedUrgentTasks.length > 0 && (

@@ -277,13 +277,6 @@ export function useActiveSiteInvoices() {
             if (!sharesItem) return false;
           }
 
-          // A continuous chain requires continuity without a prolonged shutdown gap (> 14 days)
-          // between the current invoice's scheduled end and the subsequent invoice's start.
-          // A gap > 14 days indicates a demobilization / shutdown followed by a restart phase.
-          const gapMs = new Date(otherStart).getTime() - new Date(scheduledEndDate).getTime();
-          const gapDays = gapMs / (1000 * 60 * 60 * 24);
-          if (gapDays > 14) return false;
-
           return true;
         });
         const hasNextInvoice = subsequentInvoices.length > 0;
@@ -708,55 +701,9 @@ export function useActiveSiteInvoices() {
       });
 
       // Running invoices:
-      // 1. Any invoice not marked 'Paid' that is active/recent (daysRemaining >= -45)
-      // 2. Any invoice that is lapsed (isLapsed === true), even if marked 'Paid'
-      let runningInvoices = invoiceDetails.filter(d => {
-        if (d.invoice.status !== 'Paid' && d.daysRemaining >= -45) return true;
-        if (d.isLapsed) return true;
-        return false;
-      });
-
-      if (runningInvoices.length === 0 && invoiceDetails.length > 0) {
-        // Fallback to the latest invoice by startDate so cycle status is always visible
-        runningInvoices = [
-          [...invoiceDetails].sort((a, b) => b.startDate.localeCompare(a.startDate))[0]
-        ];
-      }
-
-      // If there are currently active/live invoices (daysRemaining >= 0):
-      // The active running pool should only include invoices belonging to the CURRENT deployment phase.
-      // Prior phase invoices (separated by a gap > 14 days before the current phase) must not be lumped
-      // into the active operations pool.
-      const hasLiveInvoices = runningInvoices.some(d => d.daysRemaining >= 0);
-      if (hasLiveInvoices) {
-        const liveInvoices = runningInvoices.filter(d => d.daysRemaining >= 0);
-        const liveChainIds = new Set<string>(liveInvoices.map(d => d.invoice.id));
-        let added = true;
-        while (added) {
-          added = false;
-          runningInvoices.forEach(d => {
-            if (!liveChainIds.has(d.invoice.id) && d.nextInvoiceNumber) {
-              const targetsLive = Array.from(liveChainIds).some(id => {
-                const targetInv = runningInvoices.find(x => x.invoice.id === id);
-                return targetInv?.invoiceNumber === d.nextInvoiceNumber;
-              });
-              if (targetsLive) {
-                liveChainIds.add(d.invoice.id);
-                added = true;
-              }
-            }
-          });
-        }
-        runningInvoices = runningInvoices.filter(d => liveChainIds.has(d.invoice.id));
-      }
-
-      // Sort running invoices: lapsed/overdue first, then by daysRemaining
-      runningInvoices.sort((a, b) => {
-        if (a.isLapsed && !b.isLapsed) return -1;
-        if (!a.isLapsed && b.isLapsed) return 1;
-        if (a.isLapsed && b.isLapsed) return b.lapsedDays - a.lapsedDays;
-        return a.daysRemaining - b.daysRemaining;
-      });
+      // Show all invoices for this active site sorted chronologically so the entire
+      // project history, total contracted capacity, and all invoice links are visible.
+      const runningInvoices = [...invoiceDetails].sort((a, b) => a.startDate.localeCompare(b.startDate));
 
       const hasMultipleInvoices = runningInvoices.length > 1;
       // An invoice chain is sequential if invoices follow each other (e.g. #305 -> #309 with hasNextInvoice)
@@ -799,6 +746,36 @@ export function useActiveSiteInvoices() {
           }
         });
       });
+
+      // Ground-truth safeguard: recalculate pool machine consumed days directly from dailyMachineLogs
+      // from earliestStartDate onwards, ensuring every operational log date is counted exactly once.
+      const pumpInvoices = runningInvoices.filter(inv => !checkIsInvoiceAuxOnly(inv.invoice));
+      const poolEarliestStart = (pumpInvoices.length > 0 ? pumpInvoices : runningInvoices)[0]?.startDate;
+
+      if (poolEarliestStart) {
+        siteMachinesMap.forEach((m, assetId) => {
+          if (isAuxiliaryAsset(m)) return;
+          const mLogs = dailyMachineLogs.filter(l => {
+            const matchSite = (l.siteId && (l.siteId.toLowerCase() === siteId.toLowerCase())) ||
+              (siteNameLower && (l.siteName || (l as any).site_name || '').trim().toLowerCase() === siteNameLower);
+            if (!matchSite) return false;
+            if (l.assetId !== assetId) return false;
+            if (l.date < poolEarliestStart) return false;
+            if (m.stopDate && l.date > normalizeDate(m.stopDate)) return false;
+            return true;
+          });
+          const directConsumed = Number((mLogs.reduce((acc, l) => {
+            const status = l.operationalDay ?? (l.isActive ? 'full' : 'none');
+            if (status === 'full') return acc + 1;
+            if (status === 'half') return acc + 0.5;
+            return acc;
+          }, 0)).toFixed(1));
+          if (directConsumed > 0) {
+            m.consumedDays = directConsumed;
+            m.projectedConsumedDays = Number((m.consumedDays + (m.unloggedDays || 0)).toFixed(1));
+          }
+        });
+      }
 
       const poolMachines = Array.from(siteMachinesMap.values());
       poolMachines.sort((a, b) => {

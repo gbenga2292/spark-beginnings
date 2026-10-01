@@ -40,6 +40,7 @@ export interface InvoiceFormModalProps {
 export const defaultVatableSectionsDefault: InvoiceVatableSections = {
   equipment: true,
   technicians: false,
+  accommodation: false,
   diesel: true,
   mobDemob: true,
   installation: true,
@@ -86,6 +87,10 @@ export const initialInvoiceForm = {
   internalNotes: '',
   showNotesAsLineItems: false,
   noteLineItems: [] as InvoiceNoteLineItem[],
+  whtRate: '',
+  whtAmount: '',
+  whtTiming: 'after_vat' as 'before_vat' | 'after_vat',
+  whtDeductionType: 'deduct_gross' as 'reduce_net' | 'deduct_gross',
 };
 
 export function InvoiceFormModal({
@@ -187,6 +192,10 @@ export function InvoiceFormModal({
         internalNotes: (inv as any).internalNotes || '',
         showNotesAsLineItems: (inv as any).showNotesAsLineItems || false,
         noteLineItems: (inv as any).noteLineItems ? [...(inv as any).noteLineItems] : [],
+        whtRate: (inv as any).whtRate != null ? String((inv as any).whtRate) : '',
+        whtAmount: (inv as any).whtAmount != null ? String((inv as any).whtAmount) : '',
+        whtTiming: (inv as any).whtTiming || 'after_vat',
+        whtDeductionType: (inv as any).whtDeductionType || 'deduct_gross',
       });
 
       if (initialConfigs && initialConfigs.length > 0) {
@@ -673,20 +682,35 @@ export function InvoiceFormModal({
     const vatScope: 'overall' | 'per_section' = form.vatScope || 'per_section';
     const vatableSections = form.vatableSections || defaultVatableSectionsDefault;
 
+    // --- WHT: resolve inputs early (needed for before_vat base adjustment) ---
+    const whtTiming: 'before_vat' | 'after_vat' = (form as any).whtTiming || 'after_vat';
+    const whtDeductionType: 'reduce_net' | 'deduct_gross' = (form as any).whtDeductionType || 'deduct_gross';
+    const whtRateInput = parseFloat((form as any).whtRate) || 0;
+    const whtAmountInput = parseFloat((form as any).whtAmount) || 0;
+
+    // When before_vat: WHT is computed on totalCost and reduces the VAT base
+    const preVatWhtAmount = whtTiming === 'before_vat'
+      ? (whtRateInput > 0 ? (totalCost * whtRateInput) / 100 : whtAmountInput)
+      : 0;
+    // The base on which VAT is calculated (reduced by WHT when before_vat)
+    const vatBase = whtTiming === 'before_vat' ? Math.max(0, totalCost - preVatWhtAmount) : totalCost;
+
     let vat = 0;
     let vatableAmount = 0;
     let nonVatableAmount = 0;
     let totalCharge = totalCost;
 
     if (vatScope === 'per_section') {
+      const techCrewCost = techDayCost + techNightCost;
       const eqVal = (vatableSections.equipment ?? true) ? (rentalCost + auxiliaryCost) : 0;
-      const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
+      const techVal = (vatableSections.technicians ?? false) ? techCrewCost : 0;
+      const accomVal = (vatableSections.accommodation ?? false) ? techAccomCost : 0;
       const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
       const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
       const instVal = (vatableSections.installation ?? true) ? installation : 0;
       const damVal = (vatableSections.damages ?? false) ? damages : 0;
 
-      const grossVatable = eqVal + techVal + dieselVal + mobVal + instVal + damVal;
+      const grossVatable = eqVal + techVal + accomVal + dieselVal + mobVal + instVal + damVal;
       const grossNonVatable = Math.max(0, subtotalCost - grossVatable);
 
       let netVatable = grossVatable;
@@ -700,35 +724,40 @@ export function InvoiceFormModal({
         netNonVatable = Math.max(0, grossNonVatable - nonVatableDiscount);
       }
 
-      vatableAmount = netVatable;
-      nonVatableAmount = netNonVatable;
+      // When before_vat, reduce the vatable portion proportionally
+      const vatableAdj = whtTiming === 'before_vat' && subtotalCost > 0
+        ? Math.max(0, netVatable - preVatWhtAmount * (netVatable / Math.max(totalCost, 1)))
+        : netVatable;
+
+      vatableAmount = vatableAdj;
+      nonVatableAmount = nonVatableAmount;
 
       if (vatInc === 'Yes') {
-        vat = (netVatable / (100 + vatRate)) * vatRate;
-        totalCharge = totalCost;
+        vat = (vatableAdj / (100 + vatRate)) * vatRate;
+        totalCharge = whtTiming === 'before_vat' ? vatBase + vat : totalCost;
       } else if (vatInc === 'Add') {
-        vat = netVatable * (vatRate / 100);
-        totalCharge = totalCost + vat;
+        vat = vatableAdj * (vatRate / 100);
+        totalCharge = whtTiming === 'before_vat' ? vatBase + vat : totalCost + vat;
       } else {
         vat = 0;
-        totalCharge = totalCost;
+        totalCharge = whtTiming === 'before_vat' ? vatBase : totalCost;
       }
     } else {
       if (vatInc === 'Yes') {
-        vat = (totalCost / (100 + vatRate)) * vatRate;
-        vatableAmount = totalCost;
+        vat = (vatBase / (100 + vatRate)) * vatRate;
+        vatableAmount = vatBase;
         nonVatableAmount = 0;
-        totalCharge = totalCost;
+        totalCharge = whtTiming === 'before_vat' ? vatBase + vat : totalCost;
       } else if (vatInc === 'Add') {
-        vat = totalCost * (vatRate / 100);
-        vatableAmount = totalCost;
+        vat = vatBase * (vatRate / 100);
+        vatableAmount = vatBase;
         nonVatableAmount = 0;
-        totalCharge = totalCost + vat;
+        totalCharge = vatBase + vat;
       } else {
         vat = 0;
         vatableAmount = 0;
-        nonVatableAmount = totalCost;
-        totalCharge = totalCost;
+        nonVatableAmount = whtTiming === 'before_vat' ? vatBase : totalCost;
+        totalCharge = whtTiming === 'before_vat' ? vatBase : totalCost;
       }
     }
 
@@ -744,21 +773,37 @@ export function InvoiceFormModal({
       return 0;
     };
 
+    const techCrewCost = techDayCost + techNightCost;
     const equipmentVat = calcSectionVat(rentalCost + auxiliaryCost, vatScope === 'overall' ? true : (vatableSections.equipment ?? true));
-    const techniciansVat = calcSectionVat(techniciansCost, vatScope === 'overall' ? true : (vatableSections.technicians ?? false));
+    const techniciansVat = calcSectionVat(techCrewCost, vatScope === 'overall' ? true : (vatableSections.technicians ?? false));
+    const accommodationVat = calcSectionVat(techAccomCost, vatScope === 'overall' ? true : (vatableSections.accommodation ?? false));
     const dieselVat = calcSectionVat(dieselCost, vatScope === 'overall' ? true : (vatableSections.diesel ?? true));
     const mobDemobVat = calcSectionVat(mobDemob, vatScope === 'overall' ? true : (vatableSections.mobDemob ?? true));
     const installationVat = calcSectionVat(installation, vatScope === 'overall' ? true : (vatableSections.installation ?? true));
     const damagesVat = calcSectionVat(damages, vatScope === 'overall' ? true : (vatableSections.damages ?? false));
     const otherChargesVat = mobDemobVat + installationVat + damagesVat;
 
+    // Resolve final WHT figures
+    const whtBase = whtTiming === 'before_vat' ? totalCost : totalCharge;
+    const whtAmount = whtRateInput > 0 ? (whtBase * whtRateInput) / 100 : whtAmountInput;
+    const whtRate = whtAmountInput > 0 && whtRateInput === 0 && whtBase > 0
+      ? (whtAmountInput / whtBase) * 100
+      : whtRateInput;
+
+    // When before_vat: WHT already removed from base — totalCharge is net receivable
+    // When after_vat: deduct WHT from gross totalCharge
+    const netReceivable = whtTiming === 'before_vat'
+      ? totalCharge
+      : Math.max(0, totalCharge - whtAmount);
+
     return {
       totalCost, subtotalCost, discount, vat, totalCharge, vatInc,
       vatScope, vatableSections, vatableAmount, nonVatableAmount,
-      equipmentVat, techniciansVat, dieselVat, mobDemobVat, installationVat, damagesVat, otherChargesVat,
+      equipmentVat, techniciansVat, accommodationVat, dieselVat, mobDemobVat, installationVat, damagesVat, otherChargesVat,
       maxDuration, actualTechDuration, actualNightDuration, actualAccomDuration,
-      techniciansCost, effectiveTechDailyRate, noOfTechnicianNight,
+      techniciansCost, techCrewCost, effectiveTechDailyRate, noOfTechnicianNight,
       accomCrewCount, techAccomCost, dieselCost, rentalCost, auxiliaryCost, auxiliaryEquipment, mobDemob, installation, damages,
+      whtAmount, whtRate, whtTiming, whtDeductionType, whtBase, netReceivable,
     };
   }, [form, machineConfigs, siteRegistry, vatRate]);
 
@@ -901,20 +946,31 @@ export function InvoiceFormModal({
     const vatScope: 'overall' | 'per_section' = input.vatScope || 'per_section';
     const vatableSections: InvoiceVatableSections = input.vatableSections || defaultVatableSectionsDefault;
 
+    // WHT before-VAT: reduce the net before computing VAT
+    const _whtTiming: 'before_vat' | 'after_vat' = (input.whtTiming || 'after_vat') as 'before_vat' | 'after_vat';
+    const _whtRateInput = parseFloat(input.whtRate) || 0;
+    const _whtAmountInput = parseFloat(input.whtAmount) || 0;
+    const _preVatWhtAmount = _whtTiming === 'before_vat'
+      ? (_whtRateInput > 0 ? (totalCost * _whtRateInput) / 100 : _whtAmountInput)
+      : 0;
+    const _vatBase = _whtTiming === 'before_vat' ? Math.max(0, totalCost - _preVatWhtAmount) : totalCost;
+
     let vat = 0;
     let vatableAmount = 0;
     let nonVatableAmount = 0;
     let totalCharge = totalCost;
 
     if (vatScope === 'per_section') {
+      const techCrewCost = techDayCost + techNightCost;
       const eqVal = (vatableSections.equipment ?? true) ? (rentalCost + auxiliaryCost) : 0;
-      const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
+      const techVal = (vatableSections.technicians ?? false) ? techCrewCost : 0;
+      const accomVal = (vatableSections.accommodation ?? false) ? techAccomCost : 0;
       const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
       const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
       const instVal = (vatableSections.installation ?? true) ? installation : 0;
       const damVal = (vatableSections.damages ?? false) ? damages : 0;
 
-      const grossVatable = eqVal + techVal + dieselVal + mobVal + instVal + damVal;
+      const grossVatable = eqVal + techVal + accomVal + dieselVal + mobVal + instVal + damVal;
       const grossNonVatable = Math.max(0, subtotalCost - grossVatable);
 
       let netVatable = grossVatable;
@@ -928,32 +984,40 @@ export function InvoiceFormModal({
         netNonVatable = Math.max(0, grossNonVatable - nonVatableDiscount);
       }
 
-      vatableAmount = netVatable;
+      // Reduce vatable portion proportionally when before_vat
+      const vatableAdj = _whtTiming === 'before_vat' && totalCost > 0
+        ? Math.max(0, netVatable - _preVatWhtAmount * (netVatable / totalCost))
+        : netVatable;
+
+      vatableAmount = vatableAdj;
       nonVatableAmount = netNonVatable;
 
       if (vatInc === 'Yes') {
-        vat = (netVatable / (100 + vatRate)) * vatRate;
-        totalCharge = totalCost;
+        vat = (vatableAdj / (100 + vatRate)) * vatRate;
+        totalCharge = _whtTiming === 'before_vat' ? _vatBase + vat : totalCost;
       } else if (vatInc === 'Add') {
-        vat = netVatable * (vatRate / 100);
-        totalCharge = totalCost + vat;
+        vat = vatableAdj * (vatRate / 100);
+        totalCharge = _whtTiming === 'before_vat' ? _vatBase + vat : totalCost + vat;
       } else {
         vat = 0;
-        totalCharge = totalCost;
+        totalCharge = _whtTiming === 'before_vat' ? _vatBase : totalCost;
       }
     } else {
-      vatableAmount = totalCost;
-      nonVatableAmount = 0;
-
       if (vatInc === 'Yes') {
-        vat = (totalCost / (100 + vatRate)) * vatRate;
-        totalCharge = totalCost;
+        vat = (_vatBase / (100 + vatRate)) * vatRate;
+        vatableAmount = _vatBase;
+        nonVatableAmount = 0;
+        totalCharge = _whtTiming === 'before_vat' ? _vatBase + vat : totalCost;
       } else if (vatInc === 'Add') {
-        vat = totalCost * (vatRate / 100);
-        totalCharge = totalCost + vat;
+        vat = _vatBase * (vatRate / 100);
+        vatableAmount = _vatBase;
+        nonVatableAmount = 0;
+        totalCharge = _vatBase + vat;
       } else {
         vat = 0;
-        totalCharge = totalCost;
+        vatableAmount = 0;
+        nonVatableAmount = _whtTiming === 'before_vat' ? _vatBase : totalCost;
+        totalCharge = _whtTiming === 'before_vat' ? _vatBase : totalCost;
       }
     }
 
@@ -995,6 +1059,10 @@ export function InvoiceFormModal({
       internalNotes: input.internalNotes,
       showNotesAsLineItems: input.showNotesAsLineItems,
       noteLineItems: input.noteLineItems,
+      whtRate: parseFloat(input.whtRate) || undefined,
+      whtAmount: parseFloat(input.whtAmount) || undefined,
+      whtTiming: (input.whtTiming || 'after_vat') as 'before_vat' | 'after_vat',
+      whtDeductionType: (input.whtDeductionType || 'deduct_gross') as 'reduce_net' | 'deduct_gross',
     };
   };
 
@@ -1858,7 +1926,7 @@ export function InvoiceFormModal({
                     title="Configured in Settings > Invoice & Tax Variables"
                   >
                     <span className={`w-1.5 h-1.5 rounded-full ${(form.vatableSections?.technicians ?? false) ? 'bg-amber-500' : 'bg-slate-400'}`} />
-                    {(form.vatableSections?.technicians ?? false) ? `VAT Applied (${vatRate}%)` : 'Tax Exempt'}
+                    {(form.vatableSections?.technicians ?? false) ? `Crew VAT (${vatRate}%)` : 'Crew Tax Exempt'}
                   </span>
                 )}
               </div>
@@ -2028,11 +2096,26 @@ export function InvoiceFormModal({
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                       <p className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Crew Accommodation &amp; Lodging</p>
                     </div>
-                    {livePreview.techAccomCost > 0 && (
-                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        {livePreview.accomCrewCount} tech{livePreview.accomCrewCount === 1 ? '' : 's'} × ₦{(parseFloat(form.technicianAccommodation) || 0).toLocaleString()} × {livePreview.actualAccomDuration}d
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2.5">
+                      {livePreview.techAccomCost > 0 && (
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          {livePreview.accomCrewCount} tech{livePreview.accomCrewCount === 1 ? '' : 's'} × ₦{(parseFloat(form.technicianAccommodation) || 0).toLocaleString()} × {livePreview.actualAccomDuration}d
+                        </span>
+                      )}
+                      {form.vatScope === 'per_section' && (
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-bold select-none border ${
+                            (form.vatableSections?.accommodation ?? false)
+                              ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
+                          }`}
+                          title="Configured in Settings > Invoice & Tax Variables"
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${(form.vatableSections?.accommodation ?? false) ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          {(form.vatableSections?.accommodation ?? false) ? `Accom VAT (${vatRate}%)` : 'Accom Exempt'}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
@@ -2286,6 +2369,133 @@ export function InvoiceFormModal({
                       className="bg-white dark:bg-slate-900 border-emerald-300 dark:border-emerald-800 focus:border-emerald-500 h-11 font-mono font-semibold text-emerald-600 dark:text-emerald-400 w-full"
                       placeholder="0.00"
                     />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4b: Withholding Tax */}
+            <div className="bg-white dark:bg-slate-900 rounded-md border border-amber-200 dark:border-amber-900/50 overflow-hidden">
+              <div className="bg-amber-50/50 dark:bg-amber-950/20 px-6 py-4 border-b border-amber-150 dark:border-amber-900/40 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/40 rounded-lg text-amber-700 dark:text-amber-400">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wide">Withholding Tax (WHT)</h3>
+                    <p className="text-[10px] text-slate-400">Optional. Rate and amount sync automatically — enter either one.</p>
+                  </div>
+                </div>
+                {livePreview.whtAmount > 0 && (
+                  <span className="text-[11px] font-black font-mono text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 rounded-full border border-amber-200 dark:border-amber-800">
+                    −₦{livePreview.whtAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                  {/* WHT Rate % */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+                      WHT Rate (%)
+                    </label>
+                    <NumericFormat
+                      customInput={Input}
+                      decimalScale={4}
+                      value={(form as any).whtRate}
+                      onValueChange={(v) => {
+                        const rate = parseFloat(v.value) || 0;
+                        handleChange('whtRate', v.value || '');
+                        if (rate > 0) {
+                          const base = (form as any).whtTiming === 'before_vat' ? livePreview.totalCost : livePreview.totalCharge;
+                          const derived = (base * rate) / 100;
+                          handleChange('whtAmount', derived > 0 ? String(derived.toFixed(2)) : '');
+                        } else if (!v.value) {
+                          handleChange('whtAmount', '');
+                        }
+                      }}
+                      className="bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-800 focus:border-amber-500 h-11 font-mono font-semibold text-amber-700 dark:text-amber-300 w-full"
+                      placeholder="e.g. 5"
+                    />
+                  </div>
+
+                  {/* WHT Amount ₦ */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">
+                      WHT Amount (₦)
+                    </label>
+                    <NumericFormat
+                      customInput={Input}
+                      thousandSeparator
+                      decimalScale={2}
+                      value={(form as any).whtAmount}
+                      onValueChange={(v) => {
+                        const amt = parseFloat(v.value) || 0;
+                        handleChange('whtAmount', v.value || '');
+                        const base = (form as any).whtTiming === 'before_vat' ? livePreview.totalCost : livePreview.totalCharge;
+                        if (amt > 0 && base > 0) {
+                          handleChange('whtRate', String(((amt / base) * 100).toFixed(4)));
+                        } else if (!v.value) {
+                          handleChange('whtRate', '');
+                        }
+                      }}
+                      className="bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-800 focus:border-amber-500 h-11 font-mono font-semibold text-amber-700 dark:text-amber-300 w-full"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  {/* Timing toggle */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      Applied On
+                    </label>
+                    <div className="flex h-11 rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      {(['before_vat', 'after_vat'] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => {
+                            handleChange('whtTiming', opt);
+                            const newBase = opt === 'before_vat' ? livePreview.totalCost : livePreview.totalCharge;
+                            const rate = parseFloat((form as any).whtRate) || 0;
+                            if (rate > 0 && newBase > 0) {
+                              handleChange('whtAmount', String(((newBase * rate) / 100).toFixed(2)));
+                            }
+                          }}
+                          className={`flex-1 text-[11px] font-bold transition-colors ${
+                            (form as any).whtTiming === opt
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                          }`}
+                        >
+                          {opt === 'before_vat' ? 'Pre-VAT' : 'Post-VAT'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Deduction method toggle */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                      Deduction
+                    </label>
+                    <div className="flex h-11 rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      {(['reduce_net', 'deduct_gross'] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => handleChange('whtDeductionType', opt)}
+                          className={`flex-1 text-[11px] font-bold transition-colors ${
+                            (form as any).whtDeductionType === opt
+                              ? 'bg-slate-700 dark:bg-slate-600 text-white'
+                              : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {opt === 'reduce_net' ? 'Reduce Net' : 'Deduct Gross'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2701,11 +2911,34 @@ export function InvoiceFormModal({
                 </div>
                 <div className="h-px bg-slate-800" />
                 <div className="flex flex-col">
-                  <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">Final Amount Due</span>
+                  <span className="text-slate-500 text-[10px] uppercase font-black tracking-wider mb-1">
+                    {livePreview.whtAmount > 0 ? 'Gross Invoice Total' : 'Final Amount Due'}
+                  </span>
                   <span className="font-mono text-emerald-400 font-black text-2xl leading-none tracking-tight">
                     ₦{priv?.canViewAmounts === false ? '***' : livePreview.totalCharge.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
+
+                {livePreview.whtAmount > 0 && (
+                  <>
+                    <div className="h-px bg-amber-900/40" />
+                    <div className="flex flex-col">
+                      <span className="text-amber-400 text-[10px] uppercase font-black tracking-wider mb-1">
+                        WHT Deduction ({livePreview.whtRate.toFixed(2)}% • {livePreview.whtTiming === 'before_vat' ? 'Pre-VAT base' : 'Post-VAT base'})
+                      </span>
+                      <span className="font-mono text-amber-400 font-bold text-lg">
+                        -₦{priv?.canViewAmounts === false ? '***' : livePreview.whtAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="h-px bg-amber-900/40" />
+                    <div className="flex flex-col">
+                      <span className="text-emerald-400 text-[10px] uppercase font-black tracking-wider mb-1">Net Receivable (After WHT)</span>
+                      <span className="font-mono text-emerald-300 font-black text-2xl leading-none tracking-tight">
+                        ₦{priv?.canViewAmounts === false ? '***' : livePreview.netReceivable.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -2788,13 +3021,25 @@ export function InvoiceFormModal({
                   </div>
 
                   {livePreview.vatScope === 'per_section' && (
-                    <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
-                      <span>Crew Section VAT ({livePreview.vatInc}):</span>
-                      <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                        {(livePreview.vatableSections?.technicians ?? false) && livePreview.vatInc !== 'No'
-                          ? `+₦${livePreview.techniciansVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : '₦0.00 (Exempt)'}
-                      </span>
+                    <div className="space-y-1 pt-1">
+                      <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
+                        <span>Crew Shift VAT ({livePreview.vatInc}):</span>
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                          {(livePreview.vatableSections?.technicians ?? false) && livePreview.vatInc !== 'No'
+                            ? `+₦${livePreview.techniciansVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : '₦0.00 (Exempt)'}
+                        </span>
+                      </div>
+                      {parseFloat(form.technicianAccommodation) > 0 && (
+                        <div className="flex justify-between items-center text-[11px] px-1 text-slate-500 dark:text-slate-400">
+                          <span>Accommodation VAT ({livePreview.vatInc}):</span>
+                          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {(livePreview.vatableSections?.accommodation ?? false) && livePreview.vatInc !== 'No'
+                              ? `+₦${livePreview.accommodationVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              : '₦0.00 (Exempt)'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

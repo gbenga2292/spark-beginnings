@@ -287,6 +287,7 @@ export interface Site {
   position?: string;
   currentProgressPercentage?: number;
   currentDewateringStage?: DewateringStage;
+  trackDiesel?: boolean;
   createdAt?: string;
   created_at?: string;
 }
@@ -685,6 +686,7 @@ export interface AuxiliaryEquipmentItem {
 export interface InvoiceVatableSections {
   equipment: boolean;
   technicians: boolean;
+  accommodation: boolean;
   diesel: boolean;
   mobDemob: boolean;
   installation: boolean;
@@ -743,6 +745,10 @@ export interface PendingInvoice {
   internalNotes?: string;
   showNotesAsLineItems?: boolean;
   noteLineItems?: InvoiceNoteLineItem[];
+  whtRate?: number;
+  whtAmount?: number;
+  whtTiming?: 'before_vat' | 'after_vat';
+  whtDeductionType?: 'reduce_net' | 'deduct_gross';
 }
 
 export interface InvoiceNoteLineItem {
@@ -813,6 +819,10 @@ export interface Invoice {
   internalNotes?: string;
   showNotesAsLineItems?: boolean;
   noteLineItems?: InvoiceNoteLineItem[];
+  whtRate?: number;
+  whtAmount?: number;
+  whtTiming?: 'before_vat' | 'after_vat';
+  whtDeductionType?: 'reduce_net' | 'deduct_gross';
 }
 
 export interface SalaryAdvance {
@@ -1313,6 +1323,7 @@ export const useAppStore = create<AppState>()(
         defaultVatableSections: {
           equipment: true,
           technicians: false,
+          accommodation: false,
           diesel: true,
           mobDemob: true,
           installation: true,

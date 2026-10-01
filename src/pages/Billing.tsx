@@ -277,6 +277,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const vatableSections: InvoiceVatableSections = input.vatableSections || {
       equipment: true,
       technicians: false,
+      accommodation: false,
       diesel: true,
       mobDemob: true,
       installation: true,
@@ -289,14 +290,16 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     let totalCharge = totalCost;
 
     if (vatScope === 'per_section') {
+      const techCrewCost = techDayCost + techNightCost;
       const eqVal = (vatableSections.equipment ?? true) ? (rentalCost + auxiliaryCost) : 0;
-      const techVal = (vatableSections.technicians ?? false) ? techniciansCost : 0;
+      const techVal = (vatableSections.technicians ?? false) ? techCrewCost : 0;
+      const accomVal = (vatableSections.accommodation ?? false) ? techAccomCost : 0;
       const dieselVal = (vatableSections.diesel ?? true) ? dieselCost : 0;
       const mobVal = (vatableSections.mobDemob ?? true) ? mobDemob : 0;
       const instVal = (vatableSections.installation ?? true) ? installation : 0;
       const damVal = (vatableSections.damages ?? false) ? damages : 0;
 
-      const grossVatable = eqVal + techVal + dieselVal + mobVal + instVal + damVal;
+      const grossVatable = eqVal + techVal + accomVal + dieselVal + mobVal + instVal + damVal;
       const grossNonVatable = Math.max(0, subtotalCost - grossVatable);
 
       let netVatable = grossVatable;
@@ -2750,7 +2753,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
           list.push({
             id: generateId(),
             selected: true,
-            type: 'technician',
+            type: 'accommodation',
             desc: `Crew Accommodation Charge\n${accomCrewCount} staff @ ₦${accomRate.toLocaleString()}/tech/day for ${actualAccomDuration} day${actualAccomDuration !== 1 ? 's' : ''}.`,
             qty: accomCrewCount,
             unitRate: accomRate * actualAccomDuration,
@@ -2824,6 +2827,7 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
   const vatableSections = invoice.vatableSections || {
     equipment: true,
     technicians: false,
+    accommodation: false,
     diesel: true,
     mobDemob: true,
     installation: true,
@@ -2841,6 +2845,8 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       case 'technicians':
       case 'technician':
         return vatableSections.technicians ?? false;
+      case 'accommodation':
+        return vatableSections.accommodation ?? false;
       case 'mobDemob':
         return vatableSections.mobDemob ?? true;
       case 'installation':

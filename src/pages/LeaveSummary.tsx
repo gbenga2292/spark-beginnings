@@ -1,13 +1,85 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
+import { Card } from '@/src/components/ui/card';
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
-import { Search, ListFilter, ArrowLeft } from 'lucide-react';
+import { Search, ListFilter, ArrowLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { useAppStore } from '@/src/store/appStore';
 import { filterAndSortEmployeesExcludingCEO } from '@/src/lib/hierarchy';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
+
+// ── Robust date parser supporting DD/MM/YYYY, YYYY-MM-DD, etc. ─────────────────
+function parseEmployeeStartDate(raw?: string | null): Date | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // 1. Slash format e.g. "DD/MM/YYYY" or "YYYY/MM/DD"
+  if (trimmed.includes('/')) {
+    const parts = trimmed.split('/');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY/MM/DD
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        const dt = new Date(y, m, d);
+        if (!isNaN(dt.getTime())) return dt;
+      } else {
+        // DD/MM/YYYY
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        const dt = new Date(y, m, d);
+        if (!isNaN(dt.getTime())) return dt;
+      }
+    }
+  }
+
+  // 2. Hyphen format e.g. "YYYY-MM-DD" or "DD-MM-YYYY"
+  if (trimmed.includes('-')) {
+    const clean = trimmed.split('T')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = parseInt(parts[2], 10);
+        const dt = new Date(y, m, d);
+        if (!isNaN(dt.getTime())) return dt;
+      } else {
+        // DD-MM-YYYY
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        const dt = new Date(y, m, d);
+        if (!isNaN(dt.getTime())) return dt;
+      }
+    }
+  }
+
+  // Fallback
+  const dt = new Date(trimmed);
+  return !isNaN(dt.getTime()) ? dt : null;
+}
+
+// ── Only employees who have joined for over a year are counted for leave ────────
+function hasJoinedOverOneYear(emp: { startDate?: string; verifiedStartDate?: string }): boolean {
+  const dateStr = emp.verifiedStartDate || emp.startDate;
+  const startDate = parseEmployeeStartDate(dateStr);
+  if (!startDate) return false;
+
+  const now = new Date();
+  const oneYearAfter = new Date(startDate);
+  oneYearAfter.setFullYear(oneYearAfter.getFullYear() + 1);
+
+  return oneYearAfter <= now;
+}
+
+type SortField = 'name' | 'department' | 'entitlement' | 'daysTaken' | 'remaining' | 'timesTaken' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 export function LeaveSummary() {
   const navigate = useNavigate();
@@ -16,25 +88,57 @@ export function LeaveSummary() {
   const departments = useAppStore((state) => state.departments);
   const leaveTypes = useAppStore((state) => state.leaveTypes);
 
+  // Filter to active staff who have joined for OVER a year
   const employees = useMemo(() => {
-    const activeEmployees = allEmployees.filter(e => 
-      (e.status === 'Active' || e.status === 'On Leave') &&
-      (e.staffType === 'OFFICE' || e.staffType === 'FIELD')
-    );
-    return filterAndSortEmployeesExcludingCEO(activeEmployees);
+    const eligibleEmployees = allEmployees.filter(e => {
+      const isActive =
+        (e.status === 'Active' || e.status === 'On Leave') &&
+        (e.staffType === 'OFFICE' || e.staffType === 'FIELD');
+      if (!isActive) return false;
+
+      // Only count employees who have been with the company over 1 year
+      return hasJoinedOverOneYear(e);
+    });
+
+    return filterAndSortEmployeesExcludingCEO(eligibleEmployees);
   }, [allEmployees]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDept, setFilterDept] = useState('All');
   const [filterLeaveType, setFilterLeaveType] = useState('All Leaves');
 
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      // For numeric metrics default desc, for strings default asc
+      setSortDirection(field === 'name' || field === 'department' ? 'asc' : 'desc');
+    }
+  };
+
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100 transition-opacity" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+    );
+  };
+
   const currentYear = new Date().getFullYear();
 
-  // Summary logic extracted from Leaves.tsx
+  // Summary logic
   const leaveSummary = useMemo(() => {
     return employees.map(emp => {
       const empLeaves = leaves.filter(l => l.employeeId === emp.id && l.status !== 'Cancelled');
-      
+
       const deductibleTaken = empLeaves.reduce((acc, l) => {
         const typeStr = (l.leaveType || '').toLowerCase();
         // Maternity and Paternity do not reduce annual leave
@@ -46,8 +150,8 @@ export function LeaveSummary() {
       const specificLeaves = filterLeaveType === 'All Leaves' ? [] : empLeaves.filter(l => l.leaveType === filterLeaveType);
       const timesTakenSpecific = specificLeaves.length;
       const daysTakenSpecific = specificLeaves.reduce((acc, l) => acc + l.duration, 0);
-      
-      const entitlement = emp.yearlyLeave || 20;
+
+      const entitlement = emp.yearlyLeave || 14;
       const remaining = entitlement - deductibleTaken;
 
       const isCurrentlyOnLeave = empLeaves.some(l => {
@@ -60,20 +164,70 @@ export function LeaveSummary() {
 
       return { emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific };
     });
-  }, [employees, leaves, currentYear]);
+  }, [employees, leaves]);
 
   const filteredSummary = useMemo(() => {
     return leaveSummary.filter(item => {
       const matchesSearch = `${item.emp.surname} ${item.emp.firstname}`.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesDept = filterDept === 'All' || item.emp.department === filterDept;
-      // We don't filter rows by filterLeaveType, we only change the columns inside them
       return matchesSearch && matchesDept;
     });
-  }, [leaveSummary, searchQuery, filterDept, filterLeaveType]);
+  }, [leaveSummary, searchQuery, filterDept]);
+
+  // Apply column sorting
+  const sortedSummary = useMemo(() => {
+    const list = [...filteredSummary];
+    list.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      switch (sortField) {
+        case 'name':
+          valA = `${a.emp.surname} ${a.emp.firstname}`.toLowerCase();
+          valB = `${b.emp.surname} ${b.emp.firstname}`.toLowerCase();
+          break;
+        case 'department':
+          valA = (a.emp.department || '').toLowerCase();
+          valB = (b.emp.department || '').toLowerCase();
+          break;
+        case 'entitlement':
+          valA = a.entitlement;
+          valB = b.entitlement;
+          break;
+        case 'timesTaken':
+          valA = a.timesTakenSpecific;
+          valB = b.timesTakenSpecific;
+          break;
+        case 'daysTaken':
+          valA = filterLeaveType === 'All Leaves' ? a.deductibleTaken : a.daysTakenSpecific;
+          valB = filterLeaveType === 'All Leaves' ? b.deductibleTaken : b.daysTakenSpecific;
+          break;
+        case 'remaining':
+          valA = a.remaining;
+          valB = b.remaining;
+          break;
+        case 'status':
+          valA = a.isCurrentlyOnLeave ? 1 : 0;
+          valB = b.isCurrentlyOnLeave ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        const comp = valA.localeCompare(valB);
+        return sortDirection === 'asc' ? comp : -comp;
+      }
+
+      const diff = Number(valA) - Number(valB);
+      return sortDirection === 'asc' ? diff : -diff;
+    });
+    return list;
+  }, [filteredSummary, sortField, sortDirection, filterLeaveType]);
 
   useSetPageTitle(
     'Leave Entitlement Summary',
-    `Overview of all employee leave balances for the year ${currentYear}`,
+    `Leave balances for staff with over 1 year of continuous service (${currentYear})`,
     <Button 
       variant="ghost" 
       size="sm" 
@@ -94,7 +248,12 @@ export function LeaveSummary() {
             <div className="h-8 w-8 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
               <ListFilter className="h-4 w-4" />
             </div>
-            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">Leave Balances <span className="text-slate-400 dark:text-slate-500 font-normal">({filteredSummary.length})</span></p>
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">
+                Leave Balances <span className="text-slate-400 dark:text-slate-500 font-normal">({sortedSummary.length})</span>
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">Staff with &gt; 1 year of service</p>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -138,32 +297,97 @@ export function LeaveSummary() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase text-[11px] tracking-wider font-semibold">
-                <th className="px-5 py-3">Employee</th>
-                <th className="px-5 py-3 hidden sm:table-cell">Department</th>
+                <th 
+                  onClick={() => handleSort('name')} 
+                  className="px-5 py-3.5 cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Employee</span>
+                    {renderSortIcon('name')}
+                  </div>
+                </th>
+                <th 
+                  onClick={() => handleSort('department')} 
+                  className="px-5 py-3.5 hidden sm:table-cell cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Department</span>
+                    {renderSortIcon('department')}
+                  </div>
+                </th>
                 {filterLeaveType === 'All Leaves' ? (
                   <>
-                    <th className="px-5 py-3 text-center">Annual Leave</th>
-                    <th className="px-5 py-3 text-center">Days Taken</th>
-                    <th className="px-5 py-3 text-center">Remaining</th>
+                    <th 
+                      onClick={() => handleSort('entitlement')} 
+                      className="px-5 py-3.5 text-center cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Annual Leave</span>
+                        {renderSortIcon('entitlement')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('daysTaken')} 
+                      className="px-5 py-3.5 text-center cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Days Taken</span>
+                        {renderSortIcon('daysTaken')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('remaining')} 
+                      className="px-5 py-3.5 text-center cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Remaining</span>
+                        {renderSortIcon('remaining')}
+                      </div>
+                    </th>
                   </>
                 ) : (
                   <>
-                    <th className="px-5 py-3 text-center">Times Taken</th>
-                    <th className="px-5 py-3 text-center">Days Taken</th>
+                    <th 
+                      onClick={() => handleSort('timesTaken')} 
+                      className="px-5 py-3.5 text-center cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Times Taken</span>
+                        {renderSortIcon('timesTaken')}
+                      </div>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('daysTaken')} 
+                      className="px-5 py-3.5 text-center cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>Days Taken</span>
+                        {renderSortIcon('daysTaken')}
+                      </div>
+                    </th>
                   </>
                 )}
-                <th className="px-5 py-3 text-center">Status</th>
+                <th 
+                  onClick={() => handleSort('status')} 
+                  className="px-5 py-3.5 text-center cursor-pointer select-none group hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
+                >
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>Status</span>
+                    {renderSortIcon('status')}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredSummary.length === 0 ? (
+              {sortedSummary.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-5 py-12 text-center text-slate-500">
-                    No records found matching your filters.
+                    <p className="font-medium text-slate-700 dark:text-slate-300">No staff found matching your criteria.</p>
+                    <p className="text-xs text-slate-400 mt-1">Note: Only employees who have completed at least 1 year of service from their start date are eligible for leave balance tracking.</p>
                   </td>
                 </tr>
               ) : (
-                filteredSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
+                sortedSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
                   <tr key={emp.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="px-5 py-3 font-semibold text-slate-800 dark:text-slate-200 uppercase text-xs">{emp.surname} {emp.firstname}</td>
                     <td className="px-5 py-3 text-slate-500 dark:text-slate-400 text-xs hidden sm:table-cell">{emp.department}</td>
@@ -201,12 +425,13 @@ export function LeaveSummary() {
 
         {/* Mobile View: Cards */}
         <div className="md:hidden flex flex-col divide-y divide-slate-100 dark:divide-slate-800 flex-1">
-          {filteredSummary.length === 0 ? (
+          {sortedSummary.length === 0 ? (
             <div className="px-5 py-12 text-center text-slate-500">
-              No records found matching your filters.
+              <p className="font-medium text-slate-700 dark:text-slate-300">No staff found matching your criteria.</p>
+              <p className="text-xs text-slate-400 mt-1">Note: Only employees who have completed at least 1 year of service from their start date are eligible for leave balance tracking.</p>
             </div>
           ) : (
-            filteredSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
+            sortedSummary.map(({ emp, deductibleTaken, remaining, entitlement, isCurrentlyOnLeave, timesTakenSpecific, daysTakenSpecific }) => (
               <div key={`mobile-${emp.id}`} className="p-4 flex flex-col gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
                 <div className="flex items-start justify-between">
                   <div className="flex flex-col">
@@ -255,4 +480,3 @@ export function LeaveSummary() {
     </div>
   );
 }
-

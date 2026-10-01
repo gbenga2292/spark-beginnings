@@ -49,6 +49,8 @@ export function dbToSite(r: any): Site {
     position: r.position || undefined,
     currentProgressPercentage: (r.end_date && r.end_date.trim() !== '') ? 100 : (r.current_progress_percentage ?? undefined),
     currentDewateringStage: (r.end_date && r.end_date.trim() !== '') ? 'demobilisation' : (r.current_dewatering_stage ?? undefined),
+    // Explicitly map false → false, null/undefined/true → true (null means default enabled)
+    trackDiesel: r.track_diesel === false ? false : true,
   };
 }
 
@@ -144,6 +146,10 @@ export function dbToInvoice(r: any): Invoice {
     internalNotes: r.internal_notes || undefined,
     showNotesAsLineItems: r.show_notes_as_line_items ?? false,
     noteLineItems: r.note_line_items || [],
+    whtRate: r.wht_rate != null ? Number(r.wht_rate) : undefined,
+    whtAmount: r.wht_amount != null ? Number(r.wht_amount) : undefined,
+    whtTiming: r.wht_timing || undefined,
+    whtDeductionType: r.wht_deduction_type || undefined,
   };
 }
 
@@ -187,6 +193,10 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     internalNotes: r.internal_notes || undefined,
     showNotesAsLineItems: r.show_notes_as_line_items ?? false,
     noteLineItems: r.note_line_items || [],
+    whtRate: r.wht_rate != null ? Number(r.wht_rate) : undefined,
+    whtAmount: r.wht_amount != null ? Number(r.wht_amount) : undefined,
+    whtTiming: r.wht_timing || undefined,
+    whtDeductionType: r.wht_deduction_type || undefined,
   };
 }
 
@@ -762,7 +772,7 @@ function clientProfileToDb(c: any) {
 
 function siteToDb(s: Site) {
   const hasEndDate = !!(s.endDate && s.endDate.trim() !== '');
-  return { 
+  const dbObj: any = { 
     id: s.id, 
     name: s.name, 
     client: s.client, 
@@ -777,6 +787,11 @@ function siteToDb(s: Site) {
     current_progress_percentage: hasEndDate ? 100 : (s.currentProgressPercentage ?? null),
     current_dewatering_stage: hasEndDate ? 'demobilisation' : sanitizeDewateringStage(s.currentDewateringStage),
   };
+  // Only write track_diesel when explicitly set — never overwrite DB value with a default
+  if (s.trackDiesel !== undefined) {
+    dbObj.track_diesel = s.trackDiesel === false ? false : true;
+  }
+  return dbObj;
 }
 
 
@@ -873,6 +888,10 @@ function invoiceToDb(i: Invoice) {
     internal_notes: i.internalNotes || null,
     show_notes_as_line_items: i.showNotesAsLineItems ?? false,
     note_line_items: i.noteLineItems || [],
+    wht_rate: i.whtRate != null ? i.whtRate : null,
+    wht_amount: i.whtAmount != null ? i.whtAmount : null,
+    wht_timing: i.whtTiming || null,
+    wht_deduction_type: i.whtDeductionType || null,
   };
 }
 
@@ -916,6 +935,10 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     internal_notes: p.internalNotes || null,
     show_notes_as_line_items: p.showNotesAsLineItems ?? false,
     note_line_items: p.noteLineItems || [],
+    wht_rate: p.whtRate != null ? p.whtRate : null,
+    wht_amount: p.whtAmount != null ? p.whtAmount : null,
+    wht_timing: p.whtTiming || null,
+    wht_deduction_type: p.whtDeductionType || null,
   };
 }
 
@@ -1677,6 +1700,7 @@ export const db = {
     if (s.currentDewateringStage !== undefined && !(update.end_date && update.end_date.trim() !== '')) {
       update.current_dewatering_stage = s.currentDewateringStage ?? null;
     }
+    if (s.trackDiesel !== undefined) update.track_diesel = s.trackDiesel;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) { console.error('updateSite:', error); throw error; }
   },
@@ -1989,7 +2013,11 @@ export const db = {
       auxiliaryEquipment: 'auxiliary_equipment',
       internalNotes: 'internal_notes',
       showNotesAsLineItems: 'show_notes_as_line_items',
-      noteLineItems: 'note_line_items'
+      noteLineItems: 'note_line_items',
+      whtRate: 'wht_rate',
+      whtAmount: 'wht_amount',
+      whtTiming: 'wht_timing',
+      whtDeductionType: 'wht_deduction_type'
     };
     const validDbColumns = new Set(Object.values(map));
     const update: any = {};
@@ -2064,7 +2092,11 @@ export const db = {
       technicianAccommodationDurationSameAsDay: 'technician_accommodation_duration_same_as_day',
       internalNotes: 'internal_notes',
       showNotesAsLineItems: 'show_notes_as_line_items',
-      noteLineItems: 'note_line_items'
+      noteLineItems: 'note_line_items',
+      whtRate: 'wht_rate',
+      whtAmount: 'wht_amount',
+      whtTiming: 'wht_timing',
+      whtDeductionType: 'wht_deduction_type'
     };
     const validDbColumns = new Set(Object.values(map));
     const update: any = {};

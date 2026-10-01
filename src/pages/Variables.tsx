@@ -2787,7 +2787,8 @@ export function Variables() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {[
                     { key: 'equipment', label: 'Equipment & Machinery Lease', desc: 'Pump rental & equipment' },
-                    { key: 'technicians', label: 'Dewatering Crew & Personnel', desc: 'Day/night shift crew & accommodation' },
+                    { key: 'technicians', label: 'Dewatering Crew & Personnel', desc: 'Day and night shift site crew' },
+                    { key: 'accommodation', label: 'Crew Accommodation & Lodging', desc: 'Technician housing & accommodation' },
                     { key: 'diesel', label: 'Consumables & Diesel', desc: 'Fuel liters & consumption' },
                     { key: 'mobDemob', label: 'Mobilization & Demob', desc: 'Logistics delivery & transport' },
                     { key: 'installation', label: 'Installation Fee', desc: 'Rigging & site installation' },
@@ -2796,6 +2797,7 @@ export function Variables() {
                     const currentDefaults = localPayrollVars.defaultVatableSections || {
                       equipment: true,
                       technicians: false,
+                      accommodation: false,
                       diesel: true,
                       mobDemob: true,
                       installation: true,

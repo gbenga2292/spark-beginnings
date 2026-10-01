@@ -13,8 +13,10 @@ export interface RefillForecastItem {
   benchmarkBurnRate: number;
   lastRefillDate: string | null;
   lastRefillLitres: number;
+  lastRefillSiteName?: string | null;
   lastDipstickDate: string | null;
   lastDipstickLitres: number | null;
+  lastDipstickSiteName?: string | null;
   estimatedRemainingLitres: number;
   fuelPercentage: number;
   isDipstickVerified: boolean;
@@ -160,7 +162,12 @@ export function useRefillForecast() {
         const isOnHold = (siteHoldPeriods || []).some(
           h => (h.siteId === s.id || h.siteName?.trim().toLowerCase() === nameLower) && !h.holdEnd
         );
-        return !isOnHold;
+        if (isOnHold) return false;
+
+        // Exclude sites where diesel tracking has been disabled
+        if (s.trackDiesel === false) return false;
+
+        return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [sites, siteHoldPeriods, isDewateringSite]);
@@ -211,14 +218,19 @@ export function useRefillForecast() {
         const benchmarkBurnRate = Number(rawAsset?.expectedDailyBurnRate) || 18.0;
         const tankCapacityLitres = Number(rawAsset?.tankCapacityLitres) || 0;
 
-        const mLogs = sLogs.filter(l => l.assetId === mId).sort((a, b) => b.date.localeCompare(a.date));
+        // Machine logs across all sites, ordered by date descending, so fuel telemetry persists across site moves
+        const mLogs = (dailyMachineLogs || [])
+          .filter(l => l.assetId === mId || (rawAsset?.name && l.assetName?.toLowerCase().trim() === rawAsset.name.toLowerCase().trim()))
+          .sort((a, b) => b.date.localeCompare(a.date));
         const lastDipstickLog = mLogs.find(l => l.dipstickLevelLitres != null && Number(l.dipstickLevelLitres) >= 0);
         const lastDipstickDate = lastDipstickLog?.date || null;
         const lastDipstickLitres = lastDipstickLog?.dipstickLevelLitres != null ? Number(lastDipstickLog.dipstickLevelLitres) : null;
+        const lastDipstickSiteName = lastDipstickLog?.siteName || null;
 
         const lastRefillLog = mLogs.find(l => (Number(l.dieselUsage) || 0) > 0);
         const lastRefillDate = lastRefillLog?.date || null;
         const lastRefillLitres = Number(lastRefillLog?.dieselUsage) || 0;
+        const lastRefillSiteName = lastRefillLog?.siteName || null;
         const wasLastRefillFull = !!lastRefillLog?.isTankFilledToFull;
 
         const effectiveTankCapacity = tankCapacityLitres > 0 
@@ -349,8 +361,10 @@ export function useRefillForecast() {
           benchmarkBurnRate,
           lastRefillDate,
           lastRefillLitres,
+          lastRefillSiteName,
           lastDipstickDate,
           lastDipstickLitres,
+          lastDipstickSiteName,
           estimatedRemainingLitres,
           fuelPercentage,
           isDipstickVerified,

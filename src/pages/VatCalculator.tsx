@@ -27,6 +27,7 @@ const DEFAULT_PARAMS: VatCalculatorParams = {
   vatableSections: {
     equipment: true,
     technicians: false,
+    accommodation: false,
     diesel: true,
     mobDemob: true,
     installation: true,
@@ -231,6 +232,7 @@ export default function VatCalculator() {
           vatableSections: {
             equipment: matchingInvoice.vatableSections?.equipment ?? true,
             technicians: matchingInvoice.vatableSections?.technicians ?? false,
+            accommodation: matchingInvoice.vatableSections?.accommodation ?? false,
             diesel: matchingInvoice.vatableSections?.diesel ?? true,
             mobDemob: matchingInvoice.vatableSections?.mobDemob ?? true,
             installation: matchingInvoice.vatableSections?.installation ?? true,
@@ -319,6 +321,7 @@ export default function VatCalculator() {
       vatableSections: {
         equipment: r.vatableSections?.equipment ?? true,
         technicians: r.vatableSections?.technicians ?? false,
+        accommodation: r.vatableSections?.accommodation ?? false,
         diesel: r.vatableSections?.diesel ?? true,
         mobDemob: r.vatableSections?.mobDemob ?? true,
         installation: r.vatableSections?.installation ?? true,
@@ -390,7 +393,8 @@ export default function VatCalculator() {
 
   const SECTIONS: { key: keyof VatableSectionFlags; label: string }[] = [
     { key: 'equipment', label: 'Equipment' },
-    { key: 'technicians', label: 'Technicians' },
+    { key: 'technicians', label: 'Crew' },
+    { key: 'accommodation', label: 'Accommodation' },
     { key: 'diesel', label: 'Diesel' },
     { key: 'mobDemob', label: 'Mob/Demob' },
     { key: 'installation', label: 'Installation' },

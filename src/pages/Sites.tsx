@@ -7,7 +7,7 @@ import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogFooter } from '@/src/components/ui/dialog';
-import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2, ExternalLink, Paperclip, CheckSquare } from 'lucide-react';
+import { Search, Plus, MapPin, Building2, X, Save, Pencil, Trash2, Download, Upload, CheckCircle2, Circle, Eye, FileText, MoreVertical, Clock, LayoutGrid, List, ArrowUpDown, ChevronUp, ChevronDown, MessageSquare, BookOpen, Calendar, Phone, Mail, Car, MessageCircle, Users, ArrowLeft, Check, Bell, UserCheck, UserCircle, Briefcase, Sparkles, Edit2, ExternalLink, Paperclip, CheckSquare, Fuel } from 'lucide-react';
 import { useAppStore, Site, ClientProfile } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import { SiteQuestionnaire, SiteAttachment } from '@/src/types/SiteQuestionnaire';
@@ -796,6 +796,16 @@ export function Sites() {
   };
 
 
+  const handleToggleDieselTracking = (site: Site) => {
+    const nextVal = site.trackDiesel === false ? true : false;
+    updateSite(site.id, { trackDiesel: nextVal });
+    if (nextVal) {
+      toast.success(`Diesel refill tracking enabled for "${site.name}".`);
+    } else {
+      toast.info(`Diesel refill tracking disabled for "${site.name}". Excluded from forecast.`);
+    }
+  };
+
   const handleEditStart = (site: Site) => {
     setEditingId(site.id);
     setEditForm({ name: site.name, client: site.client, vat: site.vat, status: site.status, startDate: site.startDate || '', endDate: site.endDate || '' });
@@ -1459,12 +1469,23 @@ export function Sites() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'}
-                          className="text-[10px] font-bold rounded-sm"
-                        >
-                          {site.status}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge 
+                            variant={site.status === 'Ended' ? 'destructive' : site.status === 'Active' ? 'success' : 'secondary'}
+                            className="text-[10px] font-bold rounded-sm"
+                          >
+                            {site.status}
+                          </Badge>
+                          {site.trackDiesel === false && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] font-normal text-slate-500 border-slate-200 dark:border-slate-700 rounded-sm"
+                              title="Diesel refill tracking disabled"
+                            >
+                              No Diesel
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       {hasActions && (
                         <TableCell className="text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
@@ -1571,6 +1592,16 @@ export function Sites() {
                                     </DropdownMenuItem>
                                   )}
   
+                                  {canEditSite && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleToggleDieselTracking(site)}
+                                      className="gap-2 text-slate-700 dark:text-slate-300"
+                                    >
+                                      <Fuel className="h-4 w-4 text-amber-500" />
+                                      <span>{site.trackDiesel === false ? 'Enable Diesel Tracking' : 'Disable Diesel Tracking'}</span>
+                                    </DropdownMenuItem>
+                                  )}
+  
                                   {canDeleteSite && (
                                     <>
                                       <DropdownMenuSeparator />
@@ -1653,7 +1684,16 @@ export function Sites() {
                                     </span>
                                   </>
                                 )}
-                                <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                                {site.trackDiesel === false && (
+                                    <>
+                                      <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0 rounded-sm shrink-0 bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700" title="Diesel refill tracking is disabled for this site">
+                                        <Fuel className="h-2.5 w-2.5 opacity-60" />
+                                        No Diesel
+                                      </span>
+                                    </>
+                                  )}
+                                  <span className="text-slate-300 dark:text-slate-600 shrink-0">•</span>
                                 <div className="flex items-center gap-1 min-w-0">
                                   <Building2 className="h-3 w-3 text-slate-400 shrink-0" />
                                   <span className="truncate" title={site.client}>{site.client}</span>
@@ -1750,6 +1790,15 @@ export function Sites() {
                                     <DropdownMenuItem onClick={() => { setViewMode('table'); handleEditStart(site); }} className="gap-2 text-blue-600 focus:text-blue-700 focus:bg-blue-50 dark:focus:bg-blue-950/40">
                                       <Pencil className="h-4 w-4" />
                                       <span>Edit Site</span>
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canEditSite && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleToggleDieselTracking(site)}
+                                      className="gap-2"
+                                    >
+                                      <Fuel className="h-4 w-4 text-amber-500" />
+                                      <span>{site.trackDiesel === false ? 'Enable Diesel Tracking' : 'Disable Diesel Tracking'}</span>
                                     </DropdownMenuItem>
                                   )}
                                   {canDeleteSite && (

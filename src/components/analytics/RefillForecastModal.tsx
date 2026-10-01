@@ -5,16 +5,51 @@ import { Button } from '@/src/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/src/components/ui/table';
 import { cn } from '@/src/lib/utils';
 import { useRefillForecast, formatLastRefilledDate, RefillForecastItem } from '@/src/hooks/useRefillForecast';
+import { formatDisplayDate } from '@/src/lib/dateUtils';
+import { useAppStore } from '@/src/store/appStore';
+import { toast } from '@/src/components/ui/toast';
 
 interface RefillForecastModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectSite?: (siteId: string) => void;
+  currentSiteId?: string;
+  currentSiteName?: string;
+  initialScope?: 'current' | 'fleet';
 }
 
-export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillForecastModalProps) {
+export function RefillForecastModal({
+  isOpen,
+  onClose,
+  onSelectSite,
+  currentSiteId,
+  currentSiteName,
+  initialScope
+}: RefillForecastModalProps) {
   const navigate = useNavigate();
   const { fleetRefillForecast } = useRefillForecast();
+  const updateSite = useAppStore(s => s.updateSite);
+
+  const [scope, setScope] = useState<'current' | 'fleet'>(initialScope || (currentSiteId ? 'current' : 'fleet'));
+
+  // Reset or sync scope when modal opens or initialScope/currentSiteId changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setScope(initialScope || (currentSiteId ? 'current' : 'fleet'));
+    }
+  }, [isOpen, initialScope, currentSiteId]);
+
+  const currentSiteForecast = useMemo(() => {
+    if (!currentSiteId) return [];
+    return fleetRefillForecast.filter(item => item.siteId === currentSiteId);
+  }, [fleetRefillForecast, currentSiteId]);
+
+  const activeForecastList = useMemo(() => {
+    if (scope === 'current' && currentSiteId) {
+      return currentSiteForecast;
+    }
+    return fleetRefillForecast;
+  }, [scope, currentSiteId, currentSiteForecast, fleetRefillForecast]);
 
   const [refillForecastSearch, setRefillForecastSearch] = useState('');
   const deferredSearch = useDeferredValue(refillForecastSearch);
@@ -25,7 +60,7 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
     let dueTomorrow = 0;
     let safe = 0;
 
-    fleetRefillForecast.forEach(item => {
+    activeForecastList.forEach(item => {
       if (item.urgency === 'critical' || item.urgency === 'today') {
         dueToday += 1;
       } else if (item.urgency === 'tomorrow') {
@@ -36,17 +71,17 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
     });
 
     return {
-      all: fleetRefillForecast.length,
+      all: activeForecastList.length,
       dueToday,
       dueTomorrow,
       safe,
     };
-  }, [fleetRefillForecast]);
+  }, [activeForecastList]);
 
   const displayedRefillForecast = useMemo(() => {
     if (!isOpen) return [];
 
-    return fleetRefillForecast.filter(item => {
+    return activeForecastList.filter(item => {
       // Urgency filtering
       if (refillForecastUrgencyFilter === 'urgent') {
         if (item.urgency !== 'critical' && item.urgency !== 'today') return false;
@@ -66,7 +101,7 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
 
       return true;
     });
-  }, [isOpen, fleetRefillForecast, refillForecastUrgencyFilter, deferredSearch]);
+  }, [isOpen, activeForecastList, refillForecastUrgencyFilter, deferredSearch]);
 
   if (!isOpen) return null;
 
@@ -77,6 +112,11 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
     } else {
       navigate(`/site-analytics?siteId=${siteId}`);
     }
+  };
+
+  const handleDisableDieselTracking = (siteId: string, siteName: string) => {
+    updateSite(siteId, { trackDiesel: false });
+    toast.info(`Diesel tracking disabled for "${siteName}". Removed from refill forecast.`);
   };
 
   return (
@@ -106,14 +146,59 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
         {/* Modal Controls Bar */}
         <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
           
-          {/* Scope indicator */}
+          {/* Scope indicator / toggle */}
           <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-300/80 dark:border-slate-700 text-xs overflow-x-auto w-full sm:w-auto">
-            <div className="px-3 py-1.5 rounded-md font-semibold text-xs bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs flex items-center gap-1.5 shrink-0">
-              <span>All Active Sites</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200">
-                {fleetRefillForecast.length}
-              </span>
-            </div>
+            {currentSiteId ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setScope('current')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
+                    scope === 'current'
+                      ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  )}
+                >
+                  <span className="truncate max-w-[140px]">Current Site: {currentSiteName || 'Site'}</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    scope === 'current'
+                      ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  )}>
+                    {currentSiteForecast.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScope('fleet')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md font-semibold text-xs transition-all flex items-center gap-1.5 shrink-0",
+                    scope === 'fleet'
+                      ? "bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  )}
+                >
+                  <span>All Active Sites</span>
+                  <span className={cn(
+                    "text-[10px] px-1.5 py-0.2 rounded-full font-bold",
+                    scope === 'fleet'
+                      ? "bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200"
+                      : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                  )}>
+                    {fleetRefillForecast.length}
+                  </span>
+                </button>
+              </>
+            ) : (
+              <div className="px-3 py-1.5 rounded-md font-semibold text-xs bg-white dark:bg-slate-900 text-cyan-700 dark:text-cyan-300 shadow-xs flex items-center gap-1.5 shrink-0">
+                <span>All Active Sites</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200">
+                  {fleetRefillForecast.length}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Filters: Search and Urgency Tabs */}
@@ -309,7 +394,11 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
                           </div>
                           <div className="flex items-center justify-between text-[10px] text-slate-400">
                             <span>
-                              {item.isDipstickVerified ? '✓ Dipstick verified' : (item.lastRefillDate ? 'Refill calculated' : 'No anchor')}
+                              {item.lastDipstickDate
+                                ? `✓ Dipstick: ${item.lastDipstickLitres}L (${formatDisplayDate(item.lastDipstickDate)})`
+                                : item.lastRefillDate
+                                ? 'Refill calculated'
+                                : 'No anchor'}
                             </span>
                             <span>Runway: {item.runwayDays}d</span>
                           </div>
@@ -329,11 +418,21 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
                             <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
                               {formatLastRefilledDate(item.lastRefillDate)}
                             </div>
-                            {item.lastRefillLitres > 0 && (
-                              <div className="text-[10px] text-slate-400 mt-0.5">
-                                {item.lastRefillLitres}L refilled
-                              </div>
-                            )}
+                            <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 flex-wrap">
+                              {item.lastRefillLitres > 0 && <span>{item.lastRefillLitres}L refilled</span>}
+                              {item.lastRefillSiteName && item.lastRefillSiteName !== item.siteName && (
+                                <span className="text-amber-600 dark:text-amber-400 font-medium">({item.lastRefillSiteName})</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : item.lastDipstickDate ? (
+                          <div>
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                              Dip: {item.lastDipstickLitres}L
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              {formatLastRefilledDate(item.lastDipstickDate)}
+                            </div>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">No refill recorded</span>
@@ -362,16 +461,34 @@ export function RefillForecastModal({ isOpen, onClose, onSelectSite }: RefillFor
 
                       {/* Action Column */}
                       <TableCell className="py-3 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewSite(item.siteId)}
-                          className="h-7 text-xs px-2.5 font-semibold text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-950/40 dark:hover:text-cyan-300 transition-all"
-                          title={`Switch view to ${item.siteName}`}
-                        >
-                          <span>View Site</span>
-                          <ArrowRight className="w-3 h-3 ml-1 text-slate-400" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {currentSiteId && item.siteId === currentSiteId ? (
+                            <span className="inline-block text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-200 dark:border-cyan-800">
+                              Current Site
+                            </span>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewSite(item.siteId)}
+                              className="h-7 text-xs px-2.5 font-semibold text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-cyan-50 hover:text-cyan-700 dark:hover:bg-cyan-950/40 dark:hover:text-cyan-300 transition-all"
+                              title={`Switch view to ${item.siteName}`}
+                            >
+                              <span>View Site</span>
+                              <ArrowRight className="w-3 h-3 ml-1 text-slate-400" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDisableDieselTracking(item.siteId, item.siteName)}
+                            className="h-7 text-xs px-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
+                            title={`Disable diesel tracking for ${item.siteName} (hide from forecast)`}
+                          >
+                            <Fuel className="w-3.5 h-3.5 mr-1" />
+                            <span className="hidden sm:inline">Disable</span>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

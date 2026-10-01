@@ -1188,7 +1188,13 @@ function RefillForecastCard({ onOpenModal }: { onOpenModal: () => void }) {
                 <div className="flex items-center gap-1 min-w-0 truncate">
                   <span className="font-medium text-foreground/90">{item.shortName}</span>
                   <span className="text-muted-foreground/60">·</span>
-                  <span className="truncate">Last: {item.lastRefillDate ? formatDisplayDate(item.lastRefillDate) : 'No log'}</span>
+                  <span className="truncate">
+                    {item.lastDipstickDate && (!item.lastRefillDate || item.lastDipstickDate >= item.lastRefillDate)
+                      ? `Dip: ${item.lastDipstickLitres}L (${formatDisplayDate(item.lastDipstickDate)})`
+                      : item.lastRefillDate
+                      ? `Last: ${formatDisplayDate(item.lastRefillDate)} (${item.lastRefillLitres}L)`
+                      : 'No log'}
+                  </span>
                 </div>
                 <div className="text-right shrink-0 text-[11px] font-medium text-foreground/80">
                   Next: {item.targetRefillFormatted}
