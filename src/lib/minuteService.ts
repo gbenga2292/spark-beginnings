@@ -199,8 +199,13 @@ export async function processAudioWithGemini(
   audioFile: File,
   geminiApiKey: string,
   model: string = 'gemini-3.6-flash',
-  onProgress?: (status: string) => void
+  onProgress?: (status: string) => void,
+  customPromptGuidelines?: string
 ): Promise<MinuteGenerationResult> {
+  const effectiveSystemPrompt = customPromptGuidelines?.trim()
+    ? `${SYSTEM_PROMPT}\n\nOrganization / Custom Meeting Guidelines:\n${customPromptGuidelines.trim()}`
+    : SYSTEM_PROMPT;
+
   // Check file size: Gemini inlineData payload is capped at ~20MB
   const maxInlineBytes = 22 * 1024 * 1024;
   if (audioFile.size > maxInlineBytes) {
@@ -239,7 +244,7 @@ export async function processAudioWithGemini(
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             systemInstruction: {
-              parts: [{ text: SYSTEM_PROMPT }],
+              parts: [{ text: effectiveSystemPrompt }],
             },
             contents: [
               {
@@ -319,10 +324,15 @@ export async function generateMinuteFromText(
     geminiKey?: string;
     groqKey?: string;
     model?: string;
+    customPromptGuidelines?: string;
   },
   onProgress?: (status: string) => void
 ): Promise<MinuteGenerationResult> {
   onProgress?.(`Structuring meeting minutes using ${engine.toUpperCase()}...`);
+
+  const effectiveSystemPrompt = options?.customPromptGuidelines?.trim()
+    ? `${SYSTEM_PROMPT}\n\nOrganization / Custom Meeting Guidelines:\n${options.customPromptGuidelines.trim()}`
+    : SYSTEM_PROMPT;
 
   // If engine is Groq or Gemini:
   if (engine === 'groq' && options?.groqKey) {
@@ -335,7 +345,7 @@ export async function generateMinuteFromText(
       body: JSON.stringify({
         model: options.model || 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: effectiveSystemPrompt },
           {
             role: 'user',
             content: `Here is the meeting text/transcript. Extract standard corporate meeting minutes:\n\n${transcriptText}`,
@@ -376,7 +386,7 @@ export async function generateMinuteFromText(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            systemInstruction: { parts: [{ text: effectiveSystemPrompt }] },
             contents: [
               {
                 parts: [

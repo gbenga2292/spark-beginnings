@@ -7,7 +7,7 @@ import {
   Save, Building, Link as LinkIcon, CloudDownload,
   RefreshCw, Library, Pencil, X, Mail, Phone, MapPin, Hash, CheckCircle2,
   DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle, FolderOpen,
-  Bot, Key, Eye, EyeOff, Star, Trash2, ToggleLeft, ToggleRight, FlaskConical, Cpu,
+  Bot, Key, Eye, EyeOff, Star, Trash2, ToggleLeft, ToggleRight, FlaskConical, Cpu, Calendar,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Variables } from './Variables';
@@ -15,6 +15,9 @@ import { useAppStore } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useOperations } from '@/src/contexts/OperationsContext';
+import { useMinuteStore } from '@/src/store/minuteStore';
+import { useMeetingSettingsStore } from '@/src/store/meetingSettingsStore';
+import { MeetingSettingsPanel } from '@/src/components/minute/MeetingSettingsPanel';
 import { toast } from '@/src/components/ui/toast';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -456,6 +459,9 @@ export function Settings() {
         projects: taskState.projects,
         reminders: taskState.reminders,
         budgetItems: state.budgetItems,
+        // Meeting Minutes & Settings
+        minutes: useMinuteStore.getState().minutes,
+        meetingSettings: useMeetingSettingsStore.getState().settings,
       },
     };
   }, [state, userState, taskState, operationsState, appVersion]);
@@ -561,6 +567,8 @@ export function Settings() {
         if (d.vendorInvoices)       useAppStore.setState({ vendorInvoices: d.vendorInvoices });
         if (d.vendorInvoicePayments) useAppStore.setState({ vendorInvoicePayments: d.vendorInvoicePayments });
         if (d.budgetItems)          useAppStore.setState({ budgetItems: d.budgetItems });
+        if (d.minutes)              useMinuteStore.setState({ minutes: d.minutes });
+        if (d.meetingSettings)      useMeetingSettingsStore.setState({ settings: d.meetingSettings });
 
         // Restore Operations & Tasks context states
         operationsState.importOperationsBackupData(d);
@@ -670,6 +678,8 @@ export function Settings() {
       if (d.vehicleTrips)         useAppStore.setState({ vehicleTrips: d.vehicleTrips });
       if (d.vehicleDocumentTypes) useAppStore.setState({ vehicleDocumentTypes: d.vehicleDocumentTypes });
       if (d.budgetItems)          useAppStore.setState({ budgetItems: d.budgetItems });
+      if (d.minutes)              useMinuteStore.setState({ minutes: d.minutes });
+      if (d.meetingSettings)      useMeetingSettingsStore.setState({ settings: d.meetingSettings });
 
       // Restore Operations & Tasks context states
       operationsState.importOperationsBackupData(d);
@@ -836,6 +846,7 @@ export function Settings() {
       case 'integrations': return 'Integrations';
       case 'updates': return 'System Updates';
       case 'ai': return 'AI & Resource Settings';
+      case 'meetings': return 'Meeting Minutes Configuration';
       case 'variables': return null;
       default: return 'Settings';
     }
@@ -861,6 +872,9 @@ export function Settings() {
           </TabsTrigger>
           <TabsTrigger active={activeTab === 'ai'}           onClick={() => setActiveTab('ai')}           className="w-36">
             <Bot            className="mr-2 h-4 w-4" /> AI Settings
+          </TabsTrigger>
+          <TabsTrigger active={activeTab === 'meetings'}     onClick={() => setActiveTab('meetings')}     className="w-36">
+            <Calendar       className="mr-2 h-4 w-4" /> Meetings
           </TabsTrigger>
           <TabsTrigger active={activeTab === 'updates'}      onClick={() => setActiveTab('updates')}      className="w-32">
             <CloudDownload  className="mr-2 h-4 w-4" /> Updates
@@ -1575,6 +1589,11 @@ export function Settings() {
             </Card>
 
           </div>
+        </TabsContent>
+
+        {/* ─────────── MEETINGS TAB ────────────────────────────────── */}
+        <TabsContent active={activeTab === 'meetings'}>
+          <MeetingSettingsPanel />
         </TabsContent>
 
         {/* ─────────── INTEGRATIONS TAB ────────────────────────────── */}

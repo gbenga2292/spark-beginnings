@@ -149,6 +149,10 @@ export const exportFullAppToExcel = async (appStateData: any, appVersion: string
   appendArraySheet('projects', 'Projects');
   appendArraySheet('reminders', 'Reminders');
   appendArraySheet('budgetItems', 'BudgetItems');
+
+  /* ---- Meeting Minutes & Settings ---- */
+  appendArraySheet('minutes', 'MeetingMinutes');
+  appendObjectSheet('meetingSettings', 'MeetingSettings');
   
   // Write the file
   const now = new Date();
@@ -305,6 +309,10 @@ export const restoreFullAppFromExcel = (file: File): Promise<any> => {
         getArray('projects', 'Projects');
         getArray('reminders', 'Reminders');
         getArray('budgetItems', 'BudgetItems');
+
+        /* ---- Meeting Minutes & Settings ---- */
+        getArray('minutes', 'MeetingMinutes');
+        getObject('meetingSettings', 'MeetingSettings');
 
         resolve(restoredData);
       } catch (err) {

@@ -9,6 +9,7 @@ import {
   Search,
   Calendar,
   User,
+  Users,
   ChevronRight,
   ArrowLeft,
   Trash2,
@@ -21,6 +22,7 @@ import {
   AlertCircle,
   ExternalLink,
   RefreshCw,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -54,8 +56,10 @@ import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 import { MinuteEditor } from '@/src/components/minute/MinuteEditor';
 import { MinuteDetailView } from '@/src/components/minute/MinuteDetailView';
 import { MinutePrintPreviewView, MinutePrintPreviewViewHandle } from '@/src/components/minute/MinutePrintPreviewView';
+import { MeetingSettingsModal } from '@/src/components/minute/MeetingSettingsModal';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import type { MeetingMinute, MeetingActionItem } from '@/src/types/minute';
+import { useMeetingSettingsStore } from '@/src/store/meetingSettingsStore';
 
 interface SavedApiKey {
   id: string;
@@ -177,6 +181,12 @@ export function Minute() {
     }
   }, [activeMinute?.id]);
 
+  // Meeting settings store
+  const meetingSettings = useMeetingSettingsStore((s) => s.settings);
+
+  // Meeting settings modal
+  const [isMeetingSettingsOpen, setIsMeetingSettingsOpen] = useState(false);
+
   // Modal for new minute
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<'upload' | 'record' | 'paste'>('upload');
@@ -219,6 +229,19 @@ export function Minute() {
     setAttendeeSearch('');
     setCustomAttendeeInput('');
     setShowAttendeeDropdown(false);
+  };
+
+  const addAttendees = (names: string[]) => {
+    setModalAttendees((prev) => {
+      const next = [...prev];
+      for (const n of names) {
+        const trimmed = n.trim();
+        if (trimmed && !next.includes(trimmed)) {
+          next.push(trimmed);
+        }
+      }
+      return next;
+    });
   };
 
   const removeAttendee = (name: string) => {
@@ -424,7 +447,7 @@ export function Minute() {
     setIsEditing(true);
   };
 
-  // Create a blank minute directly
+  // Create a blank minute directly (uses Meeting Settings defaults)
   const handleCreateBlank = () => {
     if (priv && !priv.canAdd) {
       toast.error('You do not have permission to create minutes.');
@@ -435,15 +458,16 @@ export function Minute() {
         ? modalAttendees
         : currentUser?.name
         ? [currentUser.name]
-        : ['HR Admin'];
+        : [meetingSettings.defaultChairPerson || 'HR Admin'];
     const blank: MeetingMinute = {
       id: `minute-${Date.now()}`,
       title: 'Executive Meeting Minute',
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      meetingType: 'HR',
-      chairPerson: currentUser?.name || user?.email || 'HR Admin',
-      location: 'Conference Room',
+      meetingType: meetingSettings.defaultMeetingType || 'HR',
+      chairPerson: currentUser?.name || user?.email || meetingSettings.defaultChairPerson || 'HR Admin',
+      location: meetingSettings.defaultLocation || 'Conference Room',
+      confidentiality: meetingSettings.confidentialityLevel,
       attendees: defaultAttendees,
       absentees: [],
       agendaTopics: [
@@ -586,6 +610,15 @@ export function Minute() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="ghost"
+            title="Meeting Settings"
+            onClick={() => setIsMeetingSettingsOpen(true)}
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <SettingsIcon className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            size="sm"
             variant="outline"
             className="h-8 text-xs gap-1 border-border/80"
             onClick={handleCreateBlank}
@@ -690,6 +723,7 @@ export function Minute() {
               geminiKey: geminiKeyObj?.keyValue,
               groqKey: groqKeyObj?.keyValue,
               model: geminiKeyObj?.defaultModel || 'gemini-3.6-flash',
+              customPromptGuidelines: meetingSettings.customPromptGuidelines,
             },
             setStatusText
           );
@@ -710,6 +744,7 @@ export function Minute() {
               geminiKey: geminiKeyObj?.keyValue,
               groqKey: groqKeyObj?.keyValue,
               model: (llm === 'gemini' ? geminiKeyObj?.defaultModel : groqKeyObj?.defaultModel) || (llm === 'gemini' ? 'gemini-3.6-flash' : 'qwen/qwen3.8-27b'),
+              customPromptGuidelines: meetingSettings.customPromptGuidelines,
             },
             setStatusText
           );
@@ -720,7 +755,11 @@ export function Minute() {
           generated = await generateMinuteFromText(
             text,
             'groq',
-            { groqKey: apiKey, model },
+            {
+              groqKey: apiKey,
+              model,
+              customPromptGuidelines: meetingSettings.customPromptGuidelines,
+            },
             setStatusText
           );
         } else {
@@ -729,7 +768,11 @@ export function Minute() {
           generated = await generateMinuteFromText(
             transcript,
             'groq',
-            { groqKey: apiKey, model },
+            {
+              groqKey: apiKey,
+              model,
+              customPromptGuidelines: meetingSettings.customPromptGuidelines,
+            },
             setStatusText
           );
         }
@@ -739,12 +782,22 @@ export function Minute() {
           generated = await generateMinuteFromText(
             text,
             'gemini',
-            { geminiKey: apiKey, model },
+            {
+              geminiKey: apiKey,
+              model,
+              customPromptGuidelines: meetingSettings.customPromptGuidelines,
+            },
             setStatusText
           );
         } else {
           if (!file) throw new Error('Please upload an audio file or record voice.');
-          generated = await processAudioWithGemini(file, apiKey, model, setStatusText);
+          generated = await processAudioWithGemini(
+            file,
+            apiKey,
+            model,
+            setStatusText,
+            meetingSettings.customPromptGuidelines
+          );
         }
       } else {
         // notebooklm or manual notes
@@ -760,6 +813,7 @@ export function Minute() {
             geminiKey: geminiKeyObj?.keyValue,
             groqKey: groqKeyObj?.keyValue,
             model: geminiKeyObj?.defaultModel || 'gemini-3.6-flash',
+            customPromptGuidelines: meetingSettings.customPromptGuidelines,
           },
           setStatusText
         );
@@ -782,6 +836,12 @@ export function Minute() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           ...generated,
+          chairPerson: (generated.chairPerson && generated.chairPerson !== 'Not specified')
+            ? generated.chairPerson
+            : (meetingSettings.defaultChairPerson || currentUser?.name || 'HR Admin'),
+          location: generated.location || meetingSettings.defaultLocation || 'Conference Room',
+          meetingType: generated.meetingType || meetingSettings.defaultMeetingType || 'HR',
+          confidentiality: (generated as any).confidentiality || meetingSettings.confidentialityLevel || 'Confidential',
           attendees: mergedAttendees.length > 0 ? mergedAttendees : aiAttendees,
         };
         addMinute(created);
@@ -806,12 +866,16 @@ export function Minute() {
     if (!activeMinute) return;
     setIsConvertingTasks(true);
     try {
+      const defaultPriority = meetingSettings.defaultPriority || 'medium';
       const mainTask = await createMainTask({
         title: `Meeting Action Items: ${activeMinute.title}`,
         description: `Deliverables from ${activeMinute.title} on ${activeMinute.date}. Chair: ${activeMinute.chairPerson}`,
-        priority: 'medium',
+        priority: defaultPriority,
         is_hr_task: true,
       });
+
+      const turnaroundDays = meetingSettings.defaultActionTurnaroundDays || 7;
+      const defaultDueDate = new Date(Date.now() + turnaroundDays * 86400000).toISOString().split('T')[0];
 
       const updated = [...activeMinute.actionItems];
       for (const item of selectedItems) {
@@ -820,8 +884,8 @@ export function Minute() {
           title: item.description,
           description: `Deliverable from ${activeMinute.title}`,
           assigned_to: item.assigneeId || null,
-          due_date: item.dueDate || null,
-          priority: item.priority || 'medium',
+          due_date: item.dueDate || defaultDueDate,
+          priority: item.priority || defaultPriority,
           status: 'todo',
         });
         const idx = updated.findIndex((a) => a.id === item.id);
@@ -1446,6 +1510,28 @@ export function Minute() {
                   </div>
                 </div>
               </div>
+
+              {/* Committee Groups Quick Add */}
+              {meetingSettings.committeeGroups && meetingSettings.committeeGroups.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                    <Users className="w-2.5 h-2.5 text-teal-600" />
+                    Quick Add Group:
+                  </span>
+                  {meetingSettings.committeeGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => addAttendees(group.memberNames || [])}
+                      className="text-[10px] px-2 py-0.5 rounded-full border border-border/80 bg-muted/30 hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300 hover:border-teal-500/30 transition-colors flex items-center gap-1 font-medium"
+                      title={`Add members: ${(group.memberNames || []).join(', ')}`}
+                    >
+                      <span>{group.name}</span>
+                      <span className="text-[9px] opacity-60">({(group.memberNames || []).length})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>{/* end scrollable body */}
@@ -1534,6 +1620,12 @@ export function Minute() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Meeting Settings Quick-Access Modal */}
+      <MeetingSettingsModal
+        open={isMeetingSettingsOpen}
+        onOpenChange={setIsMeetingSettingsOpen}
+      />
     </div>
   );
 }

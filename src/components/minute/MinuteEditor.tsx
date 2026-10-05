@@ -24,6 +24,7 @@ import { Input } from '@/src/components/ui/input';
 import { Textarea } from '@/src/components/ui/textarea';
 import { Badge } from '@/src/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/src/components/ui/card';
+import { useMeetingSettingsStore } from '@/src/store/meetingSettingsStore';
 import type { MeetingMinute, MeetingActionItem } from '@/src/types/minute';
 import type { Employee } from '@/src/store/appStore';
 
@@ -48,6 +49,7 @@ export function MinuteEditor({
   isConverting,
   hideTopBar = false,
 }: MinuteEditorProps) {
+  const meetingSettings = useMeetingSettingsStore((s) => s.settings);
   const [newAttendee, setNewAttendee] = useState('');
   const [newDecision, setNewDecision] = useState('');
   const [showChairDropdown, setShowChairDropdown] = useState(false);
@@ -89,6 +91,17 @@ export function MinuteEditor({
     setNewAttendee('');
   };
 
+  const handleAddCommitteeGroup = (members: string[]) => {
+    const next = [...minute.attendees];
+    for (const m of members) {
+      const trimmed = m.trim();
+      if (trimmed && !next.includes(trimmed)) {
+        next.push(trimmed);
+      }
+    }
+    updateField('attendees', next);
+  };
+
   const handleRemoveAttendee = (index: number) => {
     updateField(
       'attendees',
@@ -117,12 +130,16 @@ export function MinuteEditor({
   };
 
   const handleAddActionItem = () => {
+    const turnaroundDays = meetingSettings.defaultActionTurnaroundDays || 7;
+    const defaultDueDate = new Date(Date.now() + turnaroundDays * 86400000).toISOString().split('T')[0];
+    const defaultPriority = meetingSettings.defaultPriority || 'medium';
+
     const newItem: MeetingActionItem = {
       id: String(Date.now()),
       description: '',
       assigneeName: '',
-      dueDate: new Date().toISOString().split('T')[0],
-      priority: 'medium',
+      dueDate: defaultDueDate,
+      priority: defaultPriority,
       selected: true,
     };
     updateField('actionItems', [...minute.actionItems, newItem]);
@@ -392,6 +409,28 @@ export function MinuteEditor({
               </Button>
             </div>
           </div>
+
+          {/* Committee Groups Quick Add */}
+          {meetingSettings.committeeGroups && meetingSettings.committeeGroups.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+              <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                <Users className="w-2.5 h-2.5 text-teal-600" />
+                Quick Group Add:
+              </span>
+              {meetingSettings.committeeGroups.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => handleAddCommitteeGroup(group.memberNames || [])}
+                  className="text-[10px] px-2 py-0.5 rounded-full border border-border/80 bg-muted/40 hover:bg-teal-500/10 hover:text-teal-700 dark:hover:text-teal-300 hover:border-teal-500/30 transition-colors flex items-center gap-1 font-medium"
+                  title={`Add members: ${(group.memberNames || []).join(', ')}`}
+                >
+                  <span>{group.name}</span>
+                  <span className="text-[9px] opacity-60">({(group.memberNames || []).length})</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Executive Summary */}
