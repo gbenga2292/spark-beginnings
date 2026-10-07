@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  CheckCircle2, Flame, ArrowRight, X, Calendar, ExternalLink, AlertCircle,
+  CheckCircle2, Flame, ArrowRight, X, Calendar, ExternalLink, AlertCircle, ClipboardList,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useAppData } from '@/src/contexts/AppDataContext';
 import { useUserStore } from '@/src/store/userStore';
 import { useTheme } from '@/src/hooks/useTheme';
+import { useSiteRequests } from '@/src/hooks/useSiteRequests';
 import { format, isPast, isToday, isTomorrow, differenceInDays, differenceInHours } from 'date-fns';
 import type { SubTask, MainTask, TaskUrgency } from '@/src/types/tasks';
 
@@ -125,6 +126,7 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
   const { subtasks, mainTasks, users } = useAppData();
   const { isDark }     = useTheme();
   const navigate       = useNavigate();
+  const { requests: siteRequests } = useSiteRequests();
 
   const [isOpen,        setIsOpen]        = useState(false);
   const [hasEvaluated,  setHasEvaluated]  = useState(false);
@@ -248,7 +250,14 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
     });
   }, [myUrgentTasks, mainTasksById, usersById, user, currentUser]);
 
-
+  // ── My active site requests ──────────────────────────────────────────────────
+  const myActiveSiteRequests = useMemo(() => {
+    if (!user?.id) return [];
+    return siteRequests.filter(r =>
+      (r.status === 'pending' || r.status === 'approved' || r.status === 'in_progress') &&
+      (r.requestedById === user.id || r.loggedById === user.id)
+    ).slice(0, 5);
+  }, [siteRequests, user?.id]);
 
   // ── Session trigger ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -435,7 +444,73 @@ export const DailyUrgentTasksModal = memo(function DailyUrgentTasksModal() {
               </div>
             )}
 
-            {/* Empty state */}
+            {/* ── Site Requests section ── */}
+            {myActiveSiteRequests.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      Your Site Requests ({myActiveSiteRequests.length})
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => { handleDismiss(); navigate('/operations/site-requests'); }}
+                    className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    View all
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {myActiveSiteRequests.map(req => {
+                    const srDot: Record<string, string> = {
+                      pending: 'bg-amber-500', approved: 'bg-blue-500',
+                      in_progress: 'bg-orange-500',
+                    };
+                    const srLabel: Record<string, string> = {
+                      pending: 'Pending', approved: 'Approved', in_progress: 'In Progress',
+                    };
+                    const srBadge: Record<string, string> = {
+                      pending:     'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60',
+                      approved:    'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/60',
+                      in_progress: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/60',
+                    };
+                    return (
+                      <div
+                        key={req.id}
+                        className={`relative rounded-xl border overflow-hidden flex items-center justify-between gap-3 p-3 transition-all hover:shadow-sm ${
+                          isDark ? 'bg-zinc-900/40 border-zinc-800' : 'bg-white border-zinc-200'
+                        }`}
+                      >
+                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${srDot[req.status] ?? 'bg-muted-foreground'} rounded-l-xl`} />
+                        <div className="min-w-0 flex-1 pl-2">
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                            <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border ${srBadge[req.status] ?? ''}`}>
+                              {srLabel[req.status] ?? req.status}
+                            </span>
+                            {req.category && (
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 capitalize">{req.category}</span>
+                            )}
+                          </div>
+                          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-snug">{req.item}</p>
+                          {req.siteName && (
+                            <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{req.siteName}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => { handleDismiss(); navigate('/operations/site-requests'); }}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shrink-0 transition-all cursor-pointer border ${
+                            isDark ? 'border-zinc-700 text-zinc-300 hover:bg-zinc-800' : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50'
+                          }`}
+                        >
+                          View <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {totalCount === 0 && (
               <div className="text-center py-10">
                 <div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mx-auto mb-3">

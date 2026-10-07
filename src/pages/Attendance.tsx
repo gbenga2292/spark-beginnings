@@ -612,16 +612,17 @@ export function Attendance() {
     dieselUsage: Record<string, number>;
     dipstickLevels: Record<string, number>;
     dipstickManual?: Record<string, boolean>;
-    dipstickMeta?: Record<string, { isOverCapacity: boolean; overBy: number; tankCapacity: number; startingFuel: number; burnRate: number }>;
+    dipstickMeta?: Record<string, { isOverCapacity: boolean; overBy: number; tankCapacity: number; startingFuel: number; burnRate: number; todayBurn: number; timing: 'end_of_day' | 'start_of_day'; unclamped: number }>;
     fullTanks: Record<string, boolean>;
     notes: string;
     progressPercentage?: number;
   }
 
+  const [dipstickTiming, setDipstickTiming] = useState<'end_of_day' | 'start_of_day'>('end_of_day');
   const [activeMachineBySite, setActiveMachineBySite] = useState<Record<string, MachineSiteEntry>>({}); 
 
   // Helper to compute extrapolated dipstick level for a machine using burn-rate-aware fuel estimation
-  const getEstimatedDipstick = useCallback((machineId: string, siteId: string, currentDiesel?: number) => {
+  const getEstimatedDipstick = useCallback((machineId: string, siteId: string, currentDiesel?: number, dayType?: 'full' | 'half' | 'off') => {
     const result = calculateEstimatedFuelLevel({
       machineId,
       siteId,
@@ -630,21 +631,26 @@ export function Attendance() {
       dailyMachineLogs,
       assets,
       dieselRefills,
+      timing: dipstickTiming,
+      operationalDay: dayType || 'full',
     });
     if (!result) return null;
     return {
       priorLevel: result.startingRemainingLitres,
       dieselAdded: result.refillAdded,
       estimatedLevel: result.estimatedDipstickLitres,
+      unclampedLevel: result.unclampedLitres,
       isOverCapacity: result.isOverCapacity,
       overBy: result.overCapacityByLitres,
       tankCapacity: result.tankCapacityLitres,
       startingFuel: result.startingRemainingLitres,
       burnRate: result.burnRate,
+      todayBurn: result.todayBurn,
+      timing: result.timing,
     };
-  }, [dailyMachineLogs, machineRegDate, dieselRefills, assets]);
+  }, [dailyMachineLogs, machineRegDate, dieselRefills, assets, dipstickTiming]);
 
-  // Pre-populate activeMachineBySite from existing daily logs when date changes
+  // Pre-populate activeMachineBySite from existing daily logs when date or dipstickTiming changes
   useEffect(() => {
     if (!machineRegDate) return;
     const initial: Record<string, MachineSiteEntry> = {};
@@ -675,7 +681,8 @@ export function Attendance() {
         if (l.dieselUsage) dieselUsage[l.assetId] = l.dieselUsage;
         if (l.dipstickLevelLitres != null) {
           dipstickLevels[l.assetId] = Number(l.dipstickLevelLitres);
-          dipstickManual[l.assetId] = true;
+          // If the stored log recorded whether it was manual, respect it; default true for user-saved logs
+          dipstickManual[l.assetId] = l.isDipstickManual !== false;
         }
         if (l.isTankFilledToFull != null) fullTanks[l.assetId] = !!l.isTankFilledToFull;
       });
@@ -694,8 +701,10 @@ export function Attendance() {
           dieselUsage[mId] = refillAlloc;
         }
 
-        if (dipstickLevels[mId] == null) {
+        // Auto-calculate if not present, OR if it was previously auto-calculated and timing changed
+        if (dipstickLevels[mId] == null || !dipstickManual[mId]) {
           const currentFuel = dieselUsage[mId] || refillAlloc;
+          const currentDayType = machineTypes[mId] || 'full';
           const est = calculateEstimatedFuelLevel({
             machineId: mId,
             siteId: s.id,
@@ -704,6 +713,8 @@ export function Attendance() {
             dailyMachineLogs,
             assets,
             dieselRefills,
+            timing: dipstickTiming,
+            operationalDay: currentDayType,
           });
           if (est) {
             dipstickLevels[mId] = est.estimatedDipstickLitres;
@@ -714,6 +725,9 @@ export function Attendance() {
               tankCapacity: est.tankCapacityLitres,
               startingFuel: est.startingRemainingLitres,
               burnRate: est.burnRate,
+              todayBurn: est.todayBurn,
+              timing: est.timing,
+              unclamped: est.unclampedLitres,
             };
           }
         }
@@ -734,7 +748,7 @@ export function Attendance() {
     });
 
     setActiveMachineBySite(initial);
-  }, [machineRegDate, activeSitesForMachineDate, allLoggableMachines, dailyMachineLogs, dieselRefills, assets, onSiteMachineIds]);
+  }, [machineRegDate, activeSitesForMachineDate, allLoggableMachines, dailyMachineLogs, dieselRefills, assets, onSiteMachineIds, dipstickTiming]);
 
   const handleToggleMachineSelection = useCallback((siteId: string, machineId: string) => {
     setActiveMachineBySite(prev => {
@@ -762,11 +776,20 @@ export function Attendance() {
           newTypes[machineId] = 'full'; // default to full day
         }
         if (newDipstick[machineId] == null) {
-          const est = getEstimatedDipstick(machineId, siteId, newDiesel[machineId]);
+          const est = getEstimatedDipstick(machineId, siteId, newDiesel[machineId], newTypes[machineId]);
           if (est) {
             newDipstick[machineId] = est.estimatedLevel;
             newManual[machineId] = false;
-            newMeta[machineId] = { isOverCapacity: est.isOverCapacity, overBy: est.overBy, tankCapacity: est.tankCapacity, startingFuel: est.startingFuel, burnRate: est.burnRate };
+            newMeta[machineId] = {
+              isOverCapacity: est.isOverCapacity,
+              overBy: est.overBy,
+              tankCapacity: est.tankCapacity,
+              startingFuel: est.startingFuel,
+              burnRate: est.burnRate,
+              todayBurn: est.todayBurn,
+              timing: est.timing,
+              unclamped: est.unclampedLevel,
+            };
             if (!newDiesel[machineId] && est.dieselAdded > 0) {
               newDiesel[machineId] = est.dieselAdded;
             }
@@ -792,15 +815,39 @@ export function Attendance() {
   const handleMachineTypeChange = useCallback((siteId: string, machineId: string, dayType: 'full' | 'half' | 'off') => {
     setActiveMachineBySite(prev => {
       const entry = prev[siteId] ?? { activeMachineIds: [], machineTypes: {}, dieselUsage: {}, dipstickLevels: {}, fullTanks: {}, notes: '' };
+      const newTypes = { ...entry.machineTypes, [machineId]: dayType };
+      const newDipstick = { ...(entry.dipstickLevels ?? {}) };
+      const newMeta = { ...(entry.dipstickMeta ?? {}) };
+
+      // Recalculate auto dipstick level when day type changes if operator hasn't entered manual reading
+      if (!entry.dipstickManual?.[machineId]) {
+        const est = getEstimatedDipstick(machineId, siteId, entry.dieselUsage?.[machineId], dayType);
+        if (est) {
+          newDipstick[machineId] = est.estimatedLevel;
+          newMeta[machineId] = {
+            isOverCapacity: est.isOverCapacity,
+            overBy: est.overBy,
+            tankCapacity: est.tankCapacity,
+            startingFuel: est.startingFuel,
+            burnRate: est.burnRate,
+            todayBurn: est.todayBurn,
+            timing: est.timing,
+            unclamped: est.unclampedLevel,
+          };
+        }
+      }
+
       return {
         ...prev,
         [siteId]: {
           ...entry,
-          machineTypes: { ...entry.machineTypes, [machineId]: dayType },
+          machineTypes: newTypes,
+          dipstickLevels: newDipstick,
+          dipstickMeta: newMeta,
         }
       };
     });
-  }, []);
+  }, [getEstimatedDipstick]);
 
   const handleMachineDieselChange = useCallback((siteId: string, machineId: string, dieselStr: string) => {
     setActiveMachineBySite(prev => {
@@ -808,26 +855,47 @@ export function Attendance() {
       const newDiesel = { ...entry.dieselUsage };
       const newDipstick = { ...(entry.dipstickLevels ?? {}) };
       const newManual = { ...(entry.dipstickManual ?? {}) };
+      const newMeta = { ...(entry.dipstickMeta ?? {}) };
       const val = parseFloat(dieselStr);
+      const currentDayType = entry.machineTypes[machineId] ?? 'full';
 
       if (isNaN(val) || val < 0 || dieselStr === '') {
         delete newDiesel[machineId];
         if (!newManual[machineId]) {
-          const est = getEstimatedDipstick(machineId, siteId, 0);
+          const est = getEstimatedDipstick(machineId, siteId, 0, currentDayType);
           if (est) {
             newDipstick[machineId] = est.estimatedLevel;
+            newMeta[machineId] = {
+              isOverCapacity: est.isOverCapacity,
+              overBy: est.overBy,
+              tankCapacity: est.tankCapacity,
+              startingFuel: est.startingFuel,
+              burnRate: est.burnRate,
+              todayBurn: est.todayBurn,
+              timing: est.timing,
+              unclamped: est.unclampedLevel,
+            };
           } else {
             delete newDipstick[machineId];
+            delete newMeta[machineId];
           }
         }
       } else {
         newDiesel[machineId] = val;
         if (!newManual[machineId]) {
-          const est = getEstimatedDipstick(machineId, siteId, val);
+          const est = getEstimatedDipstick(machineId, siteId, val, currentDayType);
           if (est) {
             newDipstick[machineId] = est.estimatedLevel;
-            const newMeta = { ...(entry.dipstickMeta ?? {}) };
-            newMeta[machineId] = { isOverCapacity: est.isOverCapacity, overBy: est.overBy, tankCapacity: est.tankCapacity, startingFuel: est.startingFuel, burnRate: est.burnRate };
+            newMeta[machineId] = {
+              isOverCapacity: est.isOverCapacity,
+              overBy: est.overBy,
+              tankCapacity: est.tankCapacity,
+              startingFuel: est.startingFuel,
+              burnRate: est.burnRate,
+              todayBurn: est.todayBurn,
+              timing: est.timing,
+              unclamped: est.unclampedLevel,
+            };
             return {
               ...prev,
               [siteId]: { ...entry, dieselUsage: newDiesel, dipstickLevels: newDipstick, dipstickManual: newManual, dipstickMeta: newMeta }
@@ -843,6 +911,7 @@ export function Attendance() {
           dieselUsage: newDiesel,
           dipstickLevels: newDipstick,
           dipstickManual: newManual,
+          dipstickMeta: newMeta,
         }
       };
     });
@@ -982,6 +1051,7 @@ export function Attendance() {
             maintenanceDetails: entry.notes || '',
             dieselUsage: entry.dieselUsage[machineId] || 0,
             dipstickLevelLitres: entry.dipstickLevels?.[machineId] ?? undefined,
+            isDipstickManual: !!entry.dipstickManual?.[machineId],
             isTankFilledToFull: entry.fullTanks?.[machineId] ?? false,
           });
         }
@@ -2963,6 +3033,33 @@ export function Attendance() {
                 </button>
               </div>
 
+              {/* Mobile Dipstick Timing Toggle */}
+              <div className="flex items-center justify-between bg-white px-2.5 py-1 rounded-xl border border-slate-200">
+                <span className="text-[10px] font-semibold text-slate-500">Dipstick Mode</span>
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setDipstickTiming('end_of_day')}
+                    className={cn(
+                      "px-2 py-0.5 text-[9px] rounded-md transition-all font-bold cursor-pointer",
+                      dipstickTiming === 'end_of_day' ? "bg-white text-slate-800 shadow-2xs" : "text-slate-500"
+                    )}
+                  >
+                    Shift End
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDipstickTiming('start_of_day')}
+                    className={cn(
+                      "px-2 py-0.5 text-[9px] rounded-md transition-all font-bold cursor-pointer",
+                      dipstickTiming === 'start_of_day' ? "bg-white text-slate-800 shadow-2xs" : "text-slate-500"
+                    )}
+                  >
+                    Post-Refill
+                  </button>
+                </div>
+              </div>
+
               {/* Action Buttons: 3 Comfortable Touch Targets */}
               {sitesWithMachines.length > 0 && (
                 <div className="grid grid-cols-5 gap-1.5">
@@ -3006,6 +3103,36 @@ export function Attendance() {
 
             {/* Desktop Controls (Inline, clean single row on sm and up) */}
             <div className="hidden sm:flex items-center gap-2.5 sm:self-end sm:mb-0.5 sm:ml-auto">
+              {/* Dipstick Timing Mode Toggle */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-full border border-slate-200 shrink-0" title="Dipstick Calculation Timing">
+                <button
+                  type="button"
+                  onClick={() => setDipstickTiming('end_of_day')}
+                  className={cn(
+                    "px-2.5 py-1 text-[10px] rounded-full transition-all cursor-pointer font-bold",
+                    dipstickTiming === 'end_of_day'
+                      ? "bg-white text-slate-800 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                  title="Shift End: Deducts today's operational fuel burn from remaining fuel"
+                >
+                  Shift End
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDipstickTiming('start_of_day')}
+                  className={cn(
+                    "px-2.5 py-1 text-[10px] rounded-full transition-all cursor-pointer font-bold",
+                    dipstickTiming === 'start_of_day'
+                      ? "bg-white text-slate-800 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                  title="Post-Refill: Shows fuel level before today's shift begins"
+                >
+                  Post-Refill
+                </button>
+              </div>
+
               {/* Filter Chip */}
               <button
                 type="button"
@@ -3243,10 +3370,10 @@ export function Attendance() {
                                                 placeholder="Dipstick (L)"
                                                 title={
                                                   isOver
-                                                    ? `⚠ Over capacity: ${entry.dipstickLevels?.[machineId]}L (${meta?.overBy}L over ${meta?.tankCapacity}L tank). Started at ~${meta?.startingFuel}L. Check before saving.`
+                                                    ? `⚠ Over capacity: calculated ~${meta?.unclamped}L exceeds ${meta?.tankCapacity}L tank by ${meta?.overBy}L. Clamped to tank capacity (${entry.dipstickLevels?.[machineId]}L). Check for unrecorded fuel usage or spill.`
                                                     : isAuto
-                                                    ? `⚡ Auto-calculated: ~${meta?.startingFuel}L remaining + ${entry.dieselUsage?.[machineId] ?? 0}L refill = ${entry.dipstickLevels?.[machineId]}L. Burn rate: ${meta?.burnRate}L/day.`
-                                                    : "Physical fuel remaining measured by dipstick at end of day (Litres)"
+                                                    ? `⚡ Auto-calculated (${meta?.timing === 'end_of_day' ? 'Shift End' : 'Post-Refill'}): ~${meta?.startingFuel}L prior + ${entry.dieselUsage?.[machineId] ?? 0}L refill${meta?.timing === 'end_of_day' ? ` - ${meta?.todayBurn}L burn` : ''} = ${entry.dipstickLevels?.[machineId]}L. Override by typing.`
+                                                    : "Physical fuel remaining measured by dipstick (Litres)"
                                                 }
                                                 value={entry.dipstickLevels?.[machineId] ?? ''}
                                                 onChange={e => handleMachineDipstickChange(site.id, machineId, e.target.value)}
@@ -3261,8 +3388,8 @@ export function Attendance() {
                                               />
                                               {isOver && (
                                                 <span
-                                                  className="absolute right-1 text-[9px] text-orange-500 font-bold pointer-events-none select-none"
-                                                  title={`Exceeds tank capacity by ${meta?.overBy}L`}
+                                                  className="absolute right-1 text-[9px] text-orange-600 font-bold pointer-events-none select-none"
+                                                  title={`Exceeds tank capacity by ${meta?.overBy}L (Clamped to ${meta?.tankCapacity}L)`}
                                                 >
                                                   ⚠
                                                 </span>
@@ -3270,7 +3397,7 @@ export function Attendance() {
                                               {!isOver && isAuto && (
                                                 <span 
                                                   className="absolute right-1 text-[9px] text-sky-500 font-bold pointer-events-none select-none" 
-                                                  title="Auto-calculated from prior reading + fuel refill"
+                                                  title={`Auto-calculated (${meta?.timing === 'end_of_day' ? 'Shift End' : 'Post-Refill'})`}
                                                 >
                                                   ⚡
                                                 </span>
@@ -3453,10 +3580,10 @@ export function Attendance() {
                                                 placeholder="Dipstick Level (L)"
                                                 title={
                                                   isOver
-                                                    ? `⚠ Over capacity: ${entry.dipstickLevels?.[machineId]}L (${meta?.overBy}L over ${meta?.tankCapacity}L tank). Started at ~${meta?.startingFuel}L. Check before saving.`
+                                                    ? `⚠ Over capacity: calculated ~${meta?.unclamped}L exceeds ${meta?.tankCapacity}L tank by ${meta?.overBy}L. Clamped to tank capacity (${entry.dipstickLevels?.[machineId]}L). Check for unrecorded fuel usage or spill.`
                                                     : isAuto
-                                                    ? `⚡ Auto-calculated: ~${meta?.startingFuel}L remaining + ${entry.dieselUsage?.[machineId] ?? 0}L refill = ${entry.dipstickLevels?.[machineId]}L. Burn rate: ${meta?.burnRate}L/day.`
-                                                    : "Physical fuel remaining measured by dipstick at end of day (Litres)"
+                                                    ? `⚡ Auto-calculated (${meta?.timing === 'end_of_day' ? 'Shift End' : 'Post-Refill'}): ~${meta?.startingFuel}L prior + ${entry.dieselUsage?.[machineId] ?? 0}L refill${meta?.timing === 'end_of_day' ? ` - ${meta?.todayBurn}L burn` : ''} = ${entry.dipstickLevels?.[machineId]}L. Override by typing.`
+                                                    : "Physical fuel remaining measured by dipstick (Litres)"
                                                 }
                                                 value={entry.dipstickLevels?.[machineId] ?? ''}
                                                 onChange={e => handleMachineDipstickChange(site.id, machineId, e.target.value)}
@@ -3471,8 +3598,8 @@ export function Attendance() {
                                               />
                                               {isOver && (
                                                 <span
-                                                  className="absolute right-2 text-[10px] text-orange-500 font-bold pointer-events-none select-none"
-                                                  title={`Exceeds tank capacity by ${meta?.overBy}L`}
+                                                  className="absolute right-2 text-[10px] text-orange-600 font-bold pointer-events-none select-none"
+                                                  title={`Exceeds tank capacity by ${meta?.overBy}L (Clamped to ${meta?.tankCapacity}L)`}
                                                 >
                                                   ⚠
                                                 </span>
@@ -3480,7 +3607,7 @@ export function Attendance() {
                                               {!isOver && isAuto && (
                                                 <span 
                                                   className="absolute right-2 text-[10px] text-sky-500 font-bold pointer-events-none select-none" 
-                                                  title="Auto-calculated from prior reading + fuel refill"
+                                                  title={`Auto-calculated (${meta?.timing === 'end_of_day' ? 'Shift End' : 'Post-Refill'})`}
                                                 >
                                                   ⚡
                                                 </span>

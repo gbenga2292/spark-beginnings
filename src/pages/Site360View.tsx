@@ -41,9 +41,10 @@ import {
 import { SiteGanttStoryboard } from '@/src/components/sites/SiteGanttStoryboard';
 import { SiteMilestonesCard } from '@/src/components/sites/SiteMilestonesCard';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
+import { ClientSiteRequestsPanel } from '@/src/components/site-requests/ClientSiteRequestsPanel';
 
 
-type SiteTab = 'timeline' | 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts';
+type SiteTab = 'timeline' | 'financials' | 'operations' | 'maintenance' | 'comms' | 'tasks' | 'contacts' | 'requests';
 
 interface Props {
   site: Site;
@@ -142,6 +143,9 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const canViewTasksTab       = s360Priv ? s360Priv.canViewTasksTab : Boolean(currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks);
   const canViewCommsTab       = s360Priv ? s360Priv.canViewCommsTab : Boolean(currentUser?.privileges?.commLog?.canView);
   const canViewContactsTab    = s360Priv ? s360Priv.canViewContactsTab : Boolean(currentUser?.privileges?.clients?.canView);
+  const canViewRequestsTab    = s360Priv?.canViewRequestsTab !== undefined
+    ? Boolean(s360Priv.canViewRequestsTab)
+    : (currentUser?.privileges?.opsSiteRequests?.canView ?? currentUser?.privileges?.sites?.canView ?? true);
 
   const allSites = useAppStore(s => s.sites);
   const workspaceId = useAppStore(s => (s as any).workspaceId || 'default');
@@ -190,7 +194,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   // Own filter state
   const currentYear = new Date().getFullYear();
   const [filterMonth, setFilterMonth] = useState('all');
-  const [filterYear, setFilterYear] = useState('all');
+  const [filterYear, setFilterYear] = useState(() => (new Date().getFullYear()).toString());
   const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
   const months = [
     { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
@@ -793,6 +797,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     { id: 'comms', label: 'Comms', count: data.siteComms.length, show: canViewCommsTab },
     { id: 'tasks', label: 'Tasks', count: data.pendingSiteTasks.length, show: canViewTasksTab },
     { id: 'contacts', label: 'Contacts', count: data.siteContacts.length, show: canViewContactsTab },
+    { id: 'requests', label: 'Requests', show: Boolean(canViewRequestsTab) },
   ].filter(tab => tab.show !== false) as { id: SiteTab; label: string; count?: number | string }[], [
     canViewTimelineTab,
     canViewFinancialsTab,
@@ -806,7 +811,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     canViewTasksTab,
     data.pendingSiteTasks.length,
     canViewContactsTab,
-    data.siteContacts.length
+    data.siteContacts.length,
+    canViewRequestsTab
   ]);
 
   useEffect(() => {
@@ -983,13 +989,24 @@ Answer site-specific questions and field progress accurately using this context.
             title="Filter by Month/Year"
           >
             <Filter className="w-3.5 h-3.5" />
-            {(filterMonth !== 'all' || filterYear !== 'all') && (
+            {(filterMonth !== 'all' || filterYear !== currentYear.toString()) && (
               <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white dark:border-slate-950" />
             )}
           </Button>
 
           {showFilters && (
             <div className={cn("absolute right-0 top-full mt-2 p-3 rounded-lg border shadow-xl z-50 flex flex-col gap-3 w-56", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Period</span>
+                {(filterMonth !== 'all' || filterYear !== currentYear.toString()) && (
+                  <button
+                    onClick={() => { setFilterMonth('all'); setFilterYear(currentYear.toString()); setShowFilters(false); }}
+                    className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Month</label>
                 <select value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setShowFilters(false); }} className={cn('w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500', isDark ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200')}>
@@ -2202,6 +2219,17 @@ Answer site-specific questions and field progress accurately using this context.
                   onClose={() => setActiveTab('financials')}
                   siteId={site.id}
                   inline
+                />
+              </div>
+            )}
+
+            {/* REQUESTS */}
+            {activeTab === 'requests' && (
+              <div className="transition-opacity duration-150">
+                <ClientSiteRequestsPanel
+                  siteId={site.id}
+                  siteName={site.name}
+                  clientName={site.client}
                 />
               </div>
             )}

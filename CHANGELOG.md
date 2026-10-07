@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.6] - 2026-10-05
+
+### Operations & Telemetry Enhancements
+
+- **Machine Fuel & Dipstick Auto-Calculation Accuracy Overhaul:**
+  - **End-of-Shift Burn Deduction:** Fixed the core calculation flaw where equipment fuel consumption during today's shift was ignored. Dipstick estimation now accurately deducts today's operational burn (`startingRemaining + refillAdded - todayBurn`).
+  - **Start of Day vs. End of Shift Timing Modes:** Added an interactive segmented mode toggle in both desktop and mobile Daily Machine Register headers allowing operators to switch between **Shift End** (net fuel after operational burn) and **Post-Refill** (fuel level before today's shift commences).
+  - **Anchor Poisoning Prevention (`is_dipstick_manual`):** Prevented auto-calculated fuel estimates from poisoning future forecasts by introducing `is_dipstick_manual` column in `operations_daily_logs`. Future telemetry anchor lookups strictly require verified manual physical dipstick readings (`l.isDipstickManual !== false`).
+  - **Physical Tank Capacity Clamping:** Calculated fuel volumes exceeding tank capacity are now safely clamped to `tankCapacityLitres` (e.g., maximum 90L), accompanied by an explicit over-capacity warning badge (`⚠`) and tooltip detailing the excess volume for spillage/discrepancy detection.
+  - **Reactive Day-Type Synchronization:** Changing a machine's operational status between `Full Day`, `Half Day`, and `Off` now dynamically recalculates the auto-estimated dipstick level in real time.
+
+### Features & Updates
+
+- **Site Requests & Internal Requisitions System:**
+  - Added dedicated Site Requests module (`/operations/site-requests`) to streamline field equipment, fuel, material, vehicle, and personnel requisitions.
+  - **360 Command Center Integration:** Integrated a dedicated "Requests" tab directly into both **Site 360** (`Site360View.tsx`) and **Client 360** (`Client360.tsx`) with real-time status filters, search, and pre-seeded project site scoping.
+  - **Landscape Modal Layout & Pinned Office Site:** Redesigned `NewRequestDialog` to a responsive two-column landscape format with category iconography and pinned internal headquarters "Office (DCEL)" at the very top of the active sites selection dropdown.
+  - **Interactive Detail Sheet & Status Updates:** Clickable request items open a slide-out drawer (`RequestDetailSheet.tsx`) for managing multi-stage status workflows (Pending, Approved, In Progress, Fulfilled, Rejected) and logging timestamped audit comments.
+  - **Urgent Priority Popups & Dashboards:** Embedded Site Requests section into `TaskDashboard.tsx` and `DailyUrgentTasksModal.tsx` for fast operational dispatch.
+
+- **Financial Management & VAT Calculator:**
+  - Added standalone PAYE and pension calculations, financial management tools, task dashboards, and analytics modules.
+- **Executive Meeting Minutes System:**
+  - Added executive meeting minutes authoring, committee configuration panels, multi-provider AI audio transcription, and task conversion.
+
+### Database Migrations
+
+- `20261005131500_add_is_dipstick_manual_to_daily_logs.sql` — Adds `is_dipstick_manual` column to `operations_daily_logs` to distinguish physical dipstick readings from automated estimates.
+- `20260929142500_add_wht_to_invoices.sql` — Adds Withholding Tax (WHT) schema support to invoices.
+
+---
+
 ## [2.1.5] - 2026-09-28
 
 ### Features & Enhancements

@@ -358,6 +358,8 @@ export interface DailyMachineLog {
   dieselUsage: number;
   /** Physical fuel remaining in tank measured by dipstick at end of shift (Litres) */
   dipstickLevelLitres?: number;
+  /** True if dipstick reading was manually measured by an operator, false if auto-calculated */
+  isDipstickManual?: boolean;
   /** True if the diesel refill topped the machine tank to 100% capacity */
   isTankFilledToFull?: boolean;
   supervisorOnSite?: string;

@@ -83,6 +83,7 @@ const DewateringCalculator = lazy(() => import('./pages/DewateringCalculator').t
 const VatCalculator = lazy(() => import('./pages/VatCalculator').then(m => ({ default: m.default })));
 const Budget = lazy(() => import('./pages/Budget').then(m => ({ default: m.Budget })));
 const ActiveSiteAnalytics = lazy(() => import('./pages/ActiveSiteAnalytics').then(m => ({ default: m.ActiveSiteAnalytics })));
+const SiteRequests = lazy(() => import('./pages/SiteRequests').then(m => ({ default: m.SiteRequests })));
 import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
@@ -228,7 +229,8 @@ function AppContent() {
           '/operations/checkout', '/operations/maintenance', '/operations/vehicles', '/operations/sites',
           '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/company-expenses',
           '/reports', '/financial-reports', '/tasks/reports', '/weekly-report', '/users',
-          '/settings', '/activity-log', '/profile', '/operations/site-analytics', '/site-analytics'
+          '/settings', '/activity-log', '/profile', '/operations/site-analytics', '/site-analytics',
+          '/operations/site-requests'
         ];
         
         if (rootPaths.includes(path) || path === '') {
@@ -298,7 +300,7 @@ function AppContent() {
             {/* Operations & Analytics — Restricted on Web */}
             <Route path="operations/*" element={
               <Page label="Operations">
-                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites', 'simulator']}>
+                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites', 'simulator', 'opsSiteRequests']}>
                   <>
                     <Routes>
                       <Route index element={<OperationsDashboard />} />
@@ -316,6 +318,7 @@ function AppContent() {
                       <Route path="vat-calculator" element={<ProtectedRoute requiredModule="vatCalculator"><VatCalculator /></ProtectedRoute>} />
                       <Route path="machine-reconciliation" element={<ProtectedRoute requiredModule={['opsMachineRecon']}><MachineReconciliation /></ProtectedRoute>} />
                       <Route path="site-analytics" element={<ProtectedRoute requiredModule={['operations', 'opsSites', 'sites']}><ActiveSiteAnalytics /></ProtectedRoute>} />
+                      <Route path="site-requests" element={<ProtectedRoute requiredModule="opsSiteRequests"><SiteRequests /></ProtectedRoute>} />
                       <Route path="*" element={<Navigate to="/operations" replace />} />
                     </Routes>
                   </>
@@ -344,6 +347,7 @@ function AppContent() {
         <Route path="notifications" element={<Page label="Notifications"><ProtectedRoute><NotificationsPage /></ProtectedRoute></Page>} />
         <Route path="budget" element={<Page label="Budget"><ProtectedRoute requiredModule="budget"><Budget /></ProtectedRoute></Page>} />
 
+        <Route path="site-requests" element={<Navigate to="/operations/site-requests" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -11,7 +11,7 @@ import {
   Flame, Zap, Award, Flag, Lock, Target, ListTodo, Activity,
   CheckCheck, Layers, ArrowUpRight, Sparkles, ChevronRight, ChevronDown,
   Archive, RotateCcw, Trash2, Fuel, Receipt, FileText, Building2,
-  Hourglass, ShieldAlert, ShieldCheck, Wrench, AlertCircle, Package
+  Hourglass, ShieldAlert, ShieldCheck, Wrench, AlertCircle, Package, ClipboardList
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format, parseISO, isToday, isTomorrow, isPast, differenceInHours } from "date-fns";
@@ -32,8 +32,111 @@ import type { Invoice } from "@/src/store/appStore";
 import { formatDisplayDate } from "@/src/lib/dateUtils";
 import { cn } from "@/src/lib/utils";
 import { useMachineReconSummary } from "@/src/hooks/useMachineReconSummary";
+import { SiteRequestsDashboardSection } from "@/src/components/site-requests/SiteRequestsDashboardSection";
+import { useSiteRequests } from "@/src/hooks/useSiteRequests";
+import { RequestDetailSheet } from "@/src/components/site-requests/RequestDetailSheet";
+import type { SiteRequest } from "@/src/types/siteRequests";
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as [number, number, number, number] } } };
+
+/* ─── Shimmer Skeleton Primitives ─────────────────────────────────────────── */
+function Shimmer({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`relative overflow-hidden bg-muted/60 rounded-md after:absolute after:inset-0 after:translate-x-[-100%] after:bg-gradient-to-r after:from-transparent after:via-white/20 after:to-transparent after:animate-[shimmer_1.6s_infinite] ${className}`}
+    />
+  );
+}
+
+/** Skeleton that mirrors the MetricHeroCard layout */
+function DashboardHeroSkeleton({ cols = 2 }: { cols?: 2 | 3 }) {
+  return (
+    <div className="rounded-xl overflow-hidden border border-border" style={{ boxShadow: '0 4px 20px rgba(14,165,233,0.08)' }}>
+      <div className={`grid grid-cols-1 lg:grid-cols-${cols === 3 ? '3' : '2'}`}>
+        {/* Hero panel */}
+        <div className="relative overflow-hidden flex flex-col justify-center px-5 py-5 gap-2 bg-gradient-to-r from-blue-900/40 to-sky-900/30">
+          <Shimmer className="h-2.5 w-28 opacity-60" />
+          <Shimmer className="h-8 w-20 mt-1" />
+          <Shimmer className="h-2 w-16 mt-1 opacity-50" />
+        </div>
+        {/* Secondary tiles */}
+        {Array.from({ length: cols }).map((_, i) => (
+          <div key={i} className="flex flex-col justify-center px-5 py-5 gap-2 border-t lg:border-t-0 border-l border-border/40 bg-muted/20">
+            <Shimmer className="h-2 w-20 opacity-50" />
+            <Shimmer className="h-7 w-12 mt-1" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Skeleton that mirrors a list of task rows */
+function TaskListSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="divide-y divide-border/40">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+          <Shimmer className="w-4 h-4 rounded-full shrink-0 opacity-40" />
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <Shimmer className={`h-3.5 rounded-sm ${i % 3 === 0 ? 'w-3/4' : i % 3 === 1 ? 'w-2/3' : 'w-4/5'}`} />
+            <Shimmer className="h-2.5 w-1/3 opacity-60" />
+          </div>
+          <Shimmer className="h-5 w-16 rounded-full shrink-0 opacity-50" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Skeleton for the Refill Forecast card body */
+function RefillForecastSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="divide-y divide-border/40">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="px-4 sm:px-5 py-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Shimmer className={`h-3.5 rounded-sm ${i % 2 === 0 ? 'w-2/5' : 'w-1/2'}`} />
+            <Shimmer className="h-5 w-16 rounded-md opacity-60" />
+          </div>
+          <Shimmer className="h-2.5 w-3/4 opacity-50" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Skeleton for the Machine Fleet chip grid */
+function MachineFleetSkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+        <div className="flex items-center gap-2">
+          <Shimmer className="h-7 w-7 rounded-md" />
+          <div className="space-y-1">
+            <Shimmer className="h-3.5 w-24" />
+            <Shimmer className="h-2.5 w-20 opacity-60" />
+          </div>
+        </div>
+        <Shimmer className="h-3 w-14 opacity-40" />
+      </div>
+      {/* Chip grid */}
+      <div className="grid grid-cols-4 divide-x divide-border border-b border-border">
+        {[1, 2, 3, 4].map(n => (
+          <div key={n} className="flex flex-col items-center py-4 gap-1.5">
+            <Shimmer className="h-6 w-8" />
+            <Shimmer className="h-2 w-12 opacity-50" />
+          </div>
+        ))}
+      </div>
+      <div className="px-4 py-3 space-y-2">
+        <Shimmer className="h-3 w-3/4 opacity-40" />
+        <Shimmer className="h-3 w-1/2 opacity-30" />
+      </div>
+    </div>
+  );
+}
 
 const statusConfig = {
   not_started: { label: "To Start", pillClass: "chip-pending", icon: Circle },
@@ -139,7 +242,7 @@ export function TaskDashboard() {
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function PersonalSpaceDashboard() {
   const { user: currentUser } = useAuth();
-  const { subtasks } = useAppData();
+  const { subtasks, isLoaded: tasksLoaded } = useAppData();
   const { wsTasks, workspace } = useWorkspace();
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
@@ -175,6 +278,39 @@ function PersonalSpaceDashboard() {
   const urgent = [...wsSubs].filter(s => s.status !== 'completed').sort((a, b) => urgencyScore(a) - urgencyScore(b)).slice(0, 8);
 
   const name = ((currentUser as any)?.user_metadata?.name || currentUser?.email || 'User').split(' ')[0].split('@')[0];
+
+  if (!tasksLoaded) {
+    return (
+      <div className="space-y-6 pb-8">
+        <DashboardHeroSkeleton cols={3} />
+        <div className="grid lg:grid-cols-5 gap-5">
+          <div className="lg:col-span-3 bg-card border border-border rounded-md overflow-hidden">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border">
+              <Shimmer className="h-4 w-40" />
+              <Shimmer className="h-4 w-16 opacity-50" />
+            </div>
+            <TaskListSkeleton rows={5} />
+          </div>
+          <div className="lg:col-span-2 bg-card border border-border rounded-md overflow-hidden">
+            <div className="px-4 sm:px-5 py-3.5 border-b border-border">
+              <Shimmer className="h-4 w-32" />
+            </div>
+            <div className="p-4 space-y-3">
+              {[1, 2, 3].map(n => (
+                <div key={n}>
+                  <div className="flex justify-between mb-1.5">
+                    <Shimmer className="h-3 w-1/2" />
+                    <Shimmer className="h-3 w-10 opacity-50" />
+                  </div>
+                  <Shimmer className="h-1.5 w-full rounded-full" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 pb-8">
@@ -420,7 +556,7 @@ function PersonalProductivityScore() {
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function AdminDashboard() {
   const { user: currentUser } = useAuth();
-  const { subtasks, users } = useAppData();
+  const { subtasks, users, isLoaded: tasksLoaded } = useAppData();
   const { wsTasks, wsMembers } = useWorkspace();
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
@@ -492,6 +628,31 @@ function AdminDashboard() {
   const getUser = (id: string | null) => users.find(u => u.id === id);
 
   const name = ((currentUser as any)?.user_metadata?.name || currentUser?.email || 'Admin').split(' ')[0].split('@')[0];
+
+  if (!tasksLoaded) {
+    return (
+      <div className="space-y-6 pb-8">
+        <DashboardHeroSkeleton cols={2} />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="lg:col-span-3 bg-card border border-border rounded-md overflow-hidden">
+            <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border">
+              <Shimmer className="h-4 w-40" />
+              <Shimmer className="h-4 w-16 opacity-50" />
+            </div>
+            <TaskListSkeleton rows={5} />
+          </div>
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-card border border-border rounded-md overflow-hidden">
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-border">
+                <Shimmer className="h-4 w-28" />
+              </div>
+              <RefillForecastSkeleton rows={3} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 pb-8">
@@ -716,6 +877,9 @@ function AdminDashboard() {
         </motion.div>
       </div>
 
+      {/* Site Requests — always visible for admins */}
+      <SiteRequestsDashboardSection canView={true} />
+
       <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
     </motion.div>
   );
@@ -726,8 +890,16 @@ function AdminDashboard() {
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function UserDashboard() {
   const { user: currentUser } = useAuth();
-  const { subtasks, users } = useAppData();
+  const { subtasks, users, isLoaded: tasksLoaded } = useAppData();
   const { wsTasks, wsMembers } = useWorkspace();
+  const {
+    requests: siteRequests,
+    loading: siteReqLoading,
+    updateStatus: updateSiteReqStatus,
+    addComment: addSiteReqComment,
+    fetchUpdates: fetchSiteReqUpdates,
+  } = useSiteRequests();
+  const [selectedSiteReq, setSelectedSiteReq] = useState<SiteRequest | null>(null);
   const navigate = useNavigate();
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
@@ -791,7 +963,7 @@ function UserDashboard() {
     return hasSubs || mt.is_project || isCreator;
   });
 
-  const [taskTab, setTaskTab] = useState<'tasks' | 'approvals'>('tasks');
+  const [taskTab, setTaskTab] = useState<'tasks' | 'approvals' | 'site_requests'>('tasks');
   const [taskSortFilter, setTaskSortFilter] = useState<'urgent' | 'all'>('urgent');
 
   const wsTaskIds = new Set(activeWsTasks.map(mt => mt.id));
@@ -856,6 +1028,56 @@ function UserDashboard() {
 
   const name = ((currentUser as any)?.user_metadata?.name || currentUser?.email || 'User').split(' ')[0].split('@')[0];
 
+  if (!tasksLoaded) {
+    return (
+      <div className="space-y-6 pb-8">
+        <DashboardHeroSkeleton cols={3} />
+        <div className={cn("grid gap-5", hasRightWidgets ? "grid-cols-1 lg:grid-cols-5" : "grid-cols-1")}>
+          <div className={cn("space-y-4", hasRightWidgets ? "lg:col-span-3" : "col-span-1")}>
+            <div className="bg-card border border-border rounded-md overflow-hidden">
+              <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border">
+                <Shimmer className="h-4 w-40" />
+                <Shimmer className="h-4 w-16 opacity-50" />
+              </div>
+              <TaskListSkeleton rows={5} />
+            </div>
+            {canViewMachineRecon && <MachineFleetSkeleton />}
+          </div>
+          {hasRightWidgets && (
+            <div className="lg:col-span-2 space-y-4">
+              {canViewRefillForecast && (
+                <div className="bg-card border border-border rounded-md overflow-hidden">
+                  <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-border">
+                    <Shimmer className="h-4 w-28" />
+                    <Shimmer className="h-4 w-14 opacity-50" />
+                  </div>
+                  <RefillForecastSkeleton rows={4} />
+                </div>
+              )}
+              {canViewInvoices && (
+                <div className="bg-card border border-border rounded-md overflow-hidden">
+                  <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-border">
+                    <Shimmer className="h-4 w-28" />
+                    <Shimmer className="h-4 w-14 opacity-50" />
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {[1, 2, 3].map(n => (
+                      <div key={n} className="px-4 sm:px-5 py-3 space-y-1.5">
+                        <Shimmer className="h-3.5 w-3/4" />
+                        <Shimmer className="h-2.5 w-1/2 opacity-50" />
+                        <Shimmer className="h-1.5 w-full rounded-full mt-1" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6 pb-8">
 
@@ -905,7 +1127,7 @@ function UserDashboard() {
                 )}
               >
                 <Zap className="w-3.5 h-3.5 text-amber-500" />
-                <span>{isExternalHr ? 'HR Tasks' : 'My Tasks'}</span>
+                <span>{isExternalHr ? 'HR Tasks' : 'Tasks'}</span>
                 <span className={cn(
                   "px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-bold",
                   taskTab === 'tasks' ? "bg-muted text-foreground" : "bg-muted/70 text-muted-foreground"
@@ -925,7 +1147,7 @@ function UserDashboard() {
                 )}
               >
                 <Hourglass className={cn("w-3.5 h-3.5", approvalSubs.length > 0 ? "text-amber-500 animate-pulse" : "text-muted-foreground")} />
-                <span>Approvals Needed</span>
+                <span>Approvals</span>
                 <span className={cn(
                   "px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-bold transition-all",
                   approvalSubs.length > 0
@@ -935,6 +1157,39 @@ function UserDashboard() {
                   {approvalSubs.length}
                 </span>
               </button>
+
+              {/* Site Requests tab — only show when user has access */}
+              {(isSuperAdmin ||
+                (effectiveUser as any)?.privileges?.opsSiteRequests?.canView === true ||
+                (effectiveUser as any)?.privileges?.opsSiteRequests?.canCreate === true ||
+                (effectiveUser as any)?.privileges?.opsSiteRequests?.canManage === true
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => setTaskTab('site_requests')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap",
+                    taskTab === 'site_requests'
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/40"
+                  )}
+                >
+                  <ClipboardList className={cn("w-3.5 h-3.5",
+                    siteRequests.filter(r => r.status === 'pending' || r.status === 'in_progress').length > 0
+                      ? "text-indigo-500"
+                      : "text-muted-foreground"
+                  )} />
+                  <span>Requests</span>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[10px] font-mono tabular-nums font-bold transition-all",
+                    siteRequests.filter(r => r.status === 'pending' || r.status === 'in_progress').length > 0
+                      ? "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30"
+                      : "bg-muted/70 text-muted-foreground"
+                  )}>
+                    {siteRequests.filter(r => r.status === 'pending' || r.status === 'in_progress').length}
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* Right side controls */}
@@ -957,116 +1212,156 @@ function UserDashboard() {
                   {approvalSubs.length === 1 ? '1 approval awaiting your response' : `${approvalSubs.length} approvals awaiting your response`}
                 </p>
               )}
-              <button onClick={() => navigate('/tasks')} className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors shrink-0">
+              <button
+                onClick={() => navigate(taskTab === 'site_requests' ? '/operations/site-requests' : '/tasks')}
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors shrink-0 cursor-pointer"
+              >
                 View all <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {displayedTasks.length === 0 ? (
-            <div className="px-5 py-14 text-center">
-              <div className="w-10 h-10 rounded-md bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          {/* ── Tasks / Approvals body ── */}
+          {taskTab !== 'site_requests' && (
+            displayedTasks.length === 0 ? (
+              <div className="px-5 py-14 text-center">
+                <div className="w-10 h-10 rounded-md bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  {taskTab === 'approvals' ? "All approvals clear!" : "You're all caught up!"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {taskTab === 'approvals'
+                    ? "You have no pending approvals requiring your action."
+                    : "No pending tasks found for this filter."}
+                </p>
               </div>
-              <p className="text-sm font-semibold text-foreground">
-                {taskTab === 'approvals'
-                  ? "All approvals clear!"
-                  : "You're all caught up!"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {taskTab === 'approvals'
-                  ? "You have no pending approvals requiring your action."
-                  : "No pending tasks found for this filter."}
-              </p>
-            </div>
-          ) : (
-            <div className="max-h-[480px] overflow-y-auto divide-y divide-border/40">
-              {displayedTasks.map((sub, i) => {
-                const mt = activeWsTasks.find(m => m.id === sub.mainTaskId || m.id === (sub as any).main_task_id) ||
-                  wsTasks.find(m => m.id === sub.mainTaskId || m.id === (sub as any).main_task_id);
-                const isApproval = taskTab === 'approvals' || sub.status === 'pending_approval';
-                const sc = (statusConfig as Record<string, typeof statusConfig['completed']>)[sub.status] ?? statusConfig.not_started;
-                const StatusIcon = sc.icon;
-                const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
-
-                // Resolve assignee names for approvals context
-                const assigneeNames = (typeof sub.assignedTo === 'string' ? sub.assignedTo.split(',') : Array.isArray(sub.assignedTo) ? sub.assignedTo : [])
-                  .map(id => users.find(u => u.id === id.trim())?.name)
-                  .filter(Boolean)
-                  .join(', ');
-
-                return (
-                  <div
-                    key={sub.id ?? i}
-                    onClick={() => setOpenSubtaskId(sub.id ?? null)}
-                    className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer"
-                  >
-                    <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums hidden sm:block flex-shrink-0">
-                      {i + 1}
-                    </span>
-                    <div className={cn(
-                      "w-1 h-10 rounded-full flex-shrink-0 hidden sm:block",
-                      isApproval
-                        ? "bg-amber-500"
-                        : isOverdue
-                        ? "bg-red-500"
-                        : sub.status === 'in_progress'
-                        ? "bg-primary"
-                        : "bg-muted-foreground/20"
-                    )} />
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        "text-sm font-medium truncate group-hover:text-primary transition-colors",
-                        sub.status === 'completed' ? "line-through text-muted-foreground" : "text-foreground"
-                      )}>
-                        {sub.title}
-                      </p>
-                      <div className="flex items-center gap-x-1.5 mt-0.5 text-[11px] text-muted-foreground min-w-0">
-                        <span className="truncate min-w-0">{mt?.title ?? ''}</span>
-                        {assigneeNames && isApproval && (
-                          <>
-                            <span className="shrink-0">·</span>
-                            <span className="truncate min-w-0 text-slate-500 dark:text-slate-400">
-                              For: {assigneeNames}
-                            </span>
-                          </>
+            ) : (
+              <div className="max-h-[480px] overflow-y-auto divide-y divide-border/40">
+                {displayedTasks.map((sub, i) => {
+                  const mt = activeWsTasks.find(m => m.id === sub.mainTaskId || m.id === (sub as any).main_task_id) ||
+                    wsTasks.find(m => m.id === sub.mainTaskId || m.id === (sub as any).main_task_id);
+                  const isApproval = taskTab === 'approvals' || sub.status === 'pending_approval';
+                  const sc = (statusConfig as Record<string, typeof statusConfig['completed']>)[sub.status] ?? statusConfig.not_started;
+                  const StatusIcon = sc.icon;
+                  const isOverdue = sub.deadline && isPast(new Date(sub.deadline)) && sub.status !== 'completed';
+                  const assigneeNames = (typeof sub.assignedTo === 'string' ? sub.assignedTo.split(',') : Array.isArray(sub.assignedTo) ? sub.assignedTo : [])
+                    .map(id => users.find(u => u.id === id.trim())?.name)
+                    .filter(Boolean)
+                    .join(', ');
+                  return (
+                    <div
+                      key={sub.id ?? i}
+                      onClick={() => setOpenSubtaskId(sub.id ?? null)}
+                      className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer"
+                    >
+                      <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums hidden sm:block flex-shrink-0">{i + 1}</span>
+                      <div className={cn(
+                        "w-1 h-10 rounded-full flex-shrink-0 hidden sm:block",
+                        isApproval ? "bg-amber-500" : isOverdue ? "bg-red-500" : sub.status === 'in_progress' ? "bg-primary" : "bg-muted-foreground/20"
+                      )} />
+                      <div className="flex-1 min-w-0">
+                        <p className={cn(
+                          "text-sm font-medium truncate group-hover:text-primary transition-colors",
+                          sub.status === 'completed' ? "line-through text-muted-foreground" : "text-foreground"
+                        )}>{sub.title}</p>
+                        <div className="flex items-center gap-x-1.5 mt-0.5 text-[11px] text-muted-foreground min-w-0">
+                          <span className="truncate min-w-0">{mt?.title ?? ''}</span>
+                          {assigneeNames && isApproval && (
+                            <><span className="shrink-0">·</span><span className="truncate min-w-0 text-slate-500 dark:text-slate-400">For: {assigneeNames}</span></>
+                          )}
+                          {sub.deadline && (
+                            <><span className="shrink-0">·</span>
+                            <span className={cn("flex items-center gap-0.5 shrink-0", isOverdue ? "text-red-500 font-medium" : "")}>
+                              <Clock className="w-3 h-3" />{safeFmt(sub.deadline)}
+                            </span></>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+                        {mt?.priority && <PriorityPill priority={mt.priority} />}
+                        {isApproval ? (
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            Respond / Review
+                          </span>
+                        ) : (
+                          <span className={cn("text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 whitespace-nowrap", sc.pillClass)}>
+                            <StatusIcon className="w-3 h-3" />{sc.label}
+                          </span>
                         )}
-                        {sub.deadline && (
-                          <>
-                            <span className="shrink-0">·</span>
-                            <span className={cn(
-                              "flex items-center gap-0.5 shrink-0",
-                              isOverdue ? "text-red-500 font-medium" : ""
-                            )}>
-                              <Clock className="w-3 h-3" />
-                              {safeFmt(sub.deadline)}
-                            </span>
-                          </>
-                        )}
+                        <ChevronRight className="hidden sm:block w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors flex-shrink-0" />
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
-                      {mt?.priority && <PriorityPill priority={mt.priority} />}
-                      {isApproval ? (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 flex-shrink-0 whitespace-nowrap bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          Respond / Review
+                  );
+                })}
+              </div>
+            )
+          )}
+
+          {/* ── Site Requests tab body ── */}
+          {taskTab === 'site_requests' && (
+            siteReqLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : siteRequests.length === 0 ? (
+              <div className="px-5 py-14 text-center">
+                <div className="w-10 h-10 rounded-md bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center mx-auto mb-3">
+                  <ClipboardList className="w-5 h-5 text-indigo-500" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">No site requests yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">Head to Site Requests to create one.</p>
+              </div>
+            ) : (
+              <div className="max-h-[480px] overflow-y-auto divide-y divide-border/40">
+                {siteRequests.slice(0, 15).map((req, i) => {
+                  const srStatusPill: Record<string, string> = {
+                    pending:     'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+                    in_progress: 'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+                    fulfilled:   'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+                    rejected:    'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',
+                    cancelled:   'bg-muted text-muted-foreground border-border',
+                  };
+                  const srDot: Record<string, string> = {
+                    pending: 'bg-amber-500', in_progress: 'bg-blue-500',
+                    fulfilled: 'bg-emerald-500', rejected: 'bg-red-500', cancelled: 'bg-muted-foreground',
+                  };
+                  const srLabel: Record<string, string> = {
+                    pending: 'Pending', in_progress: 'In Progress',
+                    fulfilled: 'Fulfilled', rejected: 'Rejected', cancelled: 'Cancelled',
+                  };
+                  const dateStr = req.requestDate
+                    ? (() => { try { return format(new Date(req.requestDate), 'MMM d'); } catch { return ''; } })()
+                    : '';
+                  return (
+                    <div
+                      key={req.id}
+                      onClick={() => setSelectedSiteReq(req)}
+                      className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-muted/40 transition-colors group cursor-pointer"
+                    >
+                      <span className="text-[11px] font-bold text-muted-foreground/40 w-4 text-center tabular-nums hidden sm:block flex-shrink-0">{i + 1}</span>
+                      <div className={`w-1 h-10 rounded-full flex-shrink-0 hidden sm:block ${srDot[req.status] ?? 'bg-muted-foreground/20'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{req.item}</p>
+                        <div className="flex items-center gap-x-1.5 mt-0.5 text-[11px] text-muted-foreground min-w-0">
+                          <span className="truncate min-w-0">{[req.category, req.siteName].filter(Boolean).join(' · ')}</span>
+                          {req.requestedByName && (<><span className="shrink-0">·</span><span className="shrink-0">{req.requestedByName}</span></>)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                        {dateStr && <span className="text-[11px] text-muted-foreground hidden sm:block">{dateStr}</span>}
+                        <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 whitespace-nowrap border ${srStatusPill[req.status] ?? ''}`}>
+                          {srLabel[req.status] ?? req.status}
                         </span>
-                      ) : (
-                        <span className={cn(
-                          "text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 flex-shrink-0 whitespace-nowrap",
-                          sc.pillClass
-                        )}>
-                          <StatusIcon className="w-3 h-3" />
-                          {sc.label}
-                        </span>
-                      )}
-                      <ChevronRight className="hidden sm:block w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-primary transition-colors flex-shrink-0" />
+                        <ChevronRight className="hidden sm:block w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-indigo-500 transition-colors flex-shrink-0" />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )
           )}
           </div>{/* end task card */}
 
@@ -1092,7 +1387,25 @@ function UserDashboard() {
         )}
       </div>
 
+
+
       <TaskDetailSheet subtaskId={openSubtaskId} onClose={() => setOpenSubtaskId(null)} />
+      {selectedSiteReq && (
+        <RequestDetailSheet
+          request={selectedSiteReq}
+          canManage={(effectiveUser as any)?.privileges?.opsSiteRequests?.canManage ?? (effectiveUser as any)?.privileges?.users?.canManage ?? true}
+          canEditOrDelete={
+            (effectiveUser as any)?.privileges?.opsSiteRequests?.canManage ||
+            (effectiveUser?.id && selectedSiteReq.loggedById === effectiveUser.id) ||
+            (!selectedSiteReq.loggedById && !selectedSiteReq.loggedByName)
+          }
+          onClose={() => setSelectedSiteReq(null)}
+          onStatusChange={updateSiteReqStatus}
+          onComment={addSiteReqComment}
+          fetchUpdates={fetchSiteReqUpdates}
+          onUpdate={(r) => setSelectedSiteReq(r)}
+        />
+      )}
       {canViewRefillForecast && (
         <RefillForecastModal
           isOpen={isRefillModalOpen}

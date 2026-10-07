@@ -43,7 +43,7 @@ function StatAmount({
 
 export function ClientSummaryGrid() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>(() => new Date().getFullYear().toString());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [contactsFor, setContactsFor] = useState<string | null>(null);
   const [breakdownModalClient, setBreakdownModalClient] = useState<{ name: string; stats: any } | null>(null);
@@ -68,6 +68,7 @@ export function ClientSummaryGrid() {
 
   const availableYears = useMemo(() => {
     const yearSet = new Set<string>();
+    yearSet.add(new Date().getFullYear().toString());
     invoices.forEach(inv => {
       const d = (inv as any).startDate || inv.date;
       if (d && d.length >= 4) {

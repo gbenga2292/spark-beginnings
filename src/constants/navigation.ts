@@ -118,6 +118,7 @@ export const navigation: NavCategory[] = [
       { name: 'External Comms', href: '/comm-log', icon: MessageSquare, privKey: 'commLog', privField: 'canView' },
       { name: 'Daily Journals', href: '/daily-journal', icon: BookOpen, privKey: 'dailyJournal', privField: 'canView' },
       { name: 'Minutes', href: '/minutes', icon: FileText, privKey: 'minute', privField: 'canView' },
+      { name: 'Site Requests', href: '/operations/site-requests', icon: ClipboardList, privKey: 'opsSiteRequests', privField: 'canView' },
     ],
   },
   {

@@ -8,33 +8,50 @@ export interface FuelEstimationParams {
   dailyMachineLogs: DailyMachineLog[];
   assets: Asset[];
   dieselRefills?: DieselRefill[];
+  /** 'end_of_day' accounts for today's operational burn; 'start_of_day' calculates post-refill level before today's shift */
+  timing?: 'end_of_day' | 'start_of_day';
+  /** Operating status for today (full, half, off/none) */
+  operationalDay?: 'full' | 'half' | 'off' | 'none';
 }
 
 export interface FuelEstimationResult {
   startingRemainingLitres: number; // fuel in tank before today's refill (e.g. 18L)
   refillAdded: number; // today's refill (e.g. 60L)
-  estimatedDipstickLitres: number; // startingRemaining + refillAdded (e.g. 78L)
+  todayBurn: number; // fuel consumed during today's shift if end_of_day (e.g. 18L)
+  estimatedDipstickLitres: number; // clamped to tank capacity (e.g. min(tankCapacity, starting + refill - todayBurn))
+  unclampedLitres: number; // raw calculated volume before clamping
   tankCapacityLitres: number; // e.g. 90L
-  isOverCapacity: boolean; // estimatedDipstickLitres > tankCapacityLitres
-  overCapacityByLitres: number; // max(0, estimatedDipstickLitres - tankCapacityLitres)
+  isOverCapacity: boolean; // unclampedLitres > tankCapacityLitres
+  overCapacityByLitres: number; // max(0, unclampedLitres - tankCapacityLitres)
   burnRate: number; // e.g. 18 L/day
+  timing: 'end_of_day' | 'start_of_day';
   lastAnchorDate: string | null;
   lastAnchorType: 'dipstick' | 'refill' | null;
   activeDaysSinceAnchor: number;
 }
 
 /**
- * Calculates current estimated fuel remaining and post-refill dipstick level
- * matching the Next Refill Date Forecast methodology:
+ * Calculates current estimated fuel remaining and post-refill/end-of-shift dipstick level:
  * 
- * 1. Finds the most recent telemetry anchor (dipstick reading or diesel refill).
- * 2. Deducts fuel burned for operational days since the anchor (using rated daily burn rate, e.g. 18L/day).
+ * 1. Finds the most recent physical telemetry anchor (manual dipstick reading or formal diesel refill).
+ *    Note: Auto-calculated estimates (isDipstickManual === false) are ignored as anchors to prevent drift.
+ * 2. Deducts fuel burned for operational days between anchor and targetDate using daily burn rate.
  * 3. Adds today's fuel refill (entered or allocated).
- * 4. NEVER silently clamps to tank capacity — reports the exact calculated value
- *    and flags `isOverCapacity` so users can clearly see if fuel exceeds tank volume.
+ * 4. In 'end_of_day' mode (default), deducts today's fuel consumption based on operationalDay.
+ * 5. Clamps displayed dipstick level to physical tank capacity while flagging isOverCapacity.
  */
 export function calculateEstimatedFuelLevel(params: FuelEstimationParams): FuelEstimationResult | null {
-  const { machineId, siteId, targetDate, currentRefill, dailyMachineLogs, assets, dieselRefills } = params;
+  const {
+    machineId,
+    siteId,
+    targetDate,
+    currentRefill,
+    dailyMachineLogs,
+    assets,
+    dieselRefills,
+    timing = 'end_of_day',
+    operationalDay = 'full',
+  } = params;
   if (!machineId || !targetDate) return null;
 
   const rawAsset = (assets || []).find(
@@ -43,13 +60,17 @@ export function calculateEstimatedFuelLevel(params: FuelEstimationParams): FuelE
   const benchmarkBurnRate = Number(rawAsset?.expectedDailyBurnRate) || 18.0;
   const tankCapacityLitres = Number(rawAsset?.tankCapacityLitres) || 0;
 
-  // Filter logs for this machine before targetDate
-  // Sort descending by date
+  // Filter logs for this machine strictly before targetDate, sorted descending
   const priorLogs = (dailyMachineLogs || [])
     .filter(l => l.assetId === machineId && l.date < targetDate)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  const lastDipstickLog = priorLogs.find(l => l.dipstickLevelLitres != null && Number(l.dipstickLevelLitres) >= 0);
+  // Only physically measured dipstick readings act as anchors (ignore auto-estimates)
+  const lastDipstickLog = priorLogs.find(
+    l => l.dipstickLevelLitres != null &&
+         Number(l.dipstickLevelLitres) >= 0 &&
+         l.isDipstickManual !== false
+  );
   const lastDipstickDate = lastDipstickLog?.date || null;
   const lastDipstickLitres = lastDipstickLog?.dipstickLevelLitres != null ? Number(lastDipstickLog.dipstickLevelLitres) : null;
 
@@ -133,23 +154,37 @@ export function calculateEstimatedFuelLevel(params: FuelEstimationParams): FuelE
       .reduce((sum, a) => sum + (a.allocatedLitres || 0), 0);
   }
 
-  // Dipstick post-refill = starting fuel remaining + today's refill
-  // If no refill was added, dipstick reflects current remaining fuel before refill
-  const totalFuel = startingRemainingLitres + refillAdded;
-  const estimatedDipstickLitres = parseFloat(totalFuel.toFixed(1));
-  const isOverCapacity = tankCapacityLitres > 0 && estimatedDipstickLitres > tankCapacityLitres;
+  // Calculate today's fuel consumption if timing is 'end_of_day'
+  let todayBurn = 0;
+  if (timing === 'end_of_day') {
+    const todayRatio = operationalDay === 'full' ? 1.0 : (operationalDay === 'half' ? 0.5 : 0.0);
+    todayBurn = parseFloat((todayRatio * benchmarkBurnRate).toFixed(1));
+  }
+
+  // Raw calculated remaining volume
+  const unclamped = Math.max(0, parseFloat((startingRemainingLitres + refillAdded - todayBurn).toFixed(1)));
+  const preBurnVolume = startingRemainingLitres + refillAdded;
+  const isOverCapacity = tankCapacityLitres > 0 && preBurnVolume > tankCapacityLitres;
   const overCapacityByLitres = isOverCapacity 
-    ? parseFloat((estimatedDipstickLitres - tankCapacityLitres).toFixed(1)) 
+    ? parseFloat((preBurnVolume - tankCapacityLitres).toFixed(1)) 
     : 0;
+
+  // Clamped physically to tank capacity
+  const estimatedDipstickLitres = tankCapacityLitres > 0
+    ? Math.min(tankCapacityLitres, unclamped)
+    : unclamped;
 
   return {
     startingRemainingLitres,
     refillAdded,
+    todayBurn,
     estimatedDipstickLitres,
+    unclampedLitres: unclamped,
     tankCapacityLitres,
     isOverCapacity,
     overCapacityByLitres,
     burnRate: benchmarkBurnRate,
+    timing,
     lastAnchorDate,
     lastAnchorType,
     activeDaysSinceAnchor,

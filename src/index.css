@@ -1040,9 +1040,18 @@ html.dark.ui-brutalism {
 
 
 /* ══════════════════════════════════════════════════════════════════════
+   SKELETON SHIMMER — dashboard loading placeholders
+   ══════════════════════════════════════════════════════════════════════ */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    BOTTOM SHEET ANIMATION — used by the mobile 3-dot action menu
    ══════════════════════════════════════════════════════════════════════ */
 @keyframes slide-up {
+
   from {
     transform: translateY(100%);
     opacity: 0;

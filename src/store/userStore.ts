@@ -71,6 +71,7 @@ export interface OpsSitesPriv { canView: boolean; }
 export interface OpsMachineReconPriv { canView: boolean; }
 // Ops Diesel Refill
 export interface OpsDieselPriv { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; }
+export interface OpsSiteRequestsPriv { canView: boolean; canCreate: boolean; canManage: boolean; }
 
 // ─── Account ─────────────────────────────────────────────────
 export interface BillingPriv  { canView: boolean; canCreate: boolean; canEdit: boolean; canDelete: boolean; canViewAmounts: boolean; canImport: boolean; canExport: boolean; }
@@ -172,6 +173,7 @@ export interface Client360Priv {
   canViewContactsTab: boolean;
   canViewCommsTab: boolean;
   canViewTasksTab: boolean;
+  canViewRequestsTab?: boolean;
 }
 
 export interface Site360Priv {
@@ -184,6 +186,7 @@ export interface Site360Priv {
   canViewTasksTab: boolean;
   canViewCommsTab: boolean;
   canViewContactsTab: boolean;
+  canViewRequestsTab?: boolean;
 }
 
 // ─── Master interface ─────────────────────────────────────────
@@ -219,6 +222,7 @@ export interface UserPrivileges {
   opsSites:          OpsSitesPriv;
   opsMachineRecon:   OpsMachineReconPriv;
   opsDiesel:         OpsDieselPriv;
+  opsSiteRequests?:  OpsSiteRequestsPriv;
   activityLog:       ActivityLogPriv;
   commLog:           CommLogPriv;
   beneficiaries:     BeneficiariesPriv;
@@ -298,6 +302,7 @@ export const FULL_ACCESS: UserPrivileges = {
   opsSites:         { canView: true },
   opsMachineRecon:  { canView: true },
   opsDiesel:        { canView: true, canAdd: true, canEdit: true, canDelete: true },
+  opsSiteRequests:  { canView: true, canCreate: true, canManage: true },
   activityLog:      { canView: true, canExport: true },
   commLog:          { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   beneficiaries:    { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
@@ -322,6 +327,7 @@ export const FULL_ACCESS: UserPrivileges = {
     canViewContactsTab: true,
     canViewCommsTab: true,
     canViewTasksTab: true,
+    canViewRequestsTab: true,
   },
   site360: {
     canView: true,
@@ -333,6 +339,7 @@ export const FULL_ACCESS: UserPrivileges = {
     canViewTasksTab: true,
     canViewCommsTab: true,
     canViewContactsTab: true,
+    canViewRequestsTab: true,
   },
 };
 
@@ -377,6 +384,7 @@ export const NO_ACCESS: UserPrivileges = {
   opsSites:         { canView: false },
   opsMachineRecon:  { canView: false },
   opsDiesel:        { canView: false, canAdd: false, canEdit: false, canDelete: false },
+  opsSiteRequests:  { canView: false, canCreate: false, canManage: false },
   activityLog:      { canView: false, canExport: false },
   commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   beneficiaries:    { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
@@ -401,6 +409,7 @@ export const NO_ACCESS: UserPrivileges = {
     canViewContactsTab: false,
     canViewCommsTab: false,
     canViewTasksTab: false,
+    canViewRequestsTab: false,
   },
   site360: {
     canView: false,
@@ -412,6 +421,7 @@ export const NO_ACCESS: UserPrivileges = {
     canViewTasksTab: false,
     canViewCommsTab: false,
     canViewContactsTab: false,
+    canViewRequestsTab: false,
   },
 };
 
@@ -486,6 +496,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       opsVehicles:      { canView: true, canAdd: false, canEdit: false, canDelete: false, canViewFleet: true, canAddFleet: false, canEditFleet: false, canDeleteFleet: false, canViewLogs: true, canAddLogs: false, canEditLogs: false, canDeleteLogs: false, canViewFuel: true, canAddFuel: false, canEditFuel: false, canDeleteFuel: false, canViewFuelAnalytics: true, canViewDocuments: true, canEditDocuments: false, canImport: false, canExport: false },
       opsSites:         { canView: true },
       opsDiesel:        { canView: true, canAdd: false, canEdit: false, canDelete: false },
+      opsSiteRequests:  { canView: true, canCreate: false, canManage: false },
       activityLog:      { canView: true, canExport: false },
       commLog:          { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       beneficiaries:    { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },

@@ -60,6 +60,7 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/operations/dewatering-calculator': () => import('@/src/pages/DewateringCalculator'),
   '/operations/vat-calculator': () => import('@/src/pages/VatCalculator'),
   '/operations/machine-reconciliation': () => import('@/src/pages/MachineReconciliation'),
+  '/operations/site-requests': () => import('@/src/pages/SiteRequests'),
   '/activity-log': () => import('@/src/pages/ActivityLog'),
   '/profile': () => import('@/src/pages/Profile'),
 };

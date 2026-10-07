@@ -211,6 +211,12 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canEdit', label: 'Edit Refill' },
           { key: 'canDelete', label: 'Delete Refill', danger: true },
         ] },
+      { key: 'opsSiteRequests', label: 'Site Requests', parentKey: 'opsSiteRequests', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Requests' },
+          { key: 'canCreate', label: 'Submit Requests', special: true },
+          { key: 'canManage', label: 'Approve / Manage Requests' },
+        ] },
       { key: 'simulator', label: 'Layout Simulator', parentKey: 'simulator', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View' },

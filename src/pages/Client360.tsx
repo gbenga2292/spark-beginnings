@@ -7,7 +7,7 @@ import {
   ShieldAlert, ShieldCheck, Settings2, X, Edit2, ChevronRight, CheckSquare,
   Plus, Trash2, Circle, Eye, MoreVertical, BookOpen, MessageSquare, Pencil,
   Hourglass, Printer, Download, Globe, Check, RotateCcw, PauseCircle, PlayCircle, UserCheck,
-  Zap, ListPlus, User, ListTodo, Archive, Search,
+  Zap, ListPlus, User, ListTodo, Archive, Search, ArrowLeft,
 } from 'lucide-react';
 
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -46,8 +46,9 @@ import { ClientSitesTimeline } from '@/src/components/sites/ClientSitesTimeline'
 import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 import { getInvoiceSettlement } from '@/src/lib/settlementUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/src/components/ui/dialog';
+import { ClientSiteRequestsPanel } from '@/src/components/site-requests/ClientSiteRequestsPanel';
 
-type TabType = 'overview' | 'timeline' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding';
+type TabType = 'overview' | 'timeline' | 'contacts' | 'financials' | 'report' | 'operations' | 'activity' | 'tasks' | 'onboarding' | 'requests';
 
 const renderFormattedChatMessage = (content: string) => {
   if (!content) return null;
@@ -454,6 +455,9 @@ export function Client360() {
   const canViewContactsTab    = c360Priv ? c360Priv.canViewContactsTab : Boolean(currentUser?.privileges?.clients?.canView);
   const canViewCommsTab       = c360Priv ? c360Priv.canViewCommsTab : Boolean(currentUser?.privileges?.commLog?.canView);
   const canViewTasksTab       = c360Priv ? c360Priv.canViewTasksTab : Boolean(currentUser?.privileges?.tasks?.canView || currentUser?.privileges?.tasks?.canViewMyTasks);
+  const canViewRequestsTab    = c360Priv?.canViewRequestsTab !== undefined
+    ? Boolean(c360Priv.canViewRequestsTab)
+    : (currentUser?.privileges?.opsSiteRequests?.canView ?? currentUser?.privileges?.sites?.canView ?? true);
 
   const [narrativeSite, setNarrativeSite] = useState<{ site: Site; q: any | null } | null>(null);
 
@@ -1226,7 +1230,12 @@ export function Client360() {
     }
 
     if (queryTab && queryTab !== activeTab) {
-      setRawActiveTab(queryTab as TabType);
+      if (queryTab === 'report') {
+        setRawActiveTab('financials');
+        setFinancialsSubTab('statement');
+      } else {
+        setRawActiveTab(queryTab as TabType);
+      }
     }
   }, [allClients, searchParams, selectedClient, activeTab]);
 
@@ -1234,14 +1243,14 @@ export function Client360() {
     { id: 'timeline' as TabType, show: canViewTimelineTab },
     { id: 'overview' as TabType, show: canViewOverviewTab },
     { id: 'financials' as TabType, show: canViewFinancialsTab },
-    { id: 'report' as TabType, show: canViewStatementTab },
     { id: 'operations' as TabType, show: canViewOperationsTab },
     { id: 'contacts' as TabType, show: canViewContactsTab },
     { id: 'activity' as TabType, show: canViewCommsTab },
     { id: 'tasks' as TabType, show: canViewTasksTab },
+    { id: 'requests' as TabType, show: Boolean(canViewRequestsTab) },
   ].filter(t => t.show), [
-    canViewTimelineTab, canViewOverviewTab, canViewFinancialsTab, canViewStatementTab,
-    canViewOperationsTab, canViewContactsTab, canViewCommsTab, canViewTasksTab
+    canViewTimelineTab, canViewOverviewTab, canViewFinancialsTab,
+    canViewOperationsTab, canViewContactsTab, canViewCommsTab, canViewTasksTab, canViewRequestsTab
   ]);
 
   useEffect(() => {
@@ -1294,7 +1303,7 @@ export function Client360() {
   const [activitySubTab, setActivitySubTab] = useState<'history' | 'onboarding'>('history');
   const [sitesSubTab, setSitesSubTab] = useState<'portfolio' | 'onboarding' | 'pending' | 'closed'>('portfolio');
   const [filterMonth, setFilterMonth] = useState<string>('all');
-  const [filterYear, setFilterYear] = useState<string>('all');
+  const [filterYear, setFilterYear] = useState<string>(() => new Date().getFullYear().toString());
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [isQuickStatsOpen, setIsQuickStatsOpen] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -1303,7 +1312,7 @@ export function Client360() {
   const [openSubtaskId, setOpenSubtaskId] = useState<string | null>(null);
   const [taskSubTab, setTaskSubTab] = useState<'pending' | 'approval' | 'completed'>('pending');
   const [selectedInvoiceForDetail, setSelectedInvoiceForDetail] = useState<any>(null);
-  const [financialsSubTab, setFinancialsSubTab] = useState<'invoices' | 'payments'>('invoices');
+  const [financialsSubTab, setFinancialsSubTab] = useState<'invoices' | 'payments' | 'statement'>('invoices');
   const [hideFullySettled, setHideFullySettled] = useState(false);
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set());
   const [showOnlyUnpaidInvoices, setShowOnlyUnpaidInvoices] = useState(false);
@@ -2383,13 +2392,13 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             className={cn(
               "h-8 w-8 p-0 flex items-center justify-center border shadow-none rounded-md transition-colors",
               isDark ? "bg-slate-900 border-slate-700 text-white hover:bg-slate-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
-              (filterMonth !== 'all' || filterYear !== 'all') && "border-blue-500 text-blue-600 dark:text-blue-400"
+              (filterMonth !== 'all' || filterYear !== currentYear.toString()) && "border-blue-500 text-blue-600 dark:text-blue-400"
             )}
             title="Filter by period"
           >
             <div className="relative flex items-center justify-center">
               <Filter className="w-3.5 h-3.5" />
-              {(filterMonth !== 'all' || filterYear !== 'all') && (
+              {(filterMonth !== 'all' || filterYear !== currentYear.toString()) && (
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
               )}
             </div>
@@ -2402,9 +2411,9 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
             )}>
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Filter By Period</span>
-                {(filterMonth !== 'all' || filterYear !== 'all') && (
+                {(filterMonth !== 'all' || filterYear !== currentYear.toString()) && (
                   <button 
-                    onClick={() => { setFilterMonth('all'); setFilterYear('all'); }} 
+                    onClick={() => { setFilterMonth('all'); setFilterYear(currentYear.toString()); }} 
                     className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     Reset
@@ -2921,11 +2930,11 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     { id: 'timeline', label: 'Timeline & History', show: canViewTimelineTab },
                     { id: 'overview', label: 'Overview', show: canViewOverviewTab },
                     { id: 'financials', label: 'Financials', show: canViewFinancialsTab },
-                    { id: 'report', label: 'Client Statement', show: canViewStatementTab },
-                    { id: 'operations', label: 'Site 360', count: clientPendingSites.length > 0 ? `${clientPendingSites.length} onboarding` : undefined, show: canViewOperationsTab },
-                    { id: 'contacts', label: 'Contacts', count: clientContacts.filter(c => selectedClient === 'ALL' || c.clientName?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: canViewContactsTab },
-                    { id: 'activity', label: 'Comms', count: commLogs.filter(l => selectedClient === 'ALL' || l.client?.trim().toLowerCase() === selectedClient?.trim().toLowerCase()).length, show: canViewCommsTab },
-                    { id: 'tasks', label: 'Tasks', count: clientData.pendingTasks.length, show: canViewTasksTab },
+                    { id: 'operations', label: 'Site 360', show: canViewOperationsTab },
+                    { id: 'contacts', label: 'Contacts', show: canViewContactsTab },
+                    { id: 'activity', label: 'Comms', show: canViewCommsTab },
+                    { id: 'tasks', label: 'Tasks', show: canViewTasksTab },
+                    { id: 'requests', label: 'Requests', show: Boolean(canViewRequestsTab) },
                   ].filter(tab => tab.show !== false).map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -2940,16 +2949,6 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                         )}
                       >
                         <span>{tab.label}</span>
-                        {tab.count !== undefined && tab.count !== null && (
-                          <span className={cn(
-                            'text-[10px] px-1.5 py-0.2 rounded-md font-mono font-bold transition-colors',
-                            isActive
-                              ? 'bg-white/25 text-white'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700'
-                          )}>
-                            {tab.count}
-                          </span>
-                        )}
                       </button>
                     );
                   })}
@@ -3057,86 +3056,82 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
 
               {/* FINANCIALS TAB */}
               {activeTab === 'financials' && (
-                <div className="space-y-6 animate-in fade-in-50 duration-100">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Revenue & Profit (Accrual Basis) */}
-                    <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div>
-                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><DollarSign className="w-5 h-5 text-emerald-500"/> Revenue & Accrued Profit</h3>
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Billed Revenue</span>
-                              <span className="text-xs text-slate-400">Total amount invoiced to the client</span>
-                            </div>
-                            <span className="font-bold text-lg text-blue-600 dark:text-blue-400">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
-                          </div>
-                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Project Costs</span>
-                              <span className="text-xs text-slate-400">Expenses logged for this client's sites</span>
-                            </div>
-                            <span className="font-bold text-lg text-rose-500">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
-                          </div>
-                        </div>
+                <div className="space-y-3.5 animate-in fade-in-50 duration-100">
+                  {/* Minimalist Financial Key Metrics */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    <div className="px-3.5 py-2.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Total Billed</span>
+                      <div className="text-sm sm:text-base font-extrabold text-blue-600 dark:text-blue-400 truncate mt-0.5">
+                        {currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
                       </div>
-
                     </div>
 
-                    {/* Cash Flow & Collection Status */}
-                    <div className={cn("p-6 rounded-3xl border shadow-sm flex flex-col justify-between", isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200")}>
-                      <div>
-                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                          <span className="p-1 rounded-lg bg-emerald-500/10 text-emerald-500 font-bold text-sm">₦</span> Cash Flow & Collection
-                        </h3>
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Payments Received</span>
-                              <span className="text-xs text-slate-400">Cash cleared in bank from this client</span>
-                            </div>
-                            <span className="font-bold text-lg text-emerald-600">{currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}</span>
-                          </div>
-                          <div className="flex justify-between items-center pb-3.5 border-b border-slate-100 dark:border-slate-800">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-700 dark:text-slate-350">Outstanding Balance</span>
-                              <span className="text-xs text-slate-400">Invoiced amount awaiting payment (less discounts &amp; WHT)</span>
-                            </div>
-                            <span className={cn("font-bold text-lg", (clientData.totalRevenue - clientData.paymentsCleared - (clientData.totalDiscounts || 0) - (clientData.totalWht || 0)) > 0.01 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
-                              {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.max(0, clientData.totalRevenue - clientData.paymentsCleared - (clientData.totalDiscounts || 0) - (clientData.totalWht || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
-                            </span>
-                          </div>
-                        </div>
+                    <div className="px-3.5 py-2.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Project Costs</span>
+                      <div className="text-sm sm:text-base font-extrabold text-rose-500 truncate mt-0.5">
+                        {currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
                       </div>
+                    </div>
 
+                    <div className="px-3.5 py-2.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Payments Cleared</span>
+                      <div className="text-sm sm:text-base font-extrabold text-emerald-600 dark:text-emerald-400 truncate mt-0.5">
+                        {currentUser?.privileges?.billing?.canViewAmounts ? `₦${clientData.paymentsCleared.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
+                      </div>
+                    </div>
+
+                    <div className="px-3.5 py-2.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Outstanding Balance</span>
+                      <div className={cn("text-sm sm:text-base font-extrabold truncate mt-0.5", (clientData.totalRevenue - clientData.paymentsCleared - (clientData.totalDiscounts || 0) - (clientData.totalWht || 0)) > 0.01 ? "text-amber-600 dark:text-amber-400" : "text-slate-500")}>
+                        {currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.max(0, clientData.totalRevenue - clientData.paymentsCleared - (clientData.totalDiscounts || 0) - (clientData.totalWht || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '***'}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Flat Financial Segmented Pills */}
-                  <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
-                    {[
-                      { id: 'invoices', label: 'Invoices Registry', count: clientData.clientInvoices.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.totalRevenue).toLocaleString()}` : '***', icon: FileText },
-                      { id: 'payments', label: 'Payments & Settlement', count: clientData.paymentsWithVatStatus.length, amount: currentUser?.privileges?.billing?.canViewAmounts ? `₦${Math.round(clientData.paymentsCleared).toLocaleString()}` : '***', icon: CheckCircle2 }
-                    ].map(subTab => {
-                      const isSubActive = financialsSubTab === subTab.id;
-                      const SubIcon = subTab.icon;
-                      return (
-                        <button
-                          key={subTab.id}
-                          onClick={() => setFinancialsSubTab(subTab.id as any)}
-                          className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold transition-all whitespace-nowrap outline-none",
-                            isSubActive
-                              ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
-                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                          )}
-                        >
-                          <SubIcon className="w-3.5 h-3.5" />
-                          <span>{subTab.label} ({subTab.count})</span>
-                          <span className="font-mono text-[11px] opacity-90">{subTab.amount}</span>
-                        </button>
-                      );
-                    })}
+                  {/* Flat Financial Segmented Pills & Client Statement Button */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
+                      {[
+                        { id: 'invoices', label: 'Invoices Registry', icon: FileText },
+                        { id: 'payments', label: 'Payments & Settlement', icon: CheckCircle2 },
+                        ...(canViewStatementTab ? [{ id: 'statement', label: 'Client Statement', icon: Printer }] : [])
+                      ].map(subTab => {
+                        const isSubActive = financialsSubTab === subTab.id;
+                        const SubIcon = subTab.icon;
+                        return (
+                          <button
+                            key={subTab.id}
+                            onClick={() => setFinancialsSubTab(subTab.id as any)}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap outline-none cursor-pointer",
+                              isSubActive
+                                ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/80 dark:border-slate-700 font-bold"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                            )}
+                          >
+                            <SubIcon className="w-3.5 h-3.5" />
+                            <span>{subTab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {canViewStatementTab && (
+                      <Button
+                        size="sm"
+                        variant={financialsSubTab === 'statement' ? 'default' : 'outline'}
+                        onClick={() => setFinancialsSubTab(financialsSubTab === 'statement' ? 'invoices' : 'statement')}
+                        className={cn(
+                          "h-8.5 px-3.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-xs cursor-pointer",
+                          financialsSubTab === 'statement'
+                            ? "bg-blue-600 hover:bg-blue-500 text-white border-blue-600 shadow-blue-500/20"
+                            : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400"
+                        )}
+                      >
+                        <Printer className="w-3.5 h-3.5 text-blue-500" />
+                        <span>{financialsSubTab === 'statement' ? 'Back to Invoices' : 'Client Statement'}</span>
+                      </Button>
+                    )}
                   </div>
 
                   {/* Invoices Registry */}
@@ -3811,8 +3806,8 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                 </div>
               )}
 
-              {/* CLIENT REPORT TAB */}
-              {activeTab === 'report' && (
+              {/* CLIENT REPORT TAB / FINANCIAL STATEMENT */}
+              {((activeTab === 'financials' && financialsSubTab === 'statement') || activeTab === 'report') && (
                 <div className="space-y-6 transition-opacity duration-150">
                   {/* Top Bar / Actions */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm no-print">
@@ -3834,6 +3829,17 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                      {financialsSubTab === 'statement' && (
+                        <Button
+                          onClick={() => setFinancialsSubTab('invoices')}
+                          variant="ghost"
+                          className="h-9 px-3 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <ArrowLeft className="w-3.5 h-3.5" />
+                          <span>Back to Invoices</span>
+                        </Button>
+                      )}
+
                       <Button
                         onClick={() => {
                           setReportDateModalMode('filter');
@@ -5359,6 +5365,16 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                       </>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* REQUESTS TAB */}
+              {activeTab === 'requests' && (
+                <div className="space-y-6 animate-in fade-in-50 duration-100">
+                  <ClientSiteRequestsPanel
+                    clientName={selectedClient === 'ALL' || selectedClient === 'All Clients' ? undefined : selectedClient}
+                    clientSites={selectedClient === 'ALL' || selectedClient === 'All Clients' ? undefined : clientSites}
+                  />
                 </div>
               )}
             </div>
