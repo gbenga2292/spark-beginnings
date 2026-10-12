@@ -56,6 +56,7 @@ import { MetricHeroCard } from '@/src/components/ui/MetricHeroCard';
 import { MinuteEditor } from '@/src/components/minute/MinuteEditor';
 import { MinuteDetailView } from '@/src/components/minute/MinuteDetailView';
 import { MinutePrintPreviewView, MinutePrintPreviewViewHandle } from '@/src/components/minute/MinutePrintPreviewView';
+import { exportMinuteToDocx } from '@/src/lib/minuteDocxExport';
 import { MeetingSettingsModal } from '@/src/components/minute/MeetingSettingsModal';
 import { TaskDetailSheet } from '@/src/components/tasks/TaskDetailSheet';
 import type { MeetingMinute, MeetingActionItem } from '@/src/types/minute';
@@ -193,6 +194,8 @@ export function Minute() {
 
   // Print preview page view with watermark
   const [isPrintPreview, setIsPrintPreview] = useState(false);
+  const [hideLogo, setHideLogo] = useState(false);
+  const [hideWatermark, setHideWatermark] = useState(false);
   const previewRef = useRef<MinutePrintPreviewViewHandle>(null);
 
   // View mode vs Edit mode for active minute
@@ -534,12 +537,31 @@ export function Minute() {
       : 'Meeting Minutes',
     activeMinute
       ? isPrintPreview
-        ? `${activeMinute.title} • Watermarked at 50% opacity with corporate header`
+        ? `${activeMinute.title}${hideWatermark ? ' • Watermark hidden' : ' • Watermarked'} • ${hideLogo ? 'Logo hidden' : 'Corporate header'}`
         : `${activeMinute.meetingType} Meeting • ${activeMinute.date}${activeMinute.chairPerson ? ` • Chair: ${activeMinute.chairPerson}` : ''}`
       : 'Standardized corporate minutes & task allocation',
     activeMinute ? (
       isPrintPreview ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200 cursor-pointer select-none font-medium bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <input
+              type="checkbox"
+              checked={hideLogo}
+              onChange={(e) => setHideLogo(e.target.checked)}
+              className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-3.5 w-3.5 cursor-pointer"
+            />
+            <span>Hide Logo</span>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-200 cursor-pointer select-none font-medium bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <input
+              type="checkbox"
+              checked={hideWatermark}
+              onChange={(e) => setHideWatermark(e.target.checked)}
+              className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-3.5 w-3.5 cursor-pointer"
+            />
+            <span>Hide Watermark</span>
+          </label>
+          <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-0.5 hidden sm:block" />
           <Button
             type="button"
             variant="outline"
@@ -548,6 +570,16 @@ export function Minute() {
             className="h-8 text-xs border-border/80"
           >
             Close
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => previewRef.current?.handleExportDocx()}
+            className="h-8 px-3 text-xs gap-1.5 border-border/80 text-foreground hover:bg-muted"
+          >
+            <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Export Word (.docx)</span>
           </Button>
           <Button
             type="button"
@@ -582,6 +614,16 @@ export function Minute() {
         </div>
       ) : (
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => exportMinuteToDocx(activeMinute)}
+            className="h-8 gap-1.5 text-xs border-border/80"
+          >
+            <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <span>Export Word</span>
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -921,6 +963,10 @@ export function Minute() {
           <MinutePrintPreviewView
             ref={previewRef}
             minute={activeMinute}
+            hideLogo={hideLogo}
+            hideWatermark={hideWatermark}
+            onToggleHideLogo={setHideLogo}
+            onToggleHideWatermark={setHideWatermark}
           />
         ) : isEditing ? (
           <MinuteEditor

@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Building2,
   Tag,
+  MapPin,
   ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/src/components/ui/button';
@@ -238,7 +239,7 @@ export function MinuteEditor({
             className="text-xl md:text-2xl font-bold tracking-tight border-none px-0 shadow-none focus-visible:ring-0 h-auto"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 text-xs">
             <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/40">
               <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
               <Input
@@ -314,6 +315,17 @@ export function MinuteEditor({
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/40">
+              <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Input
+                type="text"
+                placeholder="Location (e.g. Conference Room)"
+                value={minute.location || ''}
+                onChange={(e) => updateField('location', e.target.value)}
+                className="h-7 text-xs border-none bg-transparent p-0 shadow-none focus-visible:ring-0 w-full"
+              />
             </div>
 
             <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/40">

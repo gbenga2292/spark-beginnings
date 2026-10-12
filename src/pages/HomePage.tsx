@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Sparkles, BarChart3, HardHat, ArrowRightLeft,
   Calculator, ListTodo, MessageSquare, Users, Cpu, Landmark, FileText,
   Settings, Search, LogOut, ArrowUpRight, Layers, ShieldAlert,
-  Bell, User as UserIcon,
+  Bell, User as UserIcon, Contact,
 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
 import { showConfirm } from '../components/ui/toast';
@@ -196,6 +196,19 @@ export function HomePage() {
             name: 'Client 360',
             href: '/client-360',
             icon: Sparkles,
+            privKey: 'custom',
+            privField: '',
+            visible: (user: any) =>
+              Boolean(
+                user?.privileges?.users?.canManage ||
+                user?.privileges?.sites?.canView ||
+                user?.privileges?.clients?.canView
+              ),
+          },
+          {
+            name: 'Phonebook',
+            href: '/clients/phonebook',
+            icon: Contact,
             privKey: 'custom',
             privField: '',
             visible: (user: any) =>

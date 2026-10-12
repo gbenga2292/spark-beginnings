@@ -15,6 +15,8 @@ import {
   DewateringCalculationResult,
   DewateringLayoutType,
   PipeStockOption,
+  PumpSide,
+  getRecommendedPumpSides,
   calculateDewatering,
   DEFAULT_DEWATERING_INPUT,
   EMPTY_DEWATERING_INPUT,
@@ -225,15 +227,218 @@ function SiteSchematic({
     }
   }
 
-  // Optimal pump position — avoid ingress gap
-  let pumpX = ringX + ringWidth / 2;
-  let pumpY = ringY;
-  if (layout === 'l_shape') {
-    pumpX = ringX;
-    pumpY = ringY;
-  } else if (layout === 'ring' && ingressPx > 0 && ingressSide === 'north') {
-    pumpX = ringX + ringWidth * 0.2;
-  }
+  // Active pumps configuration for drawing
+  const activePumpSides: PumpSide[] = (result?.pumpSides && result.pumpSides.length > 0)
+    ? result.pumpSides
+    : (result ? getRecommendedPumpSides(result.pumps, layout, inputs.ingressSide, inputs.ingressRequired) : []);
+
+  // Count pumps per side to space them out evenly
+  const sidePumpCounts: Record<PumpSide, number> = { north: 0, east: 0, south: 0, west: 0 };
+  activePumpSides.forEach(s => { sidePumpCounts[s] = (sidePumpCounts[s] || 0) + 1; });
+  const sidePumpCurrentIdx: Record<PumpSide, number> = { north: 0, east: 0, south: 0, west: 0 };
+
+  const dischargeDir: PumpSide = inputs.dischargeDirection || result?.dischargeDirection || 'east';
+  const targetEastX = Math.min(W - 12, landX + landW - 3);
+  const targetWestX = Math.max(12, landX + 3);
+  const targetNorthY = Math.max(12, landY + 3);
+  const targetSouthY = Math.min(H - 12, landY + landH - 3);
+
+  const pumpUnits = activePumpSides.map((side, overallIdx) => {
+    const totalOnSide = sidePumpCounts[side];
+    const idxOnSide = sidePumpCurrentIdx[side]++;
+    const t = totalOnSide === 1 ? 0.5 : (idxOnSide + 1) / (totalOnSide + 1);
+
+    let pX = ringX + ringWidth * t;
+    let pY = ringY;
+    let boxX = 0;
+    let boxY = 0;
+    const boxW = 48;
+    const boxH = 14;
+    let suctionX1 = 0;
+    let suctionY1 = 0;
+    let suctionX2 = 0;
+    let suctionY2 = 0;
+
+    if (side === 'north') {
+      if (ingressPx > 0 && ingressSide === 'north') {
+        pX = (ringX + ingressL) / 2;
+      } else if (layout === 'l_shape') {
+        pX = ringX + ringWidth * 0.3;
+      }
+      pY = ringY;
+      boxX = pX - boxW / 2;
+      boxY = ringY - 28;
+      suctionX1 = pX;
+      suctionY1 = pY;
+      suctionX2 = pX;
+      suctionY2 = ringY - 14;
+    } else if (side === 'south') {
+      if (ingressPx > 0 && ingressSide === 'south') {
+        pX = (ringX + ingressL) / 2;
+      }
+      pY = botY;
+      boxX = pX - boxW / 2;
+      boxY = botY + 14;
+      suctionX1 = pX;
+      suctionY1 = pY;
+      suctionX2 = pX;
+      suctionY2 = botY + 14;
+    } else if (side === 'east') {
+      pX = ringX + ringWidth;
+      pY = ringY + ringHeight * t;
+      if (ingressPx > 0 && ingressSide === 'east') {
+        pY = (ringY + ingressT) / 2;
+      }
+      boxX = ringX + ringWidth + 14;
+      boxY = pY - boxH / 2;
+      suctionX1 = pX;
+      suctionY1 = pY;
+      suctionX2 = boxX;
+      suctionY2 = pY;
+    } else {
+      // west
+      pX = ringX;
+      pY = ringY + ringHeight * t;
+      if (ingressPx > 0 && ingressSide === 'west') {
+        pY = (ringY + ingressT) / 2;
+      }
+      boxX = ringX - 62;
+      boxY = pY - boxH / 2;
+      suctionX1 = pX;
+      suctionY1 = pY;
+      suctionX2 = ringX - 14;
+      suctionY2 = pY;
+    }
+
+    const centerX = boxX + boxW / 2;
+    const centerY = boxY + boxH / 2;
+
+    // Uniform discharge line routing towards dischargeDir (all pumps discharge in same direction)
+    let dischargePath = '';
+    let dischargeTextX = 0;
+    let dischargeTextY = 0;
+    let dischargeTextAnchor: 'start' | 'end' | 'middle' = 'start';
+    let dischargeText = 'DISCHARGE';
+
+    if (dischargeDir === 'east') {
+      dischargeText = 'DISCHARGE →';
+      dischargeTextAnchor = 'end';
+      if (side === 'east') {
+        dischargePath = `M ${boxX + boxW} ${pY} H ${targetEastX}`;
+        dischargeTextX = targetEastX - 3;
+        dischargeTextY = pY - 4;
+      } else if (side === 'north') {
+        dischargePath = `M ${boxX + boxW} ${centerY} H ${targetEastX}`;
+        dischargeTextX = targetEastX - 3;
+        dischargeTextY = centerY - 4;
+      } else if (side === 'south') {
+        dischargePath = `M ${boxX + boxW} ${centerY} H ${targetEastX}`;
+        dischargeTextX = targetEastX - 3;
+        dischargeTextY = centerY - 4;
+      } else {
+        // West pump routes around perimeter corridor to discharge East without cutting pit
+        const corridorY = pY < (ringY + ringHeight / 2) ? Math.max(PAD - 6, ringY - 42) : Math.min(H - 32, botY + 42);
+        dischargePath = `M ${boxX + boxW} ${pY} H ${boxX + boxW + 8} V ${corridorY} H ${targetEastX}`;
+        dischargeTextX = targetEastX - 3;
+        dischargeTextY = corridorY - 4;
+      }
+    } else if (dischargeDir === 'west') {
+      dischargeText = '← DISCHARGE';
+      dischargeTextAnchor = 'start';
+      if (side === 'west') {
+        dischargePath = `M ${boxX} ${pY} H ${targetWestX}`;
+        dischargeTextX = targetWestX + 3;
+        dischargeTextY = pY - 4;
+      } else if (side === 'north') {
+        dischargePath = `M ${boxX} ${centerY} H ${targetWestX}`;
+        dischargeTextX = targetWestX + 3;
+        dischargeTextY = centerY - 4;
+      } else if (side === 'south') {
+        dischargePath = `M ${boxX} ${centerY} H ${targetWestX}`;
+        dischargeTextX = targetWestX + 3;
+        dischargeTextY = centerY - 4;
+      } else {
+        // East pump routes around perimeter corridor to discharge West
+        const corridorY = pY < (ringY + ringHeight / 2) ? Math.max(PAD - 6, ringY - 42) : Math.min(H - 32, botY + 42);
+        dischargePath = `M ${boxX} ${pY} H ${boxX - 8} V ${corridorY} H ${targetWestX}`;
+        dischargeTextX = targetWestX + 3;
+        dischargeTextY = corridorY - 4;
+      }
+    } else if (dischargeDir === 'north') {
+      dischargeText = '↑ DISCHARGE';
+      dischargeTextAnchor = 'start';
+      if (side === 'north') {
+        dischargePath = `M ${pX} ${boxY} V ${targetNorthY}`;
+        dischargeTextX = pX + 4;
+        dischargeTextY = targetNorthY + 9;
+      } else if (side === 'east') {
+        dischargePath = `M ${centerX} ${boxY} V ${targetNorthY}`;
+        dischargeTextX = centerX + 4;
+        dischargeTextY = targetNorthY + 9;
+      } else if (side === 'west') {
+        dischargePath = `M ${centerX} ${boxY} V ${targetNorthY}`;
+        dischargeTextX = centerX + 4;
+        dischargeTextY = targetNorthY + 9;
+      } else {
+        // South pump routes along perimeter corridor to discharge North
+        const corridorX = pX < (ringX + ringWidth / 2) ? Math.max(16, ringX - 74) : Math.min(W - 16, ringX + ringWidth + 74);
+        dischargePath = `M ${centerX} ${boxY + boxH} V ${boxY + boxH + 8} H ${corridorX} V ${targetNorthY}`;
+        dischargeTextX = corridorX + 4;
+        dischargeTextY = targetNorthY + 9;
+      }
+    } else {
+      // south
+      dischargeText = '↓ DISCHARGE';
+      dischargeTextAnchor = 'start';
+      if (side === 'south') {
+        dischargePath = `M ${pX} ${boxY + boxH} V ${targetSouthY}`;
+        dischargeTextX = pX + 4;
+        dischargeTextY = targetSouthY - 5;
+      } else if (side === 'east') {
+        dischargePath = `M ${centerX} ${boxY + boxH} V ${targetSouthY}`;
+        dischargeTextX = centerX + 4;
+        dischargeTextY = targetSouthY - 5;
+      } else if (side === 'west') {
+        dischargePath = `M ${centerX} ${boxY + boxH} V ${targetSouthY}`;
+        dischargeTextX = centerX + 4;
+        dischargeTextY = targetSouthY - 5;
+      } else {
+        // North pump routes along perimeter corridor to discharge South
+        const corridorX = pX < (ringX + ringWidth / 2) ? Math.max(16, ringX - 74) : Math.min(W - 16, ringX + ringWidth + 74);
+        dischargePath = `M ${centerX} ${boxY} V ${boxY - 8} H ${corridorX} V ${targetSouthY}`;
+        dischargeTextX = corridorX + 4;
+        dischargeTextY = targetSouthY - 5;
+      }
+    }
+
+    return {
+      id: `pump-${side[0]}-${overallIdx}`,
+      side,
+      overallIdx,
+      pX,
+      pY,
+      boxX,
+      boxY,
+      boxW,
+      boxH,
+      textX: centerX,
+      textY: centerY + 2.5,
+      suctionX1,
+      suctionY1,
+      suctionX2,
+      suctionY2,
+      dischargePath,
+      dischargeText,
+      dischargeTextX,
+      dischargeTextY,
+      dischargeTextAnchor,
+    };
+  });
+
+  const hasNorthPump = pumpUnits.some(p => p.side === 'north');
+  const hasSouthPump = pumpUnits.some(p => p.side === 'south');
+  const hasEastPump = pumpUnits.some(p => p.side === 'east');
+  const hasWestPump = pumpUnits.some(p => p.side === 'west');
 
   // Get run summary info from result — only show if there are actual pipes
   const northRun = result?.runs.find(r => r.id === 'north');
@@ -376,21 +581,35 @@ function SiteSchematic({
             />
           ))}
 
-          {/* ── Run Dimension Labels ── kept outside ring box, skipped if no pipes ── */}
+          {/* ── Run Dimension Labels ── placed cleanly to avoid any overlap with pumps ── */}
           {nLabel && (
-            <text x={cx} y={northLabelY} textAnchor="middle" fontSize="8.5" fill={runTextColor} fontWeight="700">
+            <text
+              x={hasNorthPump ? Math.max(ringX + 8, cx - ringWidth * 0.28) : cx}
+              y={hasNorthPump ? ringY - 8 : northLabelY}
+              textAnchor={hasNorthPump ? 'end' : 'middle'}
+              fontSize="8.5"
+              fill={runTextColor}
+              fontWeight="700"
+            >
               N: {nLabel}
             </text>
           )}
           {sLabel && (
-            <text x={cx} y={southLabelY} textAnchor="middle" fontSize="8.5" fill={runTextColor} fontWeight="700">
+            <text
+              x={hasSouthPump ? Math.max(ringX + 8, cx - ringWidth * 0.28) : cx}
+              y={hasSouthPump ? botY + 10 : southLabelY}
+              textAnchor={hasSouthPump ? 'end' : 'middle'}
+              fontSize="8.5"
+              fill={runTextColor}
+              fontWeight="700"
+            >
               S: {sLabel}
             </text>
           )}
           {eLabel && (
             <text
               x={eastLabelX}
-              y={cy}
+              y={hasEastPump ? Math.max(ringY + 14, cy - ringHeight * 0.26) : cy}
               textAnchor="start"
               dominantBaseline="middle"
               fontSize="8.5"
@@ -403,7 +622,7 @@ function SiteSchematic({
           {wLabel && (
             <text
               x={westLabelX}
-              y={cy}
+              y={hasWestPump ? Math.max(ringY + 14, cy - ringHeight * 0.26) : cy}
               textAnchor="end"
               dominantBaseline="middle"
               fontSize="8.5"
@@ -471,19 +690,47 @@ function SiteSchematic({
             </g>
           )}
 
-          {/* ── Pump Unit ── wider box, legible label ── */}
-          <g>
-            <circle cx={pumpX} cy={pumpY} r="4" fill="#f59e0b" stroke="#78350f" strokeWidth="1.2" />
-            <line x1={pumpX} y1={pumpY} x2={pumpX} y2={pumpY - 20} stroke="#ca8a04" strokeWidth="1.6" strokeDasharray="2 1" />
-            <rect x={pumpX - 26} y={pumpY - 36} width="52" height="15" fill="#1d4ed8" rx="2.5" />
-            <text x={pumpX} y={pumpY - 26} textAnchor="middle" fontSize="7" fill="white" fontWeight="bold">
-              PUMP · 100 m³/h
-            </text>
-            <line x1={pumpX} y1={pumpY - 36} x2={pumpX} y2={Math.max(14, landY + 3)} stroke="#ea580c" strokeWidth="1.5" strokeDasharray="3 2" />
-            <text x={pumpX + 4} y={Math.max(20, landY + 13)} fontSize="6.5" fill="#c2410c" fontWeight="600">
-              DISCHARGE
-            </text>
-          </g>
+          {/* ── Pump Units (All positions: North, South, East, West) ── */}
+          {pumpUnits.map(pu => (
+            <g key={pu.id}>
+              {/* Suction Tie-In Connection */}
+              <circle cx={pu.pX} cy={pu.pY} r="3.5" fill="#f59e0b" stroke="#78350f" strokeWidth="1.2" />
+              <line
+                x1={pu.suctionX1}
+                y1={pu.suctionY1}
+                x2={pu.suctionX2}
+                y2={pu.suctionY2}
+                stroke="#ca8a04"
+                strokeWidth="1.6"
+                strokeDasharray="2 1"
+              />
+
+              {/* Pump Body */}
+              <rect x={pu.boxX} y={pu.boxY} width={pu.boxW} height={pu.boxH} fill="#1d4ed8" rx="2.5" />
+              <text x={pu.textX} y={pu.textY} textAnchor="middle" fontSize="6.8" fill="white" fontWeight="bold">
+                {pumpUnits.length > 1 ? `PUMP ${pu.overallIdx + 1} · 100m³` : 'PUMP · 100 m³/h'}
+              </text>
+
+              {/* Layflat Discharge Line (Uniform Direction) */}
+              <path
+                d={pu.dischargePath}
+                stroke="#ea580c"
+                strokeWidth="1.6"
+                strokeDasharray="3 2"
+                fill="none"
+              />
+              <text
+                x={pu.dischargeTextX}
+                y={pu.dischargeTextY}
+                fontSize="6.5"
+                fill="#c2410c"
+                fontWeight="700"
+                textAnchor={pu.dischargeTextAnchor}
+              >
+                {pu.dischargeText}
+              </text>
+            </g>
+          ))}
         </>
       )}
 
@@ -643,11 +890,13 @@ function BoqRow({
   value,
   unit,
   subtle,
+  extra,
 }: {
   label: string;
   value: number | string;
   unit?: string;
   subtle?: boolean;
+  extra?: React.ReactNode;
 }) {
   return (
     <div className={cn(
@@ -655,10 +904,11 @@ function BoqRow({
       subtle && 'text-slate-400 dark:text-slate-500',
     )}>
       <span className="text-slate-600 dark:text-slate-400">{label}</span>
-      <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
-        {value}
-        {unit && <span className="ml-1 text-[11px] font-normal text-slate-400">{unit}</span>}
-      </span>
+      <div className="flex items-center gap-1 font-mono font-semibold text-slate-900 dark:text-slate-100">
+        <span>{value}</span>
+        {unit && <span className="ml-0.5 text-[11px] font-normal text-slate-400">{unit}</span>}
+        {extra}
+      </div>
     </div>
   );
 }
@@ -909,67 +1159,194 @@ export default function DewateringCalculator() {
       layerId: 'layer-headers',
     };
 
-    // 1. Suction Tee on Header line (North run)
-    // If ingress is on North side, place Tee on the left solid run so it doesn't float in the ingress opening
-    const isIngressNorth = layout === 'ring' && ingressRequired && ingressSide === 'north';
-    const teeX = isIngressNorth ? Math.round((ringX + ingressL) / 2) : Math.round(ringX + ringW / 2);
-    const teeY = ringY;
-    const teeComponent: PlacedComponent = {
-      id: `tee-${Date.now()}`,
-      type: 'tee',
-      x: teeX,
-      y: teeY,
-      rotation: 180, // mouth points North towards the pump
-      levelId: glLevel.id,
-      layerId: 'layer-components',
-    };
+    // 2. Pumps, Suction Tees, and Hoses for all active pump positions
+    const simPumpSides: PumpSide[] = (result.pumpSides && result.pumpSides.length > 0)
+      ? result.pumpSides
+      : getRecommendedPumpSides(result.pumps, layout, ingressSide, ingressRequired);
 
-    // 2. Vacuum Pump Unit placed North of the header line
-    // Offset pumpX by +20px so its suction port (at comp.x - 20) aligns 100% vertically with the Tee at teeX
-    const pumpX = teeX + 20;
-    const pumpY = ringY - 45;
-    const pumpComponent: PlacedComponent = {
-      id: `pump-${Date.now()}`,
-      type: 'pump',
-      x: pumpX,
-      y: pumpY,
-      rotation: 0,
-      levelId: glLevel.id,
-      layerId: 'layer-components',
-    };
+    const pumpComponents: PlacedComponent[] = [];
+    const teeComponents: PlacedComponent[] = [];
+    const suctionHoses: HoseData[] = [];
+    const dischargeHoses: HoseData[] = [];
 
-    // 3. Heavy-Duty Suction Hose connecting Header Tee to Pump Suction port (port at pumpX - 20 === teeX)
-    // Perfectly orthogonal 90-degree tie-in (dx = 0)
-    const suctionHose: HoseData = {
-      id: `suction-hose-${Date.now()}`,
-      points: [
-        { x: teeX, y: teeY },
-        { x: teeX, y: pumpY },
-      ],
-      kind: 'suction',
-      levelId: glLevel.id,
-      layerId: 'layer-suction',
-    };
+    const simSideCounts: Record<PumpSide, number> = { north: 0, east: 0, south: 0, west: 0 };
+    simPumpSides.forEach(s => { simSideCounts[s] = (simSideCounts[s] || 0) + 1; });
+    const simSideCurrentIdx: Record<PumpSide, number> = { north: 0, east: 0, south: 0, west: 0 };
 
-    // 4. Layflat Discharge Line heading from Pump Discharge port (pumpX + 20) straight East
-    // Perfectly orthogonal 0-degree horizontal line running outward to site perimeter
-    const dischargeHose: HoseData = {
-      id: `discharge-hose-${Date.now()}`,
-      points: [
-        { x: pumpX + 20, y: pumpY },
-        { x: Math.max(pumpX + 200, ringX + ringW + 120), y: pumpY },
-      ],
-      kind: 'discharge',
-      levelId: glLevel.id,
-      layerId: 'layer-discharge',
-    };
+    const dir = inputs.dischargeDirection || 'east';
+    const targetEastX = Math.round(siteArea.x + siteArea.width + 50);
+    const targetWestX = Math.round(siteArea.x - 50);
+    const targetNorthY = Math.round(siteArea.y - 50);
+    const targetSouthY = Math.round(siteArea.y + siteArea.height + 50);
+
+    simPumpSides.forEach((side, idx) => {
+      const totalOnSide = simSideCounts[side];
+      const idxOnSide = simSideCurrentIdx[side]++;
+      const t = totalOnSide === 1 ? 0.5 : (idxOnSide + 1) / (totalOnSide + 1);
+
+      let teeX = ringX + ringW / 2;
+      let teeY = ringY;
+      let pumpX = teeX + 20;
+      let pumpY = ringY - 45;
+      let teeRot = 180;
+      let suctionPoints: { x: number; y: number }[] = [];
+
+      if (side === 'north') {
+        const isIngressNorth = layout === 'ring' && ingressRequired && ingressSide === 'north';
+        teeX = isIngressNorth ? Math.round((ringX + ingressL) / 2) : Math.round(ringX + ringW * t);
+        teeY = ringY;
+        pumpX = teeX + 20;
+        pumpY = ringY - 45;
+        teeRot = 180;
+        suctionPoints = [
+          { x: teeX, y: teeY },
+          { x: teeX, y: pumpY },
+        ];
+      } else if (side === 'south') {
+        const isIngressSouth = layout === 'ring' && ingressRequired && ingressSide === 'south';
+        teeX = isIngressSouth ? Math.round((ringX + ingressL) / 2) : Math.round(ringX + ringW * t);
+        teeY = ringY + ringH;
+        pumpX = teeX + 20;
+        pumpY = ringY + ringH + 45;
+        teeRot = 0;
+        suctionPoints = [
+          { x: teeX, y: teeY },
+          { x: teeX, y: pumpY },
+        ];
+      } else if (side === 'east') {
+        teeX = ringX + ringW;
+        teeY = Math.round(ringY + ringH * t);
+        pumpX = ringX + ringW + 45;
+        pumpY = teeY;
+        teeRot = 270;
+        suctionPoints = [
+          { x: teeX, y: teeY },
+          { x: pumpX - 20, y: pumpY },
+        ];
+      } else {
+        // west
+        teeX = ringX;
+        teeY = Math.round(ringY + ringH * t);
+        pumpX = ringX - 45;
+        pumpY = teeY;
+        teeRot = 90;
+        suctionPoints = [
+          { x: teeX, y: teeY },
+          { x: pumpX - 20, y: pumpY },
+        ];
+      }
+
+      // Every pump discharge port is at (pumpX + 20, pumpY)
+      const pumpPortX = pumpX + 20;
+      const pumpPortY = pumpY;
+      let dischargePoints: { x: number; y: number }[] = [];
+
+      if (dir === 'east') {
+        if (side === 'west') {
+          // Route West pump along perimeter corridor to discharge East without cutting pit
+          const corridorY = teeY < (ringY + ringH / 2) ? (ringY - 30) : (botY + 30);
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: pumpPortX, y: corridorY },
+            { x: targetEastX, y: corridorY },
+          ];
+        } else {
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: targetEastX, y: pumpPortY },
+          ];
+        }
+      } else if (dir === 'west') {
+        if (side === 'east') {
+          const corridorY = teeY < (ringY + ringH / 2) ? (ringY - 30) : (botY + 30);
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: pumpPortX, y: corridorY },
+            { x: targetWestX, y: corridorY },
+          ];
+        } else {
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: targetWestX, y: pumpPortY },
+          ];
+        }
+      } else if (dir === 'north') {
+        if (side === 'south') {
+          const corridorX = teeX < (ringX + ringW / 2) ? (ringX - 30) : (ringX + ringW + 30);
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: corridorX, y: pumpPortY },
+            { x: corridorX, y: targetNorthY },
+          ];
+        } else {
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: pumpPortX, y: targetNorthY },
+          ];
+        }
+      } else {
+        // south
+        if (side === 'north') {
+          const corridorX = teeX < (ringX + ringW / 2) ? (ringX - 30) : (ringX + ringW + 30);
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: corridorX, y: pumpPortY },
+            { x: corridorX, y: targetSouthY },
+          ];
+        } else {
+          dischargePoints = [
+            { x: pumpPortX, y: pumpPortY },
+            { x: pumpPortX, y: targetSouthY },
+          ];
+        }
+      }
+
+      const teeId = `tee-${Date.now()}-${idx}`;
+      const pumpId = `pump-${Date.now()}-${idx}`;
+
+      teeComponents.push({
+        id: teeId,
+        type: 'tee',
+        x: teeX,
+        y: teeY,
+        rotation: teeRot,
+        levelId: glLevel.id,
+        layerId: 'layer-components',
+      });
+
+      pumpComponents.push({
+        id: pumpId,
+        type: 'pump',
+        x: pumpX,
+        y: pumpY,
+        rotation: 0,
+        levelId: glLevel.id,
+        layerId: 'layer-components',
+      });
+
+      suctionHoses.push({
+        id: `suction-hose-${Date.now()}-${idx}`,
+        points: suctionPoints,
+        kind: 'suction',
+        levelId: glLevel.id,
+        layerId: 'layer-suction',
+      });
+
+      dischargeHoses.push({
+        id: `discharge-hose-${Date.now()}-${idx}`,
+        points: dischargePoints,
+        kind: 'discharge',
+        levelId: glLevel.id,
+        layerId: 'layer-discharge',
+      });
+    });
 
     const layoutPayload = {
       name: `Dewatering - ${result.layoutType.toUpperCase()} (${L}x${W}m Pit)`,
       lines: [headerLine],
       areas: [siteArea, pitArea],
-      components: [pumpComponent, teeComponent],
-      hoses: [suctionHose, dischargeHose],
+      components: [...pumpComponents, ...teeComponents],
+      hoses: [...suctionHoses, ...dischargeHoses],
       arrows: [],
       dimensions: [],
       texts: [],
@@ -1344,6 +1721,182 @@ export default function DewateringCalculator() {
                 </div>
               )}
 
+              <div className="border-t border-slate-100 dark:border-slate-800" />
+
+              {/* 6. Vacuum Pumps Configuration */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                    Vacuum Pumps
+                  </span>
+                  {result && (
+                    <span className="text-[10px] font-mono text-slate-400" title="1 pump per 60m header coverage">
+                      {result.isPumpsOverridden ? (
+                        <span className="text-amber-600 dark:text-amber-400 font-semibold">Overridden</span>
+                      ) : (
+                        <span>Predicted: {result.predictedPumps}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  {/* Quantity Input with Reset to Predicted */}
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/60 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium whitespace-nowrap">Quantity</span>
+                      {result?.isPumpsOverridden && (
+                        <span className="text-[9px] px-1 py-0.2 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 font-semibold rounded">
+                          Override
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        step={1}
+                        value={inputs.customPumps ?? (result?.pumps || 1)}
+                        onChange={e => {
+                          const val = parseInt(e.target.value, 10);
+                          if (isNaN(val) || val <= 0) {
+                            setField('customPumps', undefined);
+                            setField('pumpSides', undefined);
+                          } else {
+                            setField('customPumps', val);
+                            setField('pumpSides', getRecommendedPumpSides(val, activeLayout, inputs.ingressSide, inputs.ingressRequired));
+                          }
+                        }}
+                        className="w-16 text-right px-2 py-0.5 text-xs font-mono font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:border-amber-500 focus:outline-none text-slate-900 dark:text-white"
+                      />
+                      <span className="text-[11px] text-slate-400 font-mono">pumps</span>
+
+                      {(inputs.customPumps !== undefined || (inputs.pumpSides && inputs.pumpSides.length > 0)) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setField('customPumps', undefined);
+                            setField('pumpSides', undefined);
+                          }}
+                          className="text-[10px] text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 ml-1 p-0.5 rounded cursor-pointer transition-colors"
+                          title="Reset to predicted count"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Positions (NSWE) Multi-select */}
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/60 text-xs">
+                    <span className="text-slate-700 dark:text-slate-300 font-medium">Positions (NSWE)</span>
+                    <div className="flex items-center gap-1.5">
+                      {/* Segmented [N][E][S][W] for direct multi-select */}
+                      <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                        {(['north', 'east', 'south', 'west'] as const).map(s => {
+                          const isSelected = (result?.pumpSides || []).includes(s);
+                          const isAvailable = activeLayout === 'ring'
+                            ? true
+                            : activeLayout === 'u_shape'
+                            ? s !== 'south'
+                            : activeLayout === 'l_shape'
+                            ? s === 'north' || s === 'west'
+                            : s === 'north';
+
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              disabled={!isAvailable}
+                              onClick={() => {
+                                const currentSides = [...(result?.pumpSides || [])];
+                                let nextSides: PumpSide[];
+                                if (isSelected) {
+                                  if (currentSides.length <= 1) {
+                                    toast.error('At least 1 pump position is required');
+                                    return;
+                                  }
+                                  nextSides = currentSides.filter(side => side !== s);
+                                } else {
+                                  nextSides = [...currentSides, s];
+                                }
+                                setField('pumpSides', nextSides);
+                                setField('customPumps', nextSides.length);
+                              }}
+                              className={cn(
+                                'px-1.5 py-0.5 text-[10px] font-semibold rounded transition-all cursor-pointer uppercase',
+                                !isAvailable
+                                  ? 'opacity-30 cursor-not-allowed text-slate-400'
+                                  : isSelected
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                              )}
+                              title={`${s.toUpperCase()} side: click to ${isSelected ? 'remove' : 'add'} pump`}
+                            >
+                              {s[0]}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 1 Pump on Each Side (NSWE) Quick Action */}
+                      {activeLayout === 'ring' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allSides: PumpSide[] = ['north', 'east', 'south', 'west'];
+                            setField('pumpSides', allSides);
+                            setField('customPumps', 4);
+                          }}
+                          className="px-2 py-0.5 text-xs font-semibold rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all cursor-pointer whitespace-nowrap"
+                          title="Place 1 pump on each side (N, E, S, W)"
+                        >
+                          All 4
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Uniform Discharge Direction (All Pumps) */}
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/60 text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">Discharge Line</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(All)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center p-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                        {(['north', 'east', 'south', 'west'] as const).map(d => {
+                          const isSelected = (inputs.dischargeDirection || 'east') === d;
+                          const labels: Record<PumpSide, string> = {
+                            north: '↑ N',
+                            east: '→ E',
+                            south: '↓ S',
+                            west: '← W',
+                          };
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setField('dischargeDirection', d)}
+                              className={cn(
+                                'px-1.5 py-0.5 text-[10px] font-semibold rounded transition-all cursor-pointer uppercase',
+                                isSelected
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                              )}
+                              title={`Direct all pump discharge lines ${d.toUpperCase()}`}
+                            >
+                              {labels[d]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Status Badge */}
               {result && (
                 <div className={cn(
@@ -1510,7 +2063,32 @@ export default function DewateringCalculator() {
                 <div className="space-y-0.5">
                   <BoqRow label="Loop perimeter" value={result.loopPerimeter.toFixed(2)} unit="m" />
                   <BoqRow label="Wellpoint filters (1.0m c/c)" value={result.filters} />
-                  <BoqRow label="Vacuum pumps (100 m3/hr, max 60m)" value={result.pumps} />
+                  <BoqRow
+                    label="Vacuum pumps (100 m3/hr, max 60m)"
+                    value={result.pumps}
+                    extra={
+                      result.isPumpsOverridden ? (
+                        <span className="inline-flex items-center gap-1 ml-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-1 py-0.5 rounded font-sans font-medium">
+                          <span>Override ({result.pumpSides.map(s => s[0].toUpperCase()).join('')})</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setField('customPumps', undefined);
+                              setField('pumpSides', undefined);
+                            }}
+                            className="hover:text-amber-800 dark:hover:text-amber-200 cursor-pointer"
+                            title="Reset to predicted count"
+                          >
+                            <RotateCcw className="h-2.5 w-2.5" />
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="ml-1 text-[10px] text-slate-400 font-sans font-normal">
+                          (Auto: {result.pumpSides.map(s => s[0].toUpperCase()).join('')})
+                        </span>
+                      )
+                    }
+                  />
                   <BoqRow label="Header pipes, 6m" value={result.headers6m} unit="pcs" />
                   <BoqRow label="Header pipes, 3m" value={result.headers3m} unit="pcs" subtle={result.headers3m === 0} />
                   <BoqRow label="Elbows" value={result.elbows90} unit="pcs" />
@@ -1744,7 +2322,12 @@ function PrintSpecificationView({
                         <tr>
                           <td className="py-1 px-3 font-medium text-slate-900">Vacuum pumps (100 m3/hr, max 60m)</td>
                           <td className="py-1 px-3 text-slate-500 text-[10px]">Automatic priming rotary dewatering pump</td>
-                          <td className="py-1 px-3 text-right font-mono font-bold text-amber-600">{result.pumps}</td>
+                          <td className="py-1 px-3 text-right font-mono font-bold text-amber-600">
+                            {result.pumps}
+                            <span className="text-[10px] font-normal text-slate-500 ml-1">
+                              ({result.pumpSides.map(s => s[0].toUpperCase()).join('')})
+                            </span>
+                          </td>
                           <td className="py-1 px-3 text-center text-slate-500">units</td>
                         </tr>
                         <tr>
@@ -1880,7 +2463,12 @@ function PrintSpecificationView({
                           </tr>
                           <tr>
                             <td className="py-0.5 px-2.5 font-medium text-slate-900">Vacuum pumps (100 m3/hr, max 60m)</td>
-                            <td className="py-0.5 px-2.5 text-right font-mono font-bold text-amber-600">{result.pumps}</td>
+                            <td className="py-0.5 px-2.5 text-right font-mono font-bold text-amber-600">
+                              {result.pumps}
+                              <span className="text-[9px] font-normal text-slate-500 ml-1">
+                                ({result.pumpSides.map(s => s[0].toUpperCase()).join('')})
+                              </span>
+                            </td>
                             <td className="py-0.5 px-2 text-center text-slate-500">units</td>
                           </tr>
                           <tr>

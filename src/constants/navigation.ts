@@ -31,6 +31,7 @@ import {
   Sparkles,
   HardHat,
   PiggyBank,
+  Contact,
 } from 'lucide-react';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { UserPrivileges } from '@/src/store/userStore';
@@ -91,6 +92,19 @@ export const navigation: NavCategory[] = [
         name: 'Client 360',
         href: '/client-360',
         icon: Sparkles,
+        privKey: 'sites',
+        privField: 'canView',
+        visible: (user: any) =>
+          Boolean(
+            user?.privileges?.users?.canManage ||
+            user?.privileges?.sites?.canView ||
+            user?.privileges?.clients?.canView
+          ),
+      },
+      {
+        name: 'Phonebook',
+        href: '/clients/phonebook',
+        icon: Contact,
         privKey: 'sites',
         privField: 'canView',
         visible: (user: any) =>

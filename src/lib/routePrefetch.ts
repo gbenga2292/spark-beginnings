@@ -15,6 +15,7 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/leave-summary': () => import('@/src/pages/LeaveSummary'),
   '/sites': () => import('@/src/pages/Sites'),
   '/client-360': () => import('@/src/pages/Client360'),
+  '/clients/phonebook': () => import('@/src/pages/Phonebook'),
   '/onboarding': () => import('@/src/pages/Onboarding'),
   '/onboarding/new': () => import('@/src/pages/NewHire'),
   '/onboarding/contract': () => import('@/src/pages/GenerateContract'),

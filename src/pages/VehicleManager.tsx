@@ -8,7 +8,7 @@ import {
   LayoutGrid, List, ChevronLeft, Download, Upload, FileSpreadsheet,
   Fuel, TrendingUp, BarChart3, Filter, Link as LinkIcon,
   Receipt, Sparkles, CheckCircle2, Zap, RotateCcw, FileText,
-  ShieldAlert, ShieldCheck, CalendarPlus, Info, Scissors, CheckCheck, Layers
+  ShieldAlert, ShieldCheck, CalendarPlus, Info, Scissors, CheckCheck, Layers, Gauge
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
@@ -1785,6 +1785,150 @@ export function VehicleManager() {
     };
   }, [vehicleFuelLogs]);
 
+  // Filtered Movement Logs aligned with Fuel Analytics time filters
+  const filteredTripLogs = useMemo(() => vehicleTrips.filter(t => {
+    const d = new Date(t.departure_time);
+    if (d.getFullYear() !== fuelFilterYear) return false;
+    if (fuelFilterMonth !== null && d.getMonth() !== fuelFilterMonth) return false;
+    if (fuelFilterWeek !== null && getISOWeek(d) !== fuelFilterWeek) return false;
+    if (fuelFilterVehicle !== '' && t.vehicle_id !== fuelFilterVehicle) return false;
+    return true;
+  }), [vehicleTrips, fuelFilterYear, fuelFilterMonth, fuelFilterWeek, fuelFilterVehicle]);
+
+  // Comprehensive Vehicle-by-Vehicle Guardrail Analysis
+  const vehicleGuardrailData = useMemo(() => {
+    const map = new Map<string, {
+      vehicle_id: string;
+      vehicle_reg: string;
+      name: string;
+      distance: number;
+      litres: number;
+      cost: number;
+    }>();
+
+    const targetVehicles = fuelFilterVehicle !== ''
+      ? vehicles.filter(v => v.id === fuelFilterVehicle)
+      : vehicles;
+
+    targetVehicles.forEach(v => {
+      map.set(v.id, {
+        vehicle_id: v.id,
+        vehicle_reg: v.registration_number,
+        name: v.name,
+        distance: 0,
+        litres: 0,
+        cost: 0
+      });
+    });
+
+    filteredTripLogs.forEach(t => {
+      let rec = map.get(t.vehicle_id);
+      if (!rec) {
+        rec = {
+          vehicle_id: t.vehicle_id,
+          vehicle_reg: t.vehicle_reg,
+          name: getVehicleName(t.vehicle_reg),
+          distance: 0,
+          litres: 0,
+          cost: 0
+        };
+        map.set(t.vehicle_id, rec);
+      }
+      const dist = t.distance_km !== undefined && !isNaN(Number(t.distance_km))
+        ? Number(t.distance_km)
+        : (t.odometer_start && t.odometer_end && t.odometer_end > t.odometer_start ? t.odometer_end - t.odometer_start : 0);
+      rec.distance += dist;
+    });
+
+    filteredFuelLogs.forEach(f => {
+      let rec = map.get(f.vehicle_id);
+      if (!rec) {
+        rec = {
+          vehicle_id: f.vehicle_id,
+          vehicle_reg: f.vehicle_reg,
+          name: getVehicleName(f.vehicle_reg),
+          distance: 0,
+          litres: 0,
+          cost: 0
+        };
+        map.set(f.vehicle_id, rec);
+      }
+      rec.litres += f.litres;
+      rec.cost += f.total_cost;
+    });
+
+    return Array.from(map.values())
+      .filter(v => v.distance > 0 || v.litres > 0)
+      .map(item => {
+        const kmPerLitre = item.litres > 0 && item.distance > 0 ? (item.distance / item.litres) : 0;
+        const lPer100km = item.litres > 0 && item.distance > 0 ? (item.litres / item.distance) * 100 : 0;
+        const costPerKm = item.distance > 0 ? (item.cost / item.distance) : 0;
+
+        let status: 'optimal' | 'moderate' | 'high_consumption' | 'unverified_fuel' | 'no_fuel';
+        let statusLabel: string;
+        let statusDesc: string;
+
+        if (item.litres > 0 && item.distance === 0) {
+          status = 'unverified_fuel';
+          statusLabel = 'Zero Movement Logged';
+          statusDesc = `${item.litres.toFixed(1)}L fuel dispensed, but 0 km recorded in trip logs`;
+        } else if (item.litres === 0 && item.distance > 0) {
+          status = 'no_fuel';
+          statusLabel = 'No Refills Logged';
+          statusDesc = `${item.distance.toLocaleString()} km logged without fuel purchases`;
+        } else if (kmPerLitre < 5) {
+          status = 'high_consumption';
+          statusLabel = 'High Consumption Alert';
+          statusDesc = 'Low distance for fuel consumed (check for heavy idling or draining)';
+        } else if (kmPerLitre < 7.5) {
+          status = 'moderate';
+          statusLabel = 'Normal Operation';
+          statusDesc = 'Acceptable fleet efficiency';
+        } else {
+          status = 'optimal';
+          statusLabel = 'Optimal Economy';
+          statusDesc = 'High fuel efficiency';
+        }
+
+        return {
+          ...item,
+          kmPerLitre,
+          lPer100km,
+          costPerKm,
+          status,
+          statusLabel,
+          statusDesc
+        };
+      })
+      .sort((a, b) => b.cost - a.cost);
+  }, [vehicles, filteredTripLogs, filteredFuelLogs, fuelFilterVehicle]);
+
+  const totalMovementDistance = useMemo(() => {
+    return vehicleGuardrailData.reduce((acc, v) => acc + v.distance, 0);
+  }, [vehicleGuardrailData]);
+
+  // Integrated efficiency (prefers movement logs distance, falls back to pump odometer calculation)
+  const combinedEfficiency = useMemo(() => {
+    if (totalMovementDistance > 0 && totalFuelLitres > 0) {
+      return {
+        distance: totalMovementDistance,
+        kmPerLitre: totalMovementDistance / totalFuelLitres,
+        lPer100km: (totalFuelLitres / totalMovementDistance) * 100,
+        costPerKm: totalMovementDistance > 0 ? totalFuelCost / totalMovementDistance : 0
+      };
+    }
+    const legacy = fuelFilterVehicle !== '' ? efficiency : fleetEfficiency;
+    if (legacy) {
+      return {
+        distance: legacy.distance,
+        kmPerLitre: legacy.kmPerLitre,
+        lPer100km: legacy.lPer100km,
+        costPerKm: legacy.distance > 0 ? totalFuelCost / legacy.distance : 0
+      };
+    }
+    return null;
+  }, [totalMovementDistance, totalFuelLitres, totalFuelCost, fuelFilterVehicle, efficiency, fleetEfficiency]);
+
   // Combined activity log data
   const combinedLogs = useMemo(() => [
     ...vehicleTrips.map(t => ({
@@ -1874,18 +2018,19 @@ export function VehicleManager() {
     status: 'active' as 'active' | 'inactive'
   });
 
-  // 2. Trip Log Form State
+  // 2. Trip Log Form State (Simplified Daily Mileage & Active Sites)
   const [tForm, setTForm] = useState({
     vehicle_id: '',
     date: new Date().toISOString().split('T')[0],
     driver_name: '',
-    legs: [
-      { site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }
-    ] as any[]
+    distance_km: '' as string | number,
+    selected_sites: [] as string[],
+    purpose: '',
+    remark: ''
   });
 
-  const allSites = useMemo(() => [
-    ...sites.map(s => ({ id: s.id, name: s.name, type: 'active' })),
+  const activeSites = useMemo(() => [
+    ...sites.filter(s => !s.status || s.status.toLowerCase() === 'active').map(s => ({ id: s.id, name: s.name, type: 'active' })),
     ...pendingSites.map(s => ({ id: s.id, name: s.siteName, type: 'pending' }))
   ], [sites, pendingSites]);
 
@@ -2109,30 +2254,41 @@ export function VehicleManager() {
 
   const handleSaveTrip = () => {
     const selectedVehicle = vehicles.find(v => v.id === tForm.vehicle_id);
-    if (!selectedVehicle || !tForm.driver_name) return;
+    if (!selectedVehicle || !tForm.driver_name) {
+      toast.error('Please select a vehicle and enter the driver name');
+      return;
+    }
+
+    const siteNames = tForm.selected_sites.length > 0 ? tForm.selected_sites.join(', ') : 'General Route';
+    const distNum = tForm.distance_km !== '' && !isNaN(Number(tForm.distance_km)) ? Number(tForm.distance_km) : undefined;
 
     if (editingTrip) {
-      const leg = tForm.legs[0];
-      const updatedLog = {
-        ...leg,
-        id: editingTrip.id,
+      const updatedLog: VehicleTripLeg = {
+        ...editingTrip,
         vehicle_id: selectedVehicle.id,
         vehicle_reg: selectedVehicle.registration_number,
         driver_name: tForm.driver_name,
-        departure_time: `${tForm.date}T${leg.departure_time || '00:00'}:00Z`,
-        arrival_time: leg.arrival_time ? `${tForm.date}T${leg.arrival_time}:00Z` : undefined,
+        site_name: siteNames,
+        purpose: tForm.purpose,
+        remark: tForm.remark,
+        distance_km: distNum,
+        departure_time: `${tForm.date}T00:00:00Z`,
       };
       updateVehicleTripRecord(editingTrip.id, updatedLog);
+      toast.success('Movement record updated');
     } else {
-      const logs = tForm.legs.map(leg => ({
-        ...leg,
+      const newLog: VehicleTripLeg = {
         vehicle_id: selectedVehicle.id,
         vehicle_reg: selectedVehicle.registration_number,
         driver_name: tForm.driver_name,
-        departure_time: `${tForm.date}T${leg.departure_time || '00:00'}:00Z`,
-        arrival_time: leg.arrival_time ? `${tForm.date}T${leg.arrival_time}:00Z` : undefined,
-      }));
-      addVehicleTripRecords(logs);
+        site_name: siteNames,
+        purpose: tForm.purpose,
+        remark: tForm.remark,
+        distance_km: distNum,
+        departure_time: `${tForm.date}T00:00:00Z`,
+      };
+      addVehicleTripRecords([newLog]);
+      toast.success('Movement record saved');
     }
 
     setShowTripForm(false);
@@ -2141,7 +2297,10 @@ export function VehicleManager() {
       vehicle_id: '',
       date: new Date().toISOString().split('T')[0],
       driver_name: '',
-      legs: [{ site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]
+      distance_km: '',
+      selected_sites: [],
+      purpose: '',
+      remark: ''
     });
   };
 
@@ -2287,23 +2446,17 @@ export function VehicleManager() {
 
   const handleEditTrip = (trip: VehicleTripLeg) => {
     setEditingTrip(trip);
-    const datePart = trip.departure_time.split('T')[0];
-    const depTimePart = trip.departure_time.split('T')[1].substring(0, 5);
-    const arrTimePart = trip.arrival_time ? trip.arrival_time.split('T')[1].substring(0, 5) : '';
+    const datePart = trip.departure_time ? trip.departure_time.split('T')[0] : new Date().toISOString().split('T')[0];
+    const initialSites = trip.site_name ? trip.site_name.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     setTForm({
       vehicle_id: trip.vehicle_id,
       date: datePart,
       driver_name: trip.driver_name,
-      legs: [{
-        site_name: trip.site_name,
-        purpose: trip.purpose,
-        departure_time: depTimePart,
-        arrival_time: arrTimePart,
-        remark: trip.remark,
-        odometer_start: trip.odometer_start,
-        odometer_end: trip.odometer_end
-      }]
+      distance_km: trip.distance_km !== undefined ? trip.distance_km : (trip.odometer_start && trip.odometer_end ? trip.odometer_end - trip.odometer_start : ''),
+      selected_sites: initialSites,
+      purpose: trip.purpose || '',
+      remark: trip.remark || ''
     });
     setShowTripForm(true);
   };
@@ -2410,9 +2563,9 @@ export function VehicleManager() {
             </CardHeader>
             <CardContent className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               {/* Header Info */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label>Vehicle</Label>
+                  <Label className="text-xs font-semibold">Vehicle</Label>
                   <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"
                     value={tForm.vehicle_id} onChange={e => setTForm({...tForm, vehicle_id: e.target.value})}>
                     <option value="">Select Vehicle</option>
@@ -2420,121 +2573,150 @@ export function VehicleManager() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input type="date" className="font-mono tabular-nums" value={tForm.date} onChange={e => setTForm({...tForm, date: e.target.value})} />
+                  <Label className="text-xs font-semibold">Date</Label>
+                  <Input type="date" className="font-mono tabular-nums h-10" value={tForm.date} onChange={e => setTForm({...tForm, date: e.target.value})} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Driver Name</Label>
-                  <Input list="driver-list" placeholder="Select or type driver" value={tForm.driver_name} onChange={e => setTForm({...tForm, driver_name: e.target.value})} />
+                  <Label className="text-xs font-semibold">Driver Name</Label>
+                  <Input list="driver-list" className="h-10" placeholder="Select or type driver" value={tForm.driver_name} onChange={e => setTForm({...tForm, driver_name: e.target.value})} />
                   <datalist id="driver-list">
                     {employees.map(emp => <option key={emp.id} value={`${emp.firstname} ${emp.surname}`} />)}
                   </datalist>
                 </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold flex items-center justify-between">
+                    <span>Daily Mileage</span>
+                    <span className="text-[10px] text-blue-600 font-mono font-bold uppercase">km</span>
+                  </Label>
+                  <Input 
+                    type="number" 
+                    min="0" 
+                    step="0.1" 
+                    placeholder="e.g. 15" 
+                    className="font-mono tabular-nums h-10" 
+                    value={tForm.distance_km} 
+                    onChange={e => setTForm({...tForm, distance_km: e.target.value})} 
+                  />
+                </div>
               </div>
 
-              <DropdownMenuSeparator className="my-6" />
+              <DropdownMenuSeparator className="my-4" />
 
-              {/* Trip Legs */}
-              <div className="space-y-6">
+              {/* Visited Active Sites Multi-Select */}
+              <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-blue-600 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" /> {editingTrip ? 'Trip Details' : 'Trip Leg(s) / Site Visits'}
-                  </h3>
-                  {!editingTrip && (
-                    <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 gap-1 rounded-md"
-                      onClick={() => setTForm({...tForm, legs: [...tForm.legs, { site_name: '', purpose: '', departure_time: '', arrival_time: '', remark: '', odometer_start: undefined, odometer_end: undefined }]})}>
-                      <PlusCircle className="h-4 w-4" /> Add Leg
-                    </Button>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-blue-600" /> Visited Sites / Destinations
+                  </Label>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {tForm.selected_sites.length} site{tForm.selected_sites.length === 1 ? '' : 's'} selected
+                  </span>
+                </div>
+
+                {/* Selected Site Badges / Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 p-2.5 min-h-12 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
+                  {tForm.selected_sites.length === 0 ? (
+                    <span className="text-xs text-slate-400 italic px-1">
+                      No sites selected yet. Pick active sites from the dropdown below or enter a custom location.
+                    </span>
+                  ) : (
+                    tForm.selected_sites.map(siteName => (
+                      <Badge 
+                        key={siteName} 
+                        variant="secondary" 
+                        className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 gap-1.5 text-xs py-1 px-2.5 rounded-md font-medium"
+                      >
+                        <MapPin className="h-3 w-3 text-blue-500" />
+                        <span>{siteName}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTForm({ ...tForm, selected_sites: tForm.selected_sites.filter(s => s !== siteName) })}
+                          className="hover:text-rose-500 ml-0.5 rounded-full p-0.5"
+                          title="Remove site"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))
                   )}
                 </div>
 
-                {tForm.legs.map((leg, idx) => (
-                  <div key={idx} className="relative p-4 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 group">
-                    {tForm.legs.length > 1 && (
-                      <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => {
-                          const newLegs = [...tForm.legs];
-                          newLegs.splice(idx, 1);
-                          setTForm({...tForm, legs: newLegs});
-                        }}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-xs">Destination (Active/Pending/Manual)</Label>
-                        <Input list={`site-list-${idx}`} placeholder="Select site or type location" value={leg.site_name} 
-                          onChange={e => {
-                            const newLegs = [...tForm.legs];
-                            newLegs[idx].site_name = e.target.value;
-                            setTForm({...tForm, legs: newLegs});
-                          }} />
-                        <datalist id={`site-list-${idx}`}>
-                          {Array.from(new Map(allSites.map(s => [s.name, s])).values()).map(s => <option key={s.id} value={s.name} />)}
-                        </datalist>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Purpose of Movement</Label>
-                        <Input placeholder="e.g. Delivery, Site Visit, Pickup" value={leg.purpose} 
-                          onChange={e => {
-                            const newLegs = [...tForm.legs];
-                            newLegs[idx].purpose = e.target.value;
-                            setTForm({...tForm, legs: newLegs});
-                          }} />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" /> Dept Time</Label>
-                        <Input type="time" className="h-9 px-2 font-mono tabular-nums" value={leg.departure_time} 
-                          onChange={e => {
-                            const newLegs = [...tForm.legs];
-                            newLegs[idx].departure_time = e.target.value;
-                            setTForm({...tForm, legs: newLegs});
-                          }} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs flex items-center gap-1"><Clock className="h-3 w-3" /> Arr Time</Label>
-                        <Input type="time" className="h-9 px-2 font-mono tabular-nums" value={leg.arrival_time} 
-                          onChange={e => {
-                            const newLegs = [...tForm.legs];
-                            newLegs[idx].arrival_time = e.target.value;
-                            setTForm({...tForm, legs: newLegs});
-                          }} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Odom. Start</Label>
-                        <Input type="number" className="h-9 px-2 font-mono tabular-nums" placeholder="Start" value={leg.odometer_start || ''} 
-                          onChange={e => {
-                            const newLegs = [...tForm.legs];
-                            newLegs[idx].odometer_start = Number(e.target.value) || undefined;
-                            setTForm({...tForm, legs: newLegs});
-                          }} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Odom. End</Label>
-                        <Input type="number" className="h-9 px-2 font-mono tabular-nums" placeholder="End" value={leg.odometer_end || ''} 
-                          onChange={e => {
-                            const newLegs = [...tForm.legs];
-                            newLegs[idx].odometer_end = Number(e.target.value) || undefined;
-                            setTForm({...tForm, legs: newLegs});
-                          }} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-xs">Remark / Specific Notes</Label>
-                      <Input placeholder="Any additional info..." value={leg.remark} 
-                        onChange={e => {
-                          const newLegs = [...tForm.legs];
-                          newLegs[idx].remark = e.target.value;
-                          setTForm({...tForm, legs: newLegs});
-                        }} />
-                    </div>
+                {/* Dropdown to add active sites & custom location input */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 cursor-pointer"
+                      value=""
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val && !tForm.selected_sites.includes(val)) {
+                          setTForm({ ...tForm, selected_sites: [...tForm.selected_sites, val] });
+                        }
+                      }}
+                    >
+                      <option value="" disabled>+ Select an Active Site...</option>
+                      {activeSites.map(s => {
+                        const isSelected = tForm.selected_sites.includes(s.name);
+                        return (
+                          <option key={s.id} value={s.name} disabled={isSelected}>
+                            {s.name} {isSelected ? '(Already added)' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
-                ))}
+                  <div className="flex gap-2">
+                    <Input
+                      id="manual-site-input"
+                      placeholder="Or enter custom site / stop..."
+                      className="h-10 text-sm"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const val = (e.target as HTMLInputElement).value.trim();
+                          if (val && !tForm.selected_sites.includes(val)) {
+                            setTForm({ ...tForm, selected_sites: [...tForm.selected_sites, val] });
+                            (e.target as HTMLInputElement).value = '';
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0 h-10 px-3 text-xs font-semibold"
+                      onClick={() => {
+                        const el = document.getElementById('manual-site-input') as HTMLInputElement;
+                        if (el && el.value.trim() && !tForm.selected_sites.includes(el.value.trim())) {
+                          setTForm({ ...tForm, selected_sites: [...tForm.selected_sites, el.value.trim()] });
+                          el.value = '';
+                        }
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Movement Purpose & Remarks */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Purpose of Movement</Label>
+                  <Input 
+                    placeholder="e.g. Delivery, Site Visit, Pickup, Staff Transit" 
+                    value={tForm.purpose} 
+                    onChange={e => setTForm({...tForm, purpose: e.target.value})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Remark / Specific Notes</Label>
+                  <Input 
+                    placeholder="Any additional info or driver comments..." 
+                    value={tForm.remark} 
+                    onChange={e => setTForm({...tForm, remark: e.target.value})} 
+                  />
+                </div>
               </div>
             </CardContent>
             <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex flex-row gap-3 pt-4">
@@ -4936,11 +5118,19 @@ export function VehicleManager() {
                                 </div>
                               </td>
                               <td className="px-6 py-4">
-                                <div className="flex flex-col text-[10px] font-bold text-slate-600 dark:text-slate-300 font-mono tabular-nums">
-                                  <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Dep:</span> {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                                  <div className="flex items-center gap-1"><span className="text-slate-400 uppercase text-[8px]">Arr:</span> {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
-                                  {trip.odometer_start && trip.odometer_end && (
-                                    <div className="text-[9px] text-blue-600 mt-0.5">Total: {trip.odometer_end - trip.odometer_start} km</div>
+                                <div className="flex flex-col text-[11px] font-bold text-slate-700 dark:text-slate-200 font-mono tabular-nums">
+                                  {trip.distance_km !== undefined ? (
+                                    <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold">
+                                      <Gauge className="h-3.5 w-3.5" />
+                                      <span>{trip.distance_km} km</span>
+                                    </div>
+                                  ) : trip.odometer_start && trip.odometer_end ? (
+                                    <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold">
+                                      <Gauge className="h-3.5 w-3.5" />
+                                      <span>{trip.odometer_end - trip.odometer_start} km</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-400 text-[10px]">—</span>
                                   )}
                                 </div>
                               </td>
@@ -5097,13 +5287,19 @@ export function VehicleManager() {
                               <span className="text-[10px] text-slate-500 italic">{trip.purpose}</span>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-600 font-medium font-mono tabular-nums">
-                            <div>Dep: {new Date(trip.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                            <div>Arr: {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '—'}</div>
+                          <div className="flex items-center justify-between text-[11px] font-mono tabular-nums">
+                            {trip.distance_km !== undefined ? (
+                              <div className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                                <Gauge className="h-3.5 w-3.5" />
+                                <span>Distance: {trip.distance_km} km</span>
+                              </div>
+                            ) : trip.odometer_start && trip.odometer_end ? (
+                              <div className="text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                                <Gauge className="h-3.5 w-3.5" />
+                                <span>Distance: {trip.odometer_end - trip.odometer_start} km</span>
+                              </div>
+                            ) : null}
                           </div>
-                          {trip.odometer_start && trip.odometer_end && (
-                            <div className="text-[10px] text-blue-600 font-bold font-mono tabular-nums">Distance: {trip.odometer_end - trip.odometer_start} km</div>
-                          )}
                           {trip.remark && <p className="text-[10px] text-slate-400 italic mt-1">{trip.remark}</p>}
                           <div className="flex items-center justify-end gap-1 mt-2 border-t border-slate-100 dark:border-slate-800 pt-2">
                             <DropdownMenu>
@@ -5275,38 +5471,45 @@ export function VehicleManager() {
                 sparklineData: chartData.map(d => d.litres || 0),
               },
               {
-                label: 'Fleet Efficiency',
-                value: `${(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.kmPerLitre.toFixed(2) || '—'} km/L`,
-                period: `${(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.lPer100km.toFixed(2) || '—'} L/100km`,
+                label: fuelFilterVehicle !== '' ? 'Vehicle Economy' : 'Fleet Efficiency',
+                value: `${combinedEfficiency?.kmPerLitre.toFixed(2) || '—'} km/L`,
+                period: `${combinedEfficiency?.lPer100km.toFixed(2) || '—'} L/100km`,
               },
               {
-                label: fuelFilterVehicle === '' ? 'Top Consumer' : 'Odometer Span',
-                value: fuelFilterVehicle === '' ? topVehicleName : efficiency ? `${efficiency.distance.toLocaleString()} km` : '—',
-                period: 'Logged mileage span',
+                label: 'Logged Movement',
+                value: combinedEfficiency ? `${combinedEfficiency.distance.toLocaleString()} km` : '—',
+                period: combinedEfficiency?.costPerKm ? `₦${combinedEfficiency.costPerKm.toFixed(0)}/km fuel cost` : 'Total movement span',
               },
             ]}
           />
 
           {/* Efficiency Banner */}
-          {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency) && (
+          {combinedEfficiency && (
             <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                  {fuelFilterVehicle !== '' ? 'Vehicle Fuel Efficiency' : 'Fleet-Wide Fuel Efficiency'}
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                  <Gauge className="h-4 w-4 text-blue-600" />
+                  {fuelFilterVehicle !== '' ? 'Vehicle Fuel Economy & Movement' : 'Fleet-Wide Fuel Economy & Movement'}
                 </h4>
                 <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                  Calculated from {(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.distance.toLocaleString()} km of logged travel
+                  Calculated from {combinedEfficiency.distance.toLocaleString()} km of tracker movement across {totalFuelLitres.toFixed(1)} L of fuel
                 </p>
               </div>
               <div className="flex gap-6">
                 <div className="text-right">
-                  <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.kmPerLitre.toFixed(2)} km/L</p>
+                  <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{combinedEfficiency.kmPerLitre.toFixed(2)} km/L</p>
                   <p className="text-[9px] uppercase font-medium text-slate-400">km per Litre</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{(fuelFilterVehicle !== '' ? efficiency : fleetEfficiency)?.lPer100km.toFixed(2)} L/100km</p>
+                  <p className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100 tabular-nums">{combinedEfficiency.lPer100km.toFixed(2)} L/100km</p>
                   <p className="text-[9px] uppercase font-medium text-slate-400">Litres per 100km</p>
                 </div>
+                {combinedEfficiency.costPerKm > 0 && (
+                  <div className="text-right">
+                    <p className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">₦{combinedEfficiency.costPerKm.toFixed(1)}</p>
+                    <p className="text-[9px] uppercase font-medium text-slate-400">Cost per km</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -5468,6 +5671,129 @@ export function VehicleManager() {
                     </div>
                   ))
                 )}
+              </div>
+            </Card>
+
+            {/* Movement & Fuel Consumption Guardrail */}
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+              <div className="p-4 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-3 justify-between sm:items-center">
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-blue-600" /> Vehicle Movement vs Fuel Guardrail
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Cross-references diesel purchases against logged tracker mileage to flag excessive consumption, idling, or unrecorded trips
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-mono flex-wrap">
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200">
+                    🟢 Optimal (&gt;7 km/L)
+                  </Badge>
+                  <Badge variant="outline" className="bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300 border-rose-200">
+                    🔴 High Consumption (&lt;5 km/L)
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-100/75 dark:bg-slate-800/50 text-[10px] uppercase font-bold tracking-wider text-slate-500 font-mono border-b border-slate-200 dark:border-slate-800">
+                      <th className="px-6 py-3">Vehicle</th>
+                      <th className="px-6 py-3">Logged Distance</th>
+                      <th className="px-6 py-3">Fuel Consumed</th>
+                      <th className="px-6 py-3">Fuel Economy</th>
+                      <th className="px-6 py-3">Fuel Cost / km</th>
+                      <th className="px-6 py-3 text-right">Guardrail Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                    {vehicleGuardrailData.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400 italic">
+                          No movement or fuel records for this period
+                        </td>
+                      </tr>
+                    ) : (
+                      vehicleGuardrailData.map(v => (
+                        <tr key={v.vehicle_id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="px-6 py-3.5">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 dark:text-slate-100">{v.name}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">{v.vehicle_reg}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-3.5 font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300">
+                            {v.distance > 0 ? (
+                              <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-bold">
+                                <Gauge className="h-3.5 w-3.5" />
+                                {v.distance.toLocaleString()} km
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">0 km</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3.5 font-mono tabular-nums">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-amber-600 dark:text-amber-500">{v.litres.toFixed(1)} L</span>
+                              <span className="text-[10px] text-slate-400">₦{v.cost.toLocaleString()}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-3.5 font-mono tabular-nums">
+                            {v.kmPerLitre > 0 ? (
+                              <div className="flex flex-col">
+                                <span className={cn(
+                                  "font-bold",
+                                  v.kmPerLitre < 5 ? "text-rose-600 dark:text-rose-400" :
+                                  v.kmPerLitre < 7.5 ? "text-amber-600 dark:text-amber-400" :
+                                  "text-emerald-600 dark:text-emerald-400"
+                                )}>
+                                  {v.kmPerLitre.toFixed(2)} km/L
+                                </span>
+                                <span className="text-[10px] text-slate-400">{v.lPer100km.toFixed(1)} L/100km</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3.5 font-mono tabular-nums">
+                            {v.costPerKm > 0 ? (
+                              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                ₦{v.costPerKm.toFixed(1)}/km
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3.5 text-right">
+                            <div className="flex flex-col items-end">
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[10px] font-bold px-2 py-0.5 rounded-sm tracking-wider font-mono",
+                                  v.status === 'optimal' ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" :
+                                  v.status === 'moderate' ? "bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800" :
+                                  v.status === 'high_consumption' ? "bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800" :
+                                  v.status === 'unverified_fuel' ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800" :
+                                  "bg-slate-50 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-400"
+                                )}
+                              >
+                                {v.status === 'optimal' && '🟢 Optimal'}
+                                {v.status === 'moderate' && '🟡 Normal'}
+                                {v.status === 'high_consumption' && '🔴 High Consumption'}
+                                {v.status === 'unverified_fuel' && '⚠️ Zero Distance'}
+                                {v.status === 'no_fuel' && 'ℹ️ No Refills'}
+                              </Badge>
+                              <span className="text-[10px] text-slate-400 mt-0.5 max-w-[220px] text-right truncate" title={v.statusDesc}>
+                                {v.statusDesc}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </Card>
         </div>

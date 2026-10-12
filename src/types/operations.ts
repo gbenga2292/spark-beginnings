@@ -298,6 +298,7 @@ export interface VehicleTripLeg {
   remark?: string;
   odometer_start?: number;
   odometer_end?: number;
+  distance_km?: number;
 }
 
 export interface VehicleDailyLog {

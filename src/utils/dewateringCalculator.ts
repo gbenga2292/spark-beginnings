@@ -12,6 +12,7 @@
 export type DewateringLayoutType = 'ring' | 'u_shape' | 'l_shape' | 'single_line';
 export type PipeStockOption = 'all' | '6m_only';
 export type OffsetMode = 'auto' | 'manual';
+export type PumpSide = 'north' | 'east' | 'south' | 'west';
 
 export interface DewateringInput {
   landLength: number; // m
@@ -29,6 +30,9 @@ export interface DewateringInput {
   offsetMode?: OffsetMode;
   manualOffset?: number; // m
   minOffset?: number; // m (default 0.75m)
+  customPumps?: number; // User override for total number of pumps
+  pumpSides?: PumpSide[]; // Configured sides for pumps
+  dischargeDirection?: PumpSide; // Designated direction for all pump discharge lines (default: 'east')
 }
 
 export interface RunSegment {
@@ -62,6 +66,10 @@ export interface DewateringCalculationResult {
   loopPerimeter: number; // total active line length (m)
   filters: number; // wellpoint filters (1.0m c/c)
   pumps: number; // vacuum pumps
+  predictedPumps: number; // auto-calculated vacuum pumps
+  isPumpsOverridden: boolean;
+  pumpSides: PumpSide[]; // sides where pumps are positioned
+  dischargeDirection: PumpSide; // uniform direction for all pump discharge lines
   headers6m: number; // total 6m pipes
   headers3m: number; // total 3m pipes
   baseHeaderLength: number; // sum of actual run lengths
@@ -74,6 +82,39 @@ export interface DewateringCalculationResult {
   suctionHoses: number;
   dischargeHoseMeters: number;
   autoSummary: string;
+}
+
+export function getRecommendedPumpSides(
+  count: number,
+  layoutType: DewateringLayoutType = 'ring',
+  ingressSide?: PumpSide,
+  ingressRequired: boolean = false
+): PumpSide[] {
+  if (count <= 0) return [];
+
+  let candidates: PumpSide[];
+  if (layoutType === 'ring') {
+    // If ingress is active on a side, prefer other sides first before placing near ingress
+    if (ingressRequired && ingressSide) {
+      const order: PumpSide[] = ['north', 'south', 'east', 'west'];
+      candidates = [...order.filter(s => s !== ingressSide), ingressSide];
+    } else {
+      // Balanced placement: opposite sides first (North, South), then East, West
+      candidates = ['north', 'south', 'east', 'west'];
+    }
+  } else if (layoutType === 'u_shape') {
+    candidates = ['north', 'east', 'west'];
+  } else if (layoutType === 'l_shape') {
+    candidates = ['north', 'west'];
+  } else {
+    candidates = ['north'];
+  }
+
+  const result: PumpSide[] = [];
+  for (let i = 0; i < count; i++) {
+    result.push(candidates[i % candidates.length]);
+  }
+  return result;
 }
 
 export const EMPTY_DEWATERING_INPUT: DewateringInput = {
@@ -92,6 +133,7 @@ export const EMPTY_DEWATERING_INPUT: DewateringInput = {
   offsetMode: 'manual',
   manualOffset: 1.0,
   minOffset: 0.75,
+  dischargeDirection: 'east',
 };
 
 export const DEFAULT_DEWATERING_INPUT: DewateringInput = {
@@ -110,6 +152,7 @@ export const DEFAULT_DEWATERING_INPUT: DewateringInput = {
   offsetMode: 'manual',
   manualOffset: 1.0,
   minOffset: 0.75,
+  dischargeDirection: 'east',
 };
 
 export const PRESET_SCENARIOS: {
@@ -370,6 +413,10 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
       loopPerimeter: 0,
       filters: 0,
       pumps: 0,
+      predictedPumps: 0,
+      isPumpsOverridden: false,
+      pumpSides: [],
+      dischargeDirection: inputs.dischargeDirection || 'east',
       headers6m: 0,
       headers3m: 0,
       baseHeaderLength: 0,
@@ -523,14 +570,28 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
   const filters = Math.max(4, Math.ceil(loopPerimeter / 1.0));
 
   // Step 6: Pumps (100 m³/hr vacuum pumps, max 60m header coverage per pump)
-  const pumps = Math.max(1, Math.ceil(loopPerimeter / 60));
+  const predictedPumps = Math.max(1, Math.ceil(loopPerimeter / 60));
+  const hasCustomPumps = typeof inputs.customPumps === 'number' && inputs.customPumps > 0;
+  const hasCustomSides = Array.isArray(inputs.pumpSides) && inputs.pumpSides.length > 0;
+  const isPumpsOverridden = hasCustomPumps || hasCustomSides;
+
+  let pumps = predictedPumps;
+  if (hasCustomPumps) {
+    pumps = inputs.customPumps!;
+  } else if (hasCustomSides) {
+    pumps = inputs.pumpSides!.length;
+  }
+
+  const pumpSides = hasCustomSides
+    ? inputs.pumpSides!
+    : getRecommendedPumpSides(pumps, layoutType, inputs.ingressSide, ingress);
 
   // Step 7: Layout-specific fittings
   let elbows90 = 0;
   let endCaps = 0;
 
   if (layoutType === 'ring') {
-    elbows90 = ingress ? 3 : 4;
+    elbows90 = 4; // The excavation pit still has 4 corners; the ingress is a ramp/drive opening along a run, so all 4 corners still require 90° elbows
     endCaps = ingress ? 2 : 0;
   } else if (layoutType === 'u_shape') {
     elbows90 = 2;
@@ -574,6 +635,9 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
   } else {
     summary += ' Modular assembly using standard 6m and 3m header pipes.';
   }
+  if (isPumpsOverridden) {
+    summary += ` Configured with ${pumps} vacuum pump${pumps > 1 ? 's' : ''} (manual override) on ${pumpSides.map(s => s.toUpperCase()).join(', ')}.`;
+  }
 
   return {
     status: 'REQUIRED',
@@ -595,6 +659,10 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
     loopPerimeter,
     filters,
     pumps,
+    predictedPumps,
+    isPumpsOverridden,
+    pumpSides,
+    dischargeDirection: inputs.dischargeDirection || 'east',
     headers6m,
     headers3m,
     baseHeaderLength,
@@ -637,6 +705,10 @@ function createErrorResult(
     loopPerimeter: 0,
     filters: 0,
     pumps: 0,
+    predictedPumps: 0,
+    isPumpsOverridden: false,
+    pumpSides: [],
+    dischargeDirection: inputs.dischargeDirection || 'east',
     headers6m: 0,
     headers3m: 0,
     baseHeaderLength: 0,

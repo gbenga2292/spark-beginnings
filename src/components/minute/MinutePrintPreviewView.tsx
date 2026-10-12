@@ -1,294 +1,288 @@
-import React, { useRef, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useRef, useImperativeHandle, forwardRef, useCallback, useState } from 'react';
+import { FileText, Loader2 } from 'lucide-react';
 import logoSrc from '@/logo/logo-2.png';
 import type { MeetingMinute } from '@/src/types/minute';
+import { exportMinuteToDocx } from '@/src/lib/minuteDocxExport';
+import { Button } from '@/src/components/ui/button';
+import { cn } from '@/src/lib/utils';
 
 export interface MinutePrintPreviewViewHandle {
   handlePrint: () => void;
+  handleExportDocx: () => Promise<void>;
 }
 
 export interface MinutePrintPreviewViewProps {
   minute: MeetingMinute;
   className?: string;
+  hideLogo?: boolean;
+  hideWatermark?: boolean;
+  onToggleHideLogo?: (hide: boolean) => void;
+  onToggleHideWatermark?: (hide: boolean) => void;
 }
 
 export const MinutePrintPreviewView = forwardRef<
   MinutePrintPreviewViewHandle,
   MinutePrintPreviewViewProps
->(function MinutePrintPreviewView({ minute, className = '' }, ref) {
-  const printAreaRef = useRef<HTMLDivElement>(null);
+>(function MinutePrintPreviewView(
+  {
+    minute,
+    className = '',
+    hideLogo: hideLogoProp,
+    hideWatermark: hideWatermarkProp,
+    onToggleHideLogo,
+    onToggleHideWatermark,
+  },
+  ref
+) {
+  const [localHideLogo, setLocalHideLogo] = useState(false);
+  const [localHideWatermark, setLocalHideWatermark] = useState(false);
+
+  const isLogoHidden = hideLogoProp !== undefined ? hideLogoProp : localHideLogo;
+  const isWatermarkHidden = hideWatermarkProp !== undefined ? hideWatermarkProp : localHideWatermark;
+
+  const toggleHideLogo = (val: boolean) => {
+    setLocalHideLogo(val);
+    onToggleHideLogo?.(val);
+  };
+
+  const toggleHideWatermark = (val: boolean) => {
+    setLocalHideWatermark(val);
+    onToggleHideWatermark?.(val);
+  };
 
   const handlePrint = useCallback(() => {
-    const printArea = printAreaRef.current;
-    if (!printArea) {
+    const sheetEl = document.getElementById('minute-print-sheet');
+    if (!sheetEl) {
       window.print();
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
+    // Convert logoSrc to absolute URL so iframe and print environments always resolve it
+    const absoluteLogoSrc = new URL(logoSrc, window.location.href).href;
+
+    // Create a hidden iframe for isolated, pixel-perfect printing
+    const iframe = document.createElement('iframe');
+    iframe.id = 'minute-print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) {
       window.print();
       return;
     }
 
-    printWindow.document.write(`
+    // Collect all stylesheets and style blocks from document.head so Tailwind classes & fonts match exactly
+    const styles = Array.from(
+      document.head.querySelectorAll('link[rel="stylesheet"], style')
+    )
+      .map((el) => el.outerHTML)
+      .join('\n');
+
+    // Clone the sheet element
+    const clone = sheetEl.cloneNode(true) as HTMLElement;
+    // Replace any relative logo src with absolute
+    clone.querySelectorAll('img').forEach((img) => {
+      if (img.getAttribute('src') === logoSrc || img.src.includes('logo-2.png')) {
+        img.src = absoluteLogoSrc;
+      }
+    });
+
+    iframeDoc.open();
+    iframeDoc.write(`
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
         <head>
-          <title>${minute.title || 'Meeting Minute'} - Print</title>
+          <meta charset="utf-8" />
+          <title>${(minute.title || 'Meeting Minute').replace(/</g, '&lt;')} - Print</title>
+          ${styles}
           <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              color: #111827;
-              background: #ffffff;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
             @page {
-              size: A4;
-              margin: 14mm 16mm;
+              size: A4 portrait !important;
+              margin: 12mm 14mm !important;
             }
-            .print-page {
-              position: relative;
-              width: 100%;
-              min-height: 100%;
-              background: #ffffff;
+            *, *::before, *::after {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
-            .watermark-container {
-              position: fixed;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%);
-              width: 360px;
-              max-width: 70%;
-              opacity: 0.5 !important;
-              pointer-events: none;
-              z-index: 0;
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              color: #111827 !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
             }
-            .watermark-img {
-              width: 100%;
-              height: auto;
-              opacity: 0.5 !important;
-              filter: grayscale(15%);
+            .no-print, .print\\:hidden {
+              display: none !important;
             }
-            .content-wrapper {
-              position: relative;
-              z-index: 1;
-            }
-            .header-bar {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              border-bottom: 2px solid #0f172a;
-              padding-bottom: 12px;
-              margin-bottom: 18px;
-            }
-            .brand-left {
-              display: flex;
-              align-items: center;
-              gap: 14px;
-            }
-            .top-logo {
-              height: 52px;
-              width: auto;
-              object-fit: contain;
-            }
-            .company-name {
-              font-size: 14px;
-              font-weight: 800;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              color: #0f172a;
-            }
-            .company-sub {
-              font-size: 10px;
-              color: #4b5563;
-              font-weight: 500;
-              margin-top: 1px;
-            }
-            .header-meta {
-              text-align: right;
-              font-size: 10px;
-              color: #374151;
-              line-height: 1.4;
-            }
-            .meeting-badge {
-              display: inline-block;
-              font-size: 9px;
-              font-weight: 700;
-              text-transform: uppercase;
-              background: #f1f5f9;
-              border: 1px solid #cbd5e1;
-              padding: 2px 8px;
-              border-radius: 4px;
-              margin-bottom: 3px;
-            }
-            .title-section {
-              margin-bottom: 16px;
-            }
-            .meeting-title {
-              font-size: 18px;
-              font-weight: 800;
-              color: #0f172a;
-              margin-bottom: 8px;
-              line-height: 1.25;
-            }
-            .meta-grid {
-              display: grid;
-              grid-template-columns: repeat(4, 1fr);
-              gap: 8px;
-              background: #f8fafc;
-              border: 1px solid #e2e8f0;
-              padding: 8px 12px;
-              border-radius: 6px;
-              font-size: 10px;
-            }
-            .meta-item strong {
-              display: block;
-              color: #64748b;
-              font-size: 9px;
-              text-transform: uppercase;
-              margin-bottom: 2px;
-            }
-            .section {
-              margin-top: 14px;
-            }
-            .section-title {
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              color: #0f172a;
-              border-bottom: 1px solid #e2e8f0;
-              padding-bottom: 4px;
-              margin-bottom: 6px;
-            }
-            .section-content {
-              font-size: 10.5px;
-              line-height: 1.6;
-              color: #1f2937;
-            }
-            .tag-list {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 5px;
-            }
-            .tag {
-              background: #f1f5f9;
-              border: 1px solid #e2e8f0;
-              padding: 2px 7px;
-              border-radius: 4px;
-              font-size: 10px;
-            }
-            .bullet-list {
-              margin-left: 16px;
-              font-size: 10.5px;
-              line-height: 1.6;
-            }
-            .bullet-list li {
-              margin-bottom: 3px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 6px;
-              font-size: 10px;
-            }
-            th, td {
-              border: 1px solid #cbd5e1;
-              padding: 6px 8px;
-              text-align: left;
-            }
-            th {
-              background: #f8fafc;
-              font-weight: 700;
-              color: #334155;
-            }
-            .priority-badge {
-              text-transform: uppercase;
-              font-size: 8.5px;
-              font-weight: 700;
-              padding: 1px 5px;
-              border-radius: 3px;
-              background: #f1f5f9;
-            }
-            .signoff-section {
-              margin-top: 28px;
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 40px;
-              padding-top: 14px;
-              border-top: 1px dashed #cbd5e1;
-            }
-            .sig-box {
-              font-size: 10px;
-              color: #334155;
-            }
-            .sig-line {
-              border-bottom: 1px solid #0f172a;
-              height: 36px;
-              margin-bottom: 6px;
+            #minute-print-sheet {
+              box-shadow: none !important;
+              border: none !important;
+              max-width: 100% !important;
+              width: 100% !important;
+              min-height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
             }
           </style>
         </head>
-        <body>
-          <div class="print-page">
-            <div class="watermark-container">
-              <img src="${logoSrc}" alt="DCEL Watermark" class="watermark-img" />
-            </div>
-            <div class="content-wrapper">
-              ${printArea.innerHTML}
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
+        <body class="bg-white text-neutral-900">
+          ${clone.outerHTML}
         </body>
       </html>
     `);
-    printWindow.document.close();
-  }, [minute]);
+    iframeDoc.close();
+
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error('Iframe print error, falling back to window.print', err);
+        window.print();
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }
+    };
+
+    // Wait for images to finish loading inside iframe before triggering print
+    const imgs = iframeDoc.images;
+    if (imgs.length > 0) {
+      let loaded = 0;
+      const onImgReady = () => {
+        loaded++;
+        if (loaded >= imgs.length) {
+          setTimeout(triggerPrint, 100);
+        }
+      };
+      for (let i = 0; i < imgs.length; i++) {
+        if (imgs[i].complete) {
+          onImgReady();
+        } else {
+          imgs[i].onload = onImgReady;
+          imgs[i].onerror = onImgReady;
+        }
+      }
+      setTimeout(triggerPrint, 600);
+    } else {
+      setTimeout(triggerPrint, 150);
+    }
+  }, [minute.title]);
+
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
+
+  const handleExportDocx = useCallback(async () => {
+    setIsExportingDocx(true);
+    try {
+      await exportMinuteToDocx(minute, { hideLogo: isLogoHidden });
+    } finally {
+      setIsExportingDocx(false);
+    }
+  }, [minute, isLogoHidden]);
 
   useImperativeHandle(
     ref,
     () => ({
       handlePrint,
+      handleExportDocx,
     }),
-    [handlePrint]
+    [handlePrint, handleExportDocx]
   );
 
   return (
-    <div className={`w-full py-6 px-2 sm:px-4 flex justify-center ${className}`}>
+    <div className={`w-full py-4 px-2 sm:px-4 flex flex-col items-center ${className}`}>
+      {/* On-screen Print Customization Toolbar (Hidden on print) */}
+      <div className="no-print w-full max-w-[210mm] mb-3 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shadow-2xs">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+            Print & Export:
+          </span>
+          <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700 dark:text-slate-200 select-none hover:text-foreground">
+            <input
+              type="checkbox"
+              checked={isLogoHidden}
+              onChange={(e) => toggleHideLogo(e.target.checked)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+            />
+            <span>Hide Logo</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700 dark:text-slate-200 select-none hover:text-foreground">
+            <input
+              type="checkbox"
+              checked={isWatermarkHidden}
+              onChange={(e) => toggleHideWatermark(e.target.checked)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
+            />
+            <span>Hide Watermark</span>
+          </label>
+          <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-0.5 hidden sm:block" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportDocx}
+            disabled={isExportingDocx}
+            className="h-7 px-2.5 text-[11px] gap-1.5 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:text-foreground shadow-2xs font-medium"
+          >
+            {isExportingDocx ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-600" />
+            ) : (
+              <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            )}
+            <span>{isExportingDocx ? 'Exporting Word...' : 'Export Word (.docx)'}</span>
+          </Button>
+        </div>
+        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
+          A4 Portrait • Offline Word (.docx) Editable
+        </div>
+      </div>
+
+      {/* Main A4 Document Sheet */}
       <div
-        className="w-full max-w-[210mm] bg-white text-neutral-900 shadow-2xl rounded-sm border border-neutral-300 p-8 sm:p-12 relative overflow-hidden"
+        id="minute-print-sheet"
+        className="w-full max-w-[210mm] bg-white text-neutral-900 shadow-2xl rounded-sm border border-neutral-300 p-8 sm:p-12 relative overflow-hidden print:p-0 print:border-none print:shadow-none print:max-w-none"
         style={{ minHeight: '297mm' }}
       >
-        {/* Center Watermark (50% Opacity) */}
-        <div
-          className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
-          aria-hidden="true"
-        >
-          <img
-            src={logoSrc}
-            alt="Watermark"
-            className="w-[340px] max-w-[70%] object-contain"
-            style={{ opacity: 0.5 }}
-          />
-        </div>
+        {/* Center Watermark (35% Opacity) */}
+        {!isWatermarkHidden && (
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0"
+            aria-hidden="true"
+          >
+            <img
+              src={logoSrc}
+              alt="Watermark"
+              className="w-[340px] max-w-[70%] object-contain"
+              style={{ opacity: 0.35 }}
+            />
+          </div>
+        )}
 
         {/* Printable Content Section */}
-        <div ref={printAreaRef} className="relative z-10 space-y-6">
+        <div className="relative z-10 space-y-6">
           {/* Header Bar */}
           <div className="flex items-center justify-between border-b-2 border-neutral-900 pb-3 mb-4">
             <div className="flex items-center gap-3.5">
-              <img
-                src={logoSrc}
-                alt="Company Logo"
-                className="h-11 w-auto max-w-[220px] object-contain shrink-0"
-              />
-              <div className="border-l-2 border-neutral-300 pl-3">
+              {!isLogoHidden && (
+                <img
+                  src={logoSrc}
+                  alt="Company Logo"
+                  className="h-11 w-auto max-w-[220px] object-contain shrink-0"
+                />
+              )}
+              <div className={cn(!isLogoHidden ? 'border-l-2 border-neutral-300 pl-3' : '')}>
                 <h2 className="text-xs font-extrabold uppercase tracking-tight text-neutral-900">
                   Executive Meeting Minutes
                 </h2>
@@ -349,7 +343,7 @@ export const MinutePrintPreviewView = forwardRef<
             </div>
           </div>
 
-          {/* Attendees & Absentees */}
+          {/* Attendees Present */}
           <div className="space-y-1.5 text-xs">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-neutral-900 border-b border-neutral-200 pb-1">
               Attendees Present
@@ -458,7 +452,21 @@ export const MinutePrintPreviewView = forwardRef<
             </div>
           )}
 
-
+          {/* Sign-off / Signature Lines */}
+          <div className="pt-8 mt-6 border-t border-neutral-200 grid grid-cols-2 gap-8 text-[11px] text-neutral-700 break-inside-avoid">
+            <div className="space-y-1">
+              <div className="border-b border-neutral-800 h-10 mb-2 w-full max-w-[220px]" />
+              <p className="font-bold text-neutral-900">Prepared &amp; Recorded By</p>
+              <p className="text-[10px] text-neutral-500">Secretariat / Admin</p>
+            </div>
+            <div className="space-y-1 text-right">
+              <div className="border-b border-neutral-800 h-10 mb-2 w-full max-w-[220px] ml-auto" />
+              <p className="font-bold text-neutral-900">Approved &amp; Adopted By</p>
+              <p className="text-[10px] text-neutral-500">
+                {minute.chairPerson || 'Chairperson / Presiding Officer'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
