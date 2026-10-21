@@ -209,13 +209,13 @@ export function HomePage() {
             name: 'Phonebook',
             href: '/clients/phonebook',
             icon: Contact,
-            privKey: 'custom',
-            privField: '',
+            privKey: 'phonebook',
+            privField: 'canView',
             visible: (user: any) =>
               Boolean(
                 user?.privileges?.users?.canManage ||
-                user?.privileges?.sites?.canView ||
-                user?.privileges?.clients?.canView
+                user?.privileges?.phonebook?.canView ||
+                (!user?.privileges?.phonebook && (user?.privileges?.sites?.canView || user?.privileges?.clients?.canView))
               ),
           },
           { name: 'Machine Recon', href: '/operations/machine-reconciliation', icon: ArrowRightLeft, privKey: 'opsMachineRecon', privField: 'canView' },
@@ -303,7 +303,19 @@ export function HomePage() {
           { name: 'Beneficiaries Directory', href: '/beneficiaries', icon: Landmark, privKey: 'beneficiaries', privField: 'canView' },
           { name: 'Financial Ledger', href: '/ledger', icon: Landmark, privKey: 'ledger', privField: 'canView' },
           { name: 'Bank AI Import', href: '/bank-import', icon: Landmark, privKey: 'bankImport', privField: 'canView' },
-          { name: 'Company Expenses', href: '/company-expenses', icon: Landmark, privKey: 'ledger', privField: 'canView' },
+          {
+            name: 'Vendor Invoices',
+            href: '/vendor-invoices',
+            icon: Landmark,
+            privKey: 'vendorInvoices',
+            privField: 'canView',
+            visible: (user: any) =>
+              Boolean(
+                user?.privileges?.users?.canManage ||
+                user?.privileges?.vendorInvoices?.canView ||
+                (!user?.privileges?.vendorInvoices && user?.privileges?.ledger?.canView)
+              ),
+          },
           { name: 'Budget Tracking', href: '/budget', icon: Landmark, privKey: 'budget', privField: 'canView' },
         ],
       },
@@ -316,8 +328,9 @@ export function HomePage() {
         dotColor: '#f97316',
         items: [
           { name: 'Simulator', href: '/operations/simulator', icon: HardHat, privKey: 'simulator', privField: 'canView' },
-          { name: 'Dewatering Calculator', href: '/operations/dewatering-calculator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
-          { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'simulator', privField: 'canView' },
+          { name: 'Dewatering Calculator', href: '/operations/dewatering-calculator', icon: Calculator, privKey: 'dewateringCalculator', privField: 'canView' },
+          { name: 'Logistics Estimator', href: '/operations/estimator', icon: Calculator, privKey: 'estimator', privField: 'canView' },
+          { name: 'VAT Calculator', href: '/operations/vat-calculator', icon: Calculator, privKey: 'vatCalculator', privField: 'canView' },
         ],
       },
       {

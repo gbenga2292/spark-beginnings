@@ -2,8 +2,8 @@ import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/src/components/ui/dialog';
 import { Button } from '@/src/components/ui/button';
-import { Upload, Printer, Trash2, Save, X, Info, Search, Filter, Users, ChevronRight, ChevronDown, Check, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useAppStore, Employee } from '@/src/store/appStore';
+import { Upload, Printer, Trash2, Save, X, Info, Search, Filter, Users, ChevronRight, ChevronDown, Check, PanelLeftClose, PanelLeftOpen, Building2, MapPin } from 'lucide-react';
+import { useAppStore, Employee, Invoice } from '@/src/store/appStore';
 import { getPositionIndex } from '@/src/lib/hierarchy';
 import { toast } from '@/src/components/ui/toast';
 import logoSrc from '../../../logo/logo-2.png';
@@ -181,6 +181,7 @@ const TXN_COLUMNS: ColumnDef[] = [
 const SUM_COLUMNS: ColumnDef[] = [
   { id: 's_sn',            label: 'S/N',                      summable: false, sources: ['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] },
   { id: 's_client',        label: 'Client Name',              summable: false, sources: ['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] },
+  { id: 's_site',          label: 'Site',                     summable: false, sources: ['INVOICE','PAYMENT','SITE'] },
   { id: 's_tin',           label: 'Client TIN',               summable: false, sources: ['INVOICE','PAYMENT','VAT','PAYROLL','LEDGER','SITE'] },
   // ── Invoice ──
   { id: 's_inv_count',     label: 'Invoice Count (Period)',   summable: true,  sources: ['INVOICE'] },
@@ -254,7 +255,13 @@ const BUILT_IN_PRESETS: ReportPreset[] = [
     // Outstanding — uses all-time balance for accuracy
     id: '__outstanding', name: 'Outstanding Balance', builtIn: true,
     sources: ['INVOICE','PAYMENT'],
-    columns: ['s_sn','s_client','s_bfwd','s_periodcharged','s_periodcleared','s_allcharged','s_allcleared','s_balance'],
+    columns: ['s_sn','s_client','s_site','s_bfwd','s_periodcharged','s_periodcleared','s_allcharged','s_allcleared','s_balance'],
+  },
+  {
+    // Debtors Report — preset focused on debtors
+    id: '__debtors', name: 'Debtors Report', builtIn: true,
+    sources: ['INVOICE','PAYMENT'],
+    columns: ['s_sn','s_client','s_site','s_bfwd','s_periodcharged','s_periodcleared','s_allcharged','s_allcleared','s_balance'],
   },
 ];
 
@@ -270,18 +277,23 @@ const NON_NUMERIC_COLS = new Set([
   'p_employee','p_department','p_position','p_staffType','p_month','p_year', 'p_bank', 'p_account',
   'l_date','l_voucher','l_category','l_desc','l_vendor','l_bank','l_client','l_site','l_enteredBy',
   't_name','t_client','t_status','t_vat','t_start','t_end',
-  's_sn','s_client','s_tin',
+  's_sn','s_client','s_site','s_tin',
 ]);
 const isNumericCol = (colId: string) => !NON_NUMERIC_COLS.has(colId);
 
 interface TaggedRecord { _source: DataSource; _raw: any; }
 
 /**
- * Aggregated row — one per unique client in multi-source mode.
+ * Aggregated row — one per unique client or site in multi-source mode.
  * Separates period-scoped values from all-time values for accurate balance.
  */
 interface AggRow {
+  key: string;
   client: string;
+  site?: string;
+  siteSet?: Set<string>;
+  owingSiteSet?: Set<string>;
+  siteStats?: Map<string, { charged: number; cleared: number }>;
   tin: string;
   // Period-scoped (filtered by selected year/months/clients)
   invCount: number;
@@ -327,8 +339,6 @@ export interface DashboardConfig {
 const INCOMPATIBLE_PAIRS: [DataSource, DataSource][] = [
   ['INVOICE', 'PAYROLL'],
   ['INVOICE', 'LEDGER'],
-  ['INVOICE', 'SITE'],
-  ['PAYMENT', 'SITE'],
   ['PAYMENT', 'PAYROLL'],
   ['VAT',     'PAYROLL'],
   ['VAT',     'LEDGER'],
@@ -373,6 +383,11 @@ export function AccountsReportBuilder({
   const [selectedColumns, setSelectedColumns] = useState<string[]>(BUILT_IN_PRESETS[0].columns);
   const [isGroupedView,   setIsGroupedView]   = useState(false);
   const [isPivoted,       setIsPivoted]       = useState(false);
+
+  // ── Multi-Source Grouping & Debtor Flexibilities ──
+  const [multiGroupBy,    setMultiGroupBy]    = useState<'client' | 'site'>('client');
+  const [debtorFilter,    setDebtorFilter]    = useState<'all' | 'debtors' | 'cleared' | 'overpaid'>('all');
+  const [tableSearch,     setTableSearch]     = useState<string>('');
 
   // ── Payroll Specialized Filters ──
   const [selectedDepts,   setSelectedDepts]   = useState<string[]>([]);
@@ -438,12 +453,68 @@ export function AccountsReportBuilder({
     return { vat, amountForVat };
   }, []);
 
-  // Build a stable invoice index (id → invoice) for VAT ratio lookups
+  // Build a stable invoice index (id and invoiceNumber → invoice) for lookups
   const invIndex = useMemo(() => {
-    const m = new Map<string, any>();
-    rawInvoices.forEach(inv => m.set(inv.id, inv));
+    const m = new Map<string, Invoice>();
+    rawInvoices.forEach(inv => {
+      if (inv.id) m.set(inv.id, inv);
+      if (inv.invoiceNumber) m.set(inv.invoiceNumber, inv);
+    });
     return m;
   }, [rawInvoices]);
+
+  // Robust site resolution helpers
+  const resolveInvoiceSite = useCallback((inv: any): string => {
+    if (!inv) return '';
+    const direct = (inv.siteName || inv.site || '').trim();
+    if (direct) return direct;
+    if (inv.siteId) {
+      const found = sites.find(s => s.id === inv.siteId);
+      if (found?.name) return found.name.trim();
+    }
+    if (inv.client) {
+      const cSites = sites.filter(s => (s.client || '').trim().toLowerCase() === inv.client.trim().toLowerCase());
+      if (cSites.length === 1 && cSites[0]?.name) return cSites[0].name.trim();
+    }
+    return '';
+  }, [sites]);
+
+  const resolvePaymentSite = useCallback((pay: any): string => {
+    if (!pay) return '';
+    const direct = (pay.site || pay.siteName || '').trim();
+    if (direct) return direct;
+    if (pay.invoiceId && invIndex.has(pay.invoiceId)) {
+      const inv = invIndex.get(pay.invoiceId);
+      const s = resolveInvoiceSite(inv);
+      if (s) return s;
+    }
+    if (pay.invoiceNumber && invIndex.has(pay.invoiceNumber)) {
+      const inv = invIndex.get(pay.invoiceNumber);
+      const s = resolveInvoiceSite(inv);
+      if (s) return s;
+    }
+    if (pay.client) {
+      const cSites = sites.filter(s => (s.client || '').trim().toLowerCase() === pay.client.trim().toLowerCase());
+      if (cSites.length === 1 && cSites[0]?.name) return cSites[0].name.trim();
+    }
+    return '';
+  }, [sites, invIndex, resolveInvoiceSite]);
+
+  const resolveAllocSite = useCallback((alloc: any, fallbackPaySite: string): string => {
+    if (!alloc) return fallbackPaySite;
+    if (alloc.site && alloc.site.trim()) return alloc.site.trim();
+    if (alloc.invoiceId && invIndex.has(alloc.invoiceId)) {
+      const inv = invIndex.get(alloc.invoiceId);
+      const s = resolveInvoiceSite(inv);
+      if (s) return s;
+    }
+    if (alloc.invoiceNumber && invIndex.has(alloc.invoiceNumber)) {
+      const inv = invIndex.get(alloc.invoiceNumber);
+      const s = resolveInvoiceSite(inv);
+      if (s) return s;
+    }
+    return fallbackPaySite;
+  }, [invIndex, resolveInvoiceSite]);
 
   // Invoice-aware VAT resolver: when stored vat is 0 but payVat is active,
   // use the linked invoice's VAT ratio (mirrors computePaymentVatDetails).
@@ -468,8 +539,8 @@ export function AccountsReportBuilder({
     const baseAmount = Math.max(0, (pay.amount || 0) - (pay.damages || 0));
     if (pay.invoiceId && invIndex.has(pay.invoiceId)) {
       const inv = invIndex.get(pay.invoiceId);
-      const invTotal = Number(inv.totalCharge || inv.amount || 0);
-      const invVat   = Number(inv.vat || 0);
+      const invTotal = Number(inv?.totalCharge || inv?.amount || 0);
+      const invVat   = Number(inv?.vat || 0);
       if (invVat > 0 && invTotal > 0) {
         const ratio = invVat / invTotal;
         const vat = Math.round(baseAmount * ratio * 100) / 100;
@@ -503,27 +574,38 @@ export function AccountsReportBuilder({
       const client = (s.client || '').trim();
       if (!client || !selectedClients.includes(client)) return;
       if (!map[client]) map[client] = [];
-      if (s.name && !map[client].includes(s.name)) map[client].push(s.name);
+      if (s.name && !map[client].includes(s.name.trim())) map[client].push(s.name.trim());
     });
     // Also pull site names from invoices/payments for completeness
     rawInvoices.forEach(r => {
       const client = (r.client || '').trim();
-      const siteName = (r as any).site || '';
+      const siteName = resolveInvoiceSite(r);
       if (!client || !siteName || !selectedClients.includes(client)) return;
       if (!map[client]) map[client] = [];
       if (!map[client].includes(siteName)) map[client].push(siteName);
     });
     rawPayments.forEach(r => {
       const client = ((r as any).client || '').trim();
-      const siteName = (r as any).site || '';
-      if (!client || !siteName || !selectedClients.includes(client)) return;
-      if (!map[client]) map[client] = [];
-      if (!map[client].includes(siteName)) map[client].push(siteName);
+      const siteName = resolvePaymentSite(r);
+      if (client && siteName && selectedClients.includes(client)) {
+        if (!map[client]) map[client] = [];
+        if (!map[client].includes(siteName)) map[client].push(siteName);
+      }
+      if (Array.isArray((r as any).allocations)) {
+        (r as any).allocations.forEach((alloc: any) => {
+          const aClient = (alloc.client || client).trim();
+          const aSite = resolveAllocSite(alloc, siteName);
+          if (aClient && aSite && selectedClients.includes(aClient)) {
+            if (!map[aClient]) map[aClient] = [];
+            if (!map[aClient].includes(aSite)) map[aClient].push(aSite);
+          }
+        });
+      }
     });
     // Sort per client
     Object.keys(map).forEach(k => map[k].sort());
     return map;
-  }, [sites, rawInvoices, rawPayments, selectedClients]);
+  }, [sites, rawInvoices, rawPayments, selectedClients, resolveInvoiceSite, resolvePaymentSite, resolveAllocSite]);
 
   // When selected clients change, prune selectedSites to only valid ones
   useEffect(() => {
@@ -621,13 +703,27 @@ export function AccountsReportBuilder({
 
     if (selectedSources.includes('INVOICE')) {
       rawInvoices
-        .filter(r => keepByDate(r.date, r.client || '', (r as any).site))
+        .filter(r => keepByDate(r.date, r.client || '', resolveInvoiceSite(r)))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .forEach(r => rows.push({ _source: 'INVOICE', _raw: r }));
     }
     if (selectedSources.includes('PAYMENT')) {
       rawPayments
-        .filter(r => keepByDate(r.date, (r as any).client || '', (r as any).site))
+        .filter(r => {
+          const paySite = resolvePaymentSite(r);
+          if (selectedSites.length > 0) {
+            if (paySite && selectedSites.includes(paySite)) return keepByDate(r.date, (r as any).client || '', paySite);
+            if (Array.isArray((r as any).allocations) && (r as any).allocations.length > 0) {
+              const hasMatchingAlloc = (r as any).allocations.some((a: any) => {
+                const aSite = resolveAllocSite(a, paySite);
+                return selectedSites.includes(aSite);
+              });
+              if (hasMatchingAlloc) return keepByDate(r.date, (r as any).client || '');
+            }
+            return false;
+          }
+          return keepByDate(r.date, (r as any).client || '', paySite);
+        })
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .forEach(r => rows.push({ _source: 'PAYMENT', _raw: r }));
     }
@@ -637,9 +733,10 @@ export function AccountsReportBuilder({
       if (!selectedSources.includes('PAYMENT')) {
         rawPayments
           .filter(r => {
-            if (!keepByDate(r.date, (r as any).client || '', (r as any).site)) return false;
+            const paySite = resolvePaymentSite(r);
+            if (!keepByDate(r.date, (r as any).client || '', paySite)) return false;
             const pvVal = (r as any).payVat ||
-              (sites.find(s => s.name === (r as any).site && s.client === (r as any).client)?.vat as any) || 'No';
+              (sites.find(s => s.name === paySite && s.client === (r as any).client)?.vat as any) || 'No';
             const vat = (r as any).vat !== undefined && (r as any).vat !== null
               ? Number((r as any).vat)
               : getVatDetails((r as any).amount || 0, pvVal, vatRate, (r as any).damages || 0).vat;
@@ -817,15 +914,27 @@ export function AccountsReportBuilder({
 
   // ── Aggregated rows (multi-source) ───────────────────────────────────────────
   // Correctly separates period values from ALL-TIME values for accurate balance.
+  // Supports grouping by Client or by individual Site.
   const aggregatedRows = useMemo((): AggRow[] => {
     if (!isMultiSource) return [];
 
     const map = new Map<string, AggRow>();
-    const ensure = (client: string): AggRow => {
-      const cLabel = client || '—';
-      if (!map.has(cLabel)) {
-        map.set(cLabel, {
-          client: cLabel, tin: getTin(cLabel),
+    const ensure = (client: string, site?: string): AggRow => {
+      const cLabel = (client || '').trim() || '—';
+      const sLabel = (site || '').trim();
+      const mapKey = multiGroupBy === 'site'
+        ? `${cLabel}___${sLabel || 'General'}`
+        : cLabel;
+
+      if (!map.has(mapKey)) {
+        map.set(mapKey, {
+          key: mapKey,
+          client: cLabel,
+          site: multiGroupBy === 'site' ? (sLabel || 'General') : undefined,
+          siteSet: new Set<string>(),
+          owingSiteSet: new Set<string>(),
+          siteStats: new Map<string, { charged: number; cleared: number }>(),
+          tin: getTin(cLabel),
           invCount: 0, periodCharged: 0, invVat: 0,
           payCount: 0, periodCleared: 0, totalPaidCash: 0, payWht: 0, payDiscount: 0,
           vatCount: 0, vatRemitted: 0, vatOwedFromPayments: 0, vatBal: 0,
@@ -835,42 +944,90 @@ export function AccountsReportBuilder({
           balance: 0,
         });
       }
-      return map.get(cLabel)!;
+      const existing = map.get(mapKey)!;
+      if (sLabel) {
+        existing.siteSet?.add(sLabel);
+        if (!existing.site && multiGroupBy !== 'site') {
+          existing.site = sLabel;
+        }
+      }
+      return existing;
     };
 
     // Step 1: Period-scoped values from pre-filtered records
     recordsToPrint.forEach(rec => {
       const r = rec._raw;
       const client = (r.client || '').trim();
-      const row = ensure(client);
+
       if (rec._source === 'INVOICE') {
+        const recSite = resolveInvoiceSite(r);
+        const row = ensure(client, recSite);
         row.invCount++;
         row.periodCharged += r.totalCharge || 0;
         row.invVat += r.vat || 0;
       } else if (rec._source === 'PAYMENT') {
-        row.payCount++;
-        row.totalPaidCash += r.amount || 0;
-        row.payWht += r.withholdingTax || 0;
-        row.payDiscount += r.discount || 0;
-        row.periodCleared += (r.amount || 0) + (r.withholdingTax || 0) + (r.discount || 0);
-        
-        const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
-        const { vat } = resolvePaymentVat(r, pvVal);
-        row.vatOwedFromPayments += vat;
+        const recSite = resolvePaymentSite(r);
+        const allocations = Array.isArray(r.allocations) && r.allocations.length > 0 ? r.allocations : null;
+        if (multiGroupBy === 'site' && allocations) {
+          let allocatedCash = 0;
+          let allocatedWht = 0;
+          let allocatedDisct = 0;
+          allocations.forEach((alloc: any) => {
+            const aSite = resolveAllocSite(alloc, recSite);
+            const aClient = (alloc.client || client).trim();
+            const row = ensure(aClient, aSite);
+            row.payCount++;
+            const aAmt = alloc.amount || 0;
+            const aWht = alloc.withholdingTax || 0;
+            const aDisct = alloc.discount || 0;
+            allocatedCash += aAmt;
+            allocatedWht += aWht;
+            allocatedDisct += aDisct;
+            row.totalPaidCash += aAmt;
+            row.payWht += aWht;
+            row.payDiscount += aDisct;
+            row.periodCleared += aAmt + aWht + aDisct;
+          });
+          const remCash = Math.max(0, (r.amount || 0) - allocatedCash);
+          const remWht = Math.max(0, (r.withholdingTax || 0) - allocatedWht);
+          const remDisct = Math.max(0, (r.discount || 0) - allocatedDisct);
+          if (remCash > 0 || remWht > 0 || remDisct > 0) {
+            const row = ensure(client, recSite);
+            row.totalPaidCash += remCash;
+            row.payWht += remWht;
+            row.payDiscount += remDisct;
+            row.periodCleared += remCash + remWht + remDisct;
+          }
+        } else {
+          const row = ensure(client, recSite);
+          row.payCount++;
+          row.totalPaidCash += r.amount || 0;
+          row.payWht += r.withholdingTax || 0;
+          row.payDiscount += r.discount || 0;
+          row.periodCleared += (r.amount || 0) + (r.withholdingTax || 0) + (r.discount || 0);
+          
+          const pvVal = r.payVat || (sites.find(s => s.name === recSite && s.client === r.client)?.vat as any) || 'No';
+          const { vat } = resolvePaymentVat(r, pvVal);
+          row.vatOwedFromPayments += vat;
+        }
       } else if (rec._source === 'VAT') {
-        // Only count actual remittances towards the 'remitted' total.
-        // Liability records (client payments) are handled either by PAYMENT source or the _isVatLiability branch below.
+        const recSite = (r.site || '').trim();
+        const row = ensure(client, recSite);
         if (r._isVatRemittance || (!r._isVatLiability && !r._isVatRemittance)) {
           row.vatCount++;
           row.vatRemitted += r.amount || 0;
         } else if (r._isVatLiability) {
-          const pvVal = r.payVat || (sites.find(s => s.name === r.site && s.client === r.client)?.vat as any) || 'No';
+          const pvVal = r.payVat || (sites.find(s => s.name === recSite && s.client === r.client)?.vat as any) || 'No';
           const { vat } = resolvePaymentVat(r, pvVal);
           row.vatOwedFromPayments += vat;
         }
       } else if (rec._source === 'LEDGER') {
+        const recSite = (r.site || r.ledgerSite || '').trim();
+        const row = ensure(client, recSite);
         row.ledgerTotal += r.amount || 0;
       } else if (rec._source === 'SITE') {
+        const recSite = (r.name || r.site || '').trim();
+        const row = ensure(client, recSite);
         row.siteCount++;
       }
     });
@@ -880,11 +1037,15 @@ export function AccountsReportBuilder({
       rawInvoices.forEach(r => {
         const client = (r.client || '').trim();
         if (!selectedClients.includes(client)) return;
-        // Apply site filter if active
-        if (selectedSites.length > 0 && !selectedSites.includes(((r as any).site || '').trim())) return;
-        const row = ensure(client);
+        const invSite = resolveInvoiceSite(r);
+        if (selectedSites.length > 0 && !selectedSites.includes(invSite)) return;
+        const row = ensure(client, invSite);
         row.allTimeCharged += r.totalCharge || 0;
-        // Brought forward: invoices strictly before the earliest selected year
+        if (invSite && row.siteStats) {
+          const cur = row.siteStats.get(invSite) || { charged: 0, cleared: 0 };
+          cur.charged += r.totalCharge || 0;
+          row.siteStats.set(invSite, cur);
+        }
         const norm = normalizeDate(r.date);
         if (norm) {
           const yr = parseInt(norm.substring(0, 4), 10);
@@ -898,17 +1059,66 @@ export function AccountsReportBuilder({
       rawPayments.forEach(r => {
         const client = ((r as any).client || '').trim();
         if (!selectedClients.includes(client)) return;
-        // Apply site filter if active
-        if (selectedSites.length > 0 && !selectedSites.includes(((r as any).site || '').trim())) return;
-        const row = ensure(client);
-        const cleared = ((r as any).amount || 0) + ((r as any).withholdingTax || 0) + ((r as any).discount || 0);
-        row.allTimeCleared += cleared;
-        // Brought forward: payments strictly before the earliest selected year
-        const norm = normalizeDate((r as any).date);
-        if (norm) {
-          const yr = parseInt(norm.substring(0, 4), 10);
-          const minYr = Math.min(...selectedYears);
-          if (yr < minYr) row.bfwdCleared += cleared;
+        const paySite = resolvePaymentSite(r);
+
+        const allocations = Array.isArray((r as any).allocations) && (r as any).allocations.length > 0 ? (r as any).allocations : null;
+        if (allocations) {
+          let allocatedCleared = 0;
+          allocations.forEach((alloc: any) => {
+            const aSite = resolveAllocSite(alloc, paySite);
+            const aClient = (alloc.client || client).trim();
+            if (multiGroupBy === 'site' && selectedSites.length > 0 && !selectedSites.includes(aSite)) return;
+            const row = ensure(aClient, multiGroupBy === 'site' ? aSite : paySite);
+            const cleared = (alloc.amount || 0) + (alloc.withholdingTax || 0) + (alloc.discount || 0);
+            allocatedCleared += cleared;
+            row.allTimeCleared += cleared;
+            if (aSite && row.siteStats) {
+              const cur = row.siteStats.get(aSite) || { charged: 0, cleared: 0 };
+              cur.cleared += cleared;
+              row.siteStats.set(aSite, cur);
+            }
+            const norm = normalizeDate((r as any).date);
+            if (norm) {
+              const yr = parseInt(norm.substring(0, 4), 10);
+              const minYr = Math.min(...selectedYears);
+              if (yr < minYr) row.bfwdCleared += cleared;
+            }
+          });
+          const totalHeaderCleared = ((r as any).amount || 0) + ((r as any).withholdingTax || 0) + ((r as any).discount || 0);
+          const remCleared = Math.max(0, totalHeaderCleared - allocatedCleared);
+          if (remCleared > 0.001) {
+            if (selectedSites.length === 0 || selectedSites.includes(paySite)) {
+              const row = ensure(client, paySite);
+              row.allTimeCleared += remCleared;
+              if (paySite && row.siteStats) {
+                const cur = row.siteStats.get(paySite) || { charged: 0, cleared: 0 };
+                cur.cleared += remCleared;
+                row.siteStats.set(paySite, cur);
+              }
+              const norm = normalizeDate((r as any).date);
+              if (norm) {
+                const yr = parseInt(norm.substring(0, 4), 10);
+                const minYr = Math.min(...selectedYears);
+                if (yr < minYr) row.bfwdCleared += remCleared;
+              }
+            }
+          }
+        } else {
+          if (selectedSites.length > 0 && !selectedSites.includes(paySite)) return;
+          const row = ensure(client, paySite);
+          const cleared = ((r as any).amount || 0) + ((r as any).withholdingTax || 0) + ((r as any).discount || 0);
+          row.allTimeCleared += cleared;
+          if (paySite && row.siteStats) {
+            const cur = row.siteStats.get(paySite) || { charged: 0, cleared: 0 };
+            cur.cleared += cleared;
+            row.siteStats.set(paySite, cur);
+          }
+          const norm = normalizeDate((r as any).date);
+          if (norm) {
+            const yr = parseInt(norm.substring(0, 4), 10);
+            const minYr = Math.min(...selectedYears);
+            if (yr < minYr) row.bfwdCleared += cleared;
+          }
         }
       });
     }
@@ -918,10 +1128,116 @@ export function AccountsReportBuilder({
       row.bfwd    = row.bfwdCharged - row.bfwdCleared;         // opening balance
       row.balance = row.allTimeCharged - row.allTimeCleared;   // true closing balance
       row.vatBal  = Math.max(0, row.vatOwedFromPayments - row.vatRemitted); // VAT balance
+
+      if (row.siteStats) {
+        row.siteStats.forEach((stats, sName) => {
+          const bal = stats.charged - stats.cleared;
+          if (bal >= 0.01) {
+            row.owingSiteSet?.add(sName);
+          }
+        });
+      }
     });
 
-    return Array.from(map.values()).sort((a, b) => a.client.localeCompare(b.client));
-  }, [recordsToPrint, isMultiSource, selectedClients, selectedSites, selectedYears, rawInvoices, rawPayments, sites, resolvePaymentVat, vatRate]); // eslint-disable-line
+    // Step 4: When grouped by Site, if a client has overpayment/credit (e.g. from discounts on cleared sites)
+    // AND has debtor site(s), apply that credit and discount to the debtor site(s) so that the discount
+    // reflects in the owing site and debtor views, keeping client and site totals fully consistent.
+    if (multiGroupBy === 'site') {
+      const clientRowsMap = new Map<string, AggRow[]>();
+      map.forEach(row => {
+        if (!clientRowsMap.has(row.client)) clientRowsMap.set(row.client, []);
+        clientRowsMap.get(row.client)!.push(row);
+      });
+
+      clientRowsMap.forEach(rows => {
+        const debtorRows = rows.filter(r => r.balance >= 0.01);
+        const creditRows = rows.filter(r => r.balance <= -0.01);
+        if (debtorRows.length > 0 && creditRows.length > 0) {
+          creditRows.forEach(credRow => {
+            let availableCredit = Math.abs(credRow.balance);
+            const discountPortion = Math.min(availableCredit, credRow.payDiscount);
+            let remCredit = availableCredit;
+            let remDisc = discountPortion;
+
+            for (const debRow of debtorRows) {
+              if (remCredit <= 0.001) break;
+              const applyAmt = Math.min(remCredit, debRow.balance);
+              const applyDisc = Math.min(remDisc, applyAmt);
+
+              debRow.allTimeCleared += applyAmt;
+              debRow.periodCleared += applyAmt;
+              debRow.payDiscount += applyDisc;
+              debRow.balance = Math.round((debRow.balance - applyAmt) * 100) / 100;
+
+              credRow.allTimeCleared -= applyAmt;
+              credRow.periodCleared -= applyAmt;
+              credRow.payDiscount -= applyDisc;
+              credRow.balance = Math.round((credRow.balance + applyAmt) * 100) / 100;
+              if (Math.abs(credRow.balance) <= 0.001) {
+                credRow.balance = 0;
+              }
+
+              remCredit -= applyAmt;
+              remDisc -= applyDisc;
+            }
+          });
+        }
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      const cmp = a.client.localeCompare(b.client);
+      if (cmp !== 0) return cmp;
+      return (a.site || '').localeCompare(b.site || '');
+    });
+  }, [recordsToPrint, isMultiSource, multiGroupBy, selectedClients, selectedSites, selectedYears, rawInvoices, rawPayments, sites, resolvePaymentVat, vatRate, resolveInvoiceSite, resolvePaymentSite, resolveAllocSite]); // eslint-disable-line
+
+  // ── Debtor / Status / Search filtering for Aggregated Rows ──
+  const debtorCounts = useMemo(() => {
+    let debtors = 0;
+    let cleared = 0;
+    let overpaid = 0;
+    aggregatedRows.forEach(r => {
+      if (r.balance >= 0.01) debtors++;
+      else if (Math.abs(r.balance) < 0.01) cleared++;
+      else if (r.balance <= -0.01) overpaid++;
+    });
+    return { all: aggregatedRows.length, debtors, cleared, overpaid };
+  }, [aggregatedRows]);
+
+  const displayedAggregatedRows = useMemo(() => {
+    return aggregatedRows.filter(row => {
+      // Debtor filter
+      if (debtorFilter === 'debtors' && row.balance < 0.01) return false;
+      if (debtorFilter === 'cleared' && Math.abs(row.balance) >= 0.01) return false;
+      if (debtorFilter === 'overpaid' && row.balance > -0.01) return false;
+
+      // Table search
+      if (tableSearch.trim()) {
+        const q = tableSearch.toLowerCase().trim();
+        const clientMatch = row.client.toLowerCase().includes(q);
+        const siteMatch = (row.site || '').toLowerCase().includes(q) ||
+          (row.owingSiteSet ? Array.from(row.owingSiteSet).some(s => s.toLowerCase().includes(q)) : false) ||
+          (row.siteSet ? Array.from(row.siteSet).some(s => s.toLowerCase().includes(q)) : false);
+        const tinMatch = (row.tin || '').toLowerCase().includes(q);
+        if (!clientMatch && !siteMatch && !tinMatch) return false;
+      }
+
+      return true;
+    });
+  }, [aggregatedRows, debtorFilter, tableSearch]);
+
+  const displayedRecordsToPrint = useMemo(() => {
+    if (!tableSearch.trim()) return recordsToPrint;
+    const q = tableSearch.toLowerCase().trim();
+    return recordsToPrint.filter(rec => {
+      const r = rec._raw;
+      const client = (r.client || r.surname || '').toLowerCase();
+      const site = (rec._source === 'INVOICE' ? resolveInvoiceSite(r) : rec._source === 'PAYMENT' ? resolvePaymentSite(r) : r.site || r.name || '').toLowerCase();
+      const desc = (r.description || r.invoiceNo || '').toLowerCase();
+      return client.includes(q) || site.includes(q) || desc.includes(q);
+    });
+  }, [recordsToPrint, tableSearch, resolveInvoiceSite, resolvePaymentSite]);
 
   // ── Column sets ──────────────────────────────────────────────────────────────
   const relevantCols = useMemo(() => {
@@ -935,7 +1251,7 @@ export function AccountsReportBuilder({
         if (['s_vat_owed','s_vat_bal'].includes(col.id)) {
           return selectedSources.includes('PAYMENT') && selectedSources.includes('VAT');
         }
-        if (['s_sn','s_client','s_tin'].includes(col.id)) return true;
+        if (['s_sn','s_client','s_site','s_tin'].includes(col.id)) return true;
         return col.sources.some(s => selectedSources.includes(s));
       });
     }
@@ -992,7 +1308,13 @@ export function AccountsReportBuilder({
     if (colId === 'client') return r.client || '—';
     if (colId === 'tin')    return getTin(r.client || '');
     if (colId === 'date')   return formatDisplayDate(r.date);
-    if (colId === 'site')   return src !== 'VAT' ? (r.siteName || r.site || '—') : '—';
+    if (colId === 'site') {
+      if (src === 'INVOICE') return resolveInvoiceSite(r) || '—';
+      if (src === 'PAYMENT') return resolvePaymentSite(r) || '—';
+      if (src === 'SITE') return r.name || r.site || '—';
+      if (src === 'LEDGER') return r.site || r.ledgerSite || '—';
+      return '—';
+    }
 
     const invOnly = ['project','dueDate','invoiceNo','billingCycle','duration','machines','rentalCost',
       'dieselPerLtr','dailyUsage','technicians','techDailyRate','mobDemob','installation','damages',
@@ -1161,12 +1483,28 @@ export function AccountsReportBuilder({
 
     return '—';
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getTin, resolvePaymentVat, sites, vatRemittanceMap]);
+  }, [getTin, resolvePaymentVat, sites, vatRemittanceMap, resolveInvoiceSite, resolvePaymentSite]);
 
   const getAggValue = useCallback((colId: string, row: AggRow, idx: number): string | number => {
     switch (colId) {
       case 's_sn':           return idx + 1;
       case 's_client':       return row.client;
+      case 's_site': {
+        if (multiGroupBy === 'site') {
+          return row.site || (row.siteSet && row.siteSet.size > 0 ? Array.from(row.siteSet).join(', ') : 'General');
+        }
+        // When grouped by client: show only the site(s) they are currently owing on
+        if (row.owingSiteSet && row.owingSiteSet.size > 0) {
+          return Array.from(row.owingSiteSet).sort().join(', ');
+        }
+        if (row.balance >= 0.01) {
+          if (row.siteSet && row.siteSet.size > 0) return Array.from(row.siteSet).sort().join(', ');
+        }
+        if (row.siteSet && row.siteSet.size > 0) {
+          return Array.from(row.siteSet).sort().join(', ');
+        }
+        return row.site || '—';
+      }
       case 's_tin':          return row.tin;
       case 's_inv_count':    return row.invCount;
       case 's_periodcharged':return row.periodCharged;
@@ -1188,23 +1526,23 @@ export function AccountsReportBuilder({
       case 's_balance':      return row.balance;
       default: return '—';
     }
-  }, []);
+  }, [multiGroupBy]);
 
   const getColTotal = useCallback((colId: string): number => {
     let rawSum = 0;
     if (isMultiSource) {
-      rawSum = aggregatedRows.reduce((sum, row, i) => {
+      rawSum = displayedAggregatedRows.reduce((sum, row, i) => {
         const v = getAggValue(colId, row, i);
         return sum + (typeof v === 'number' ? v : 0);
       }, 0);
     } else {
-      rawSum = recordsToPrint.reduce((sum, rec, i) => {
+      rawSum = displayedRecordsToPrint.reduce((sum, rec, i) => {
         const v = getTxnValue(colId, rec, i);
         return sum + (typeof v === 'number' ? v : 0);
       }, 0);
     }
     return Math.abs(rawSum) < 0.005 ? 0 : rawSum;
-  }, [isMultiSource, aggregatedRows, recordsToPrint, getAggValue, getTxnValue]);
+  }, [isMultiSource, displayedAggregatedRows, displayedRecordsToPrint, getAggValue, getTxnValue]);
 
   // isNumericCol is now a stable module-level function above the component
 
@@ -1234,6 +1572,11 @@ export function AccountsReportBuilder({
 
   const applyPreset = (p: ReportPreset) => {
     setSelectedSources(p.sources);
+    if (p.id === '__debtors') {
+      setDebtorFilter('debtors');
+    } else {
+      setDebtorFilter('all');
+    }
     setTimeout(() => setSelectedColumns(p.columns), 50);
     toast.success(`Applied: ${p.name}`);
   };
@@ -1255,7 +1598,7 @@ export function AccountsReportBuilder({
   };
 
   const promptExport = (mode: 'csv' | 'pdf') => {
-    const rowCount = isMultiSource ? aggregatedRows.length : recordsToPrint.length;
+    const rowCount = isMultiSource ? displayedAggregatedRows.length : displayedRecordsToPrint.length;
     if (rowCount === 0) { toast.error('No data to export.'); return; }
     
     if (selectedMonths.length > 1) {
@@ -1272,15 +1615,15 @@ export function AccountsReportBuilder({
 
   // ── Export CSV ───────────────────────────────────────────────────────────────
   const handleExportCSV = async (separateMonths: boolean = false) => {
-    const rowCount = isMultiSource ? aggregatedRows.length : recordsToPrint.length;
+    const rowCount = isMultiSource ? displayedAggregatedRows.length : displayedRecordsToPrint.length;
     if (rowCount === 0) { toast.error('No data to export.'); return; }
 
     const headers = orderedCols.map(c => c.label);
     const esc = (v: any) => typeof v === 'number' ? String(v) : `"${String(v ?? '').replace(/"/g, '""')}"`;
 
     const dataRows = isMultiSource
-      ? aggregatedRows.map((row, i) => orderedCols.map(c => getAggValue(c.id, row, i)))
-      : recordsToPrint.map((rec, i) => orderedCols.map(c => getTxnValue(c.id, rec, i)));
+      ? displayedAggregatedRows.map((row, i) => orderedCols.map(c => getAggValue(c.id, row, i)))
+      : displayedRecordsToPrint.map((rec, i) => orderedCols.map(c => getTxnValue(c.id, rec, i)));
     
     // Total row calculation (ignoring grouping for the overall total)
     const totalsRow = orderedCols.map(c => c.summable ? getColTotal(c.id) : (c.id === 'client' || c.id === 's_client' ? 'TOTAL' : ''));
@@ -1291,7 +1634,7 @@ export function AccountsReportBuilder({
       const rowsByMonth: Record<string, any[][]> = {};
       
       if (isMultiSource) {
-        aggregatedRows.forEach((row, i) => {
+        displayedAggregatedRows.forEach((row, i) => {
           const rowData = orderedCols.map(c => getAggValue(c.id, row, i));
           // In multi-source aggregated rows, there isn't a single month unless we look at the raw data,
           // but we aggregate across selected months. To do month-by-month for aggregated rows, we would need 
@@ -1303,7 +1646,7 @@ export function AccountsReportBuilder({
           rowsByMonth[m].push(rowData);
         });
       } else {
-        recordsToPrint.forEach((rec, i) => {
+        displayedRecordsToPrint.forEach((rec, i) => {
           const rowData = orderedCols.map(c => getTxnValue(c.id, rec, i));
           // Find date field
           const d = (rec as any).date || (rec as any).startDate;
@@ -1352,7 +1695,7 @@ export function AccountsReportBuilder({
   };
 
   const handleExportPDF = async (separateMonths: boolean = false) => {
-    const rowCount = isMultiSource ? aggregatedRows.length : recordsToPrint.length;
+    const rowCount = isMultiSource ? displayedAggregatedRows.length : displayedRecordsToPrint.length;
     if (rowCount === 0) { toast.error('No data to export.'); return; }
 
     const doc = new jsPDF('landscape');
@@ -1434,7 +1777,7 @@ export function AccountsReportBuilder({
 
     const reportTitleText = selectedSources.length === 1
       ? `${SOURCE_LABELS[selectedSources[0]]} Report`
-      : 'Combined Financial Report';
+      : (debtorFilter === 'debtors' ? 'Debtors Financial Report' : multiGroupBy === 'site' ? 'Combined Financial Report (By Site)' : 'Combined Financial Report');
 
     // Draw header on first page
     drawHeader(reportTitleText);
@@ -1444,11 +1787,11 @@ export function AccountsReportBuilder({
     const fm = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     
     const dataRows = isMultiSource
-      ? aggregatedRows.map((row, i) => orderedCols.map(c => {
+      ? displayedAggregatedRows.map((row, i) => orderedCols.map(c => {
           const val = getAggValue(c.id, row, i);
           return typeof val === 'number' && c.summable ? fm(val) : String(val);
         }))
-      : recordsToPrint.map((rec, i) => orderedCols.map(c => {
+      : displayedRecordsToPrint.map((rec, i) => orderedCols.map(c => {
           const val = getTxnValue(c.id, rec, i);
           return typeof val === 'number' && c.summable ? fm(val) : String(val);
         }));
@@ -2046,6 +2389,100 @@ export function AccountsReportBuilder({
                 {isMultiSource && (
                   <p className="text-[10px] text-slate-400 italic mt-1"><strong>B/F</strong> = balance before {Math.min(...selectedYears)}</p>
                 )}
+                {isMultiSource && (
+                  <div className="mt-3 p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex flex-col gap-2.5">
+                    <div>
+                      <h4 className="text-[11px] font-bold text-indigo-950 uppercase tracking-wide flex items-center gap-1">
+                        <Building2 className="h-3.5 w-3.5 text-indigo-600" />
+                        Report Grouping
+                      </h4>
+                      <p className="text-[10px] text-indigo-700">Choose aggregation level</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        onClick={() => setMultiGroupBy('client')}
+                        className={`px-2 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all ${
+                          multiGroupBy === 'client'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-indigo-200 hover:bg-indigo-100/50'
+                        }`}
+                      >
+                        By Client
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMultiGroupBy('site');
+                          if (!selectedColumns.includes('s_site')) {
+                            setSelectedColumns(prev => {
+                              const idx = prev.indexOf('s_client');
+                              if (idx !== -1) {
+                                const copy = [...prev];
+                                copy.splice(idx + 1, 0, 's_site');
+                                return copy;
+                              }
+                              return [...prev, 's_site'];
+                            });
+                          }
+                        }}
+                        className={`px-2 py-1.5 text-xs font-semibold rounded-lg border text-center transition-all ${
+                          multiGroupBy === 'site'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-indigo-200 hover:bg-indigo-100/50'
+                        }`}
+                      >
+                        By Site
+                      </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-indigo-200">
+                      <label className="text-[10px] font-bold text-indigo-950 uppercase tracking-wide block mb-1.5">
+                        Balance Status Filter
+                      </label>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          onClick={() => setDebtorFilter('all')}
+                          className={`px-2 py-1 text-[11px] rounded font-medium transition-all ${
+                            debtorFilter === 'all'
+                              ? 'bg-slate-800 text-white font-bold'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          All ({debtorCounts.all})
+                        </button>
+                        <button
+                          onClick={() => setDebtorFilter('debtors')}
+                          className={`px-2 py-1 text-[11px] rounded font-medium transition-all ${
+                            debtorFilter === 'debtors'
+                              ? 'bg-rose-600 text-white font-bold'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                          }`}
+                        >
+                          Debtors ({debtorCounts.debtors})
+                        </button>
+                        <button
+                          onClick={() => setDebtorFilter('cleared')}
+                          className={`px-2 py-1 text-[11px] rounded font-medium transition-all ${
+                            debtorFilter === 'cleared'
+                              ? 'bg-emerald-600 text-white font-bold'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          Cleared ({debtorCounts.cleared})
+                        </button>
+                        <button
+                          onClick={() => setDebtorFilter('overpaid')}
+                          className={`px-2 py-1 text-[11px] rounded font-medium transition-all ${
+                            debtorFilter === 'overpaid'
+                              ? 'bg-amber-600 text-white font-bold'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                          }`}
+                        >
+                          Overpaid ({debtorCounts.overpaid})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Months */}
@@ -2366,12 +2803,165 @@ export function AccountsReportBuilder({
                     {selectedSources.length > 1 && `${selectedSources.map(s => SOURCE_LABELS[s]).join(' + ')} · `}
                     {selectedYears.length === 1 ? selectedYears[0] : `${Math.min(...selectedYears)}–${Math.max(...selectedYears)}`} · {selectedMonths.length === 12 ? 'All Months' : (selectedMonths.length === 1 ? MONTHS.find(m => m.key === selectedMonths[0])?.label : `${selectedMonths.length} month(s)`)}
                     {selectedClients.length !== availableClients.length ? ` · ${selectedClients.length} ${selectedSources.includes('PAYROLL') ? 'employee(s)' : 'client(s)'}` : ''}
-                    {!selectedSources.includes('PAYROLL') && (isMultiSource ? ` · ${aggregatedRows.length} unique client(s)` : ` · ${recordsToPrint.length} record(s)`)}
+                    {!selectedSources.includes('PAYROLL') && (isMultiSource ? ` · ${displayedAggregatedRows.length} ${multiGroupBy === 'site' ? 'site(s)' : 'unique client(s)'}` : ` · ${displayedRecordsToPrint.length} record(s)`)}
+                    {isMultiSource && debtorFilter !== 'all' && (
+                      <span className="font-semibold text-rose-600"> · Filtered: {debtorFilter.toUpperCase()}</span>
+                    )}
                   </p>
                 </div>
                 <div className="text-left sm:text-right text-xs text-slate-400 print:hidden w-full sm:w-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0 mt-2 sm:mt-0">
                   <p>Generated: {new Date().toLocaleDateString()}</p>
                   {orderedCols.length > 0 && <p className="mt-0.5">{orderedCols.length} column(s)</p>}
+                </div>
+              </div>
+
+              {/* ── Flexibility & Filter Toolbar (Print Hidden) ── */}
+              <div className="print:hidden px-4 sm:px-8 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Grouping mode: Client vs Site (available when multi-source) */}
+                  {isMultiSource && (
+                    <div className="flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">Group:</span>
+                      <button
+                        onClick={() => setMultiGroupBy('client')}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                          multiGroupBy === 'client'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                        title="Consolidate totals per client"
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        By Client
+                      </button>
+                      <button
+                        onClick={() => {
+                          setMultiGroupBy('site');
+                          if (!selectedColumns.includes('s_site')) {
+                            setSelectedColumns(prev => {
+                              const idx = prev.indexOf('s_client');
+                              if (idx !== -1) {
+                                const copy = [...prev];
+                                copy.splice(idx + 1, 0, 's_site');
+                                return copy;
+                              }
+                              return [...prev, 's_site'];
+                            });
+                          }
+                        }}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                          multiGroupBy === 'site'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                        title="Break down totals by individual site"
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        By Site
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Debtor / Status Filters (multi-source mode) */}
+                  {isMultiSource && (
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shadow-xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">Status:</span>
+                      <button
+                        onClick={() => setDebtorFilter('all')}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          debtorFilter === 'all'
+                            ? 'bg-slate-800 text-white font-semibold'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        All ({debtorCounts.all})
+                      </button>
+                      <button
+                        onClick={() => setDebtorFilter('debtors')}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+                          debtorFilter === 'debtors'
+                            ? 'bg-rose-600 text-white font-semibold shadow-xs'
+                            : 'text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                        }`}
+                        title="Show only accounts with balance owing"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                        Debtors Only ({debtorCounts.debtors})
+                      </button>
+                      <button
+                        onClick={() => setDebtorFilter('cleared')}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          debtorFilter === 'cleared'
+                            ? 'bg-emerald-600 text-white font-semibold shadow-xs'
+                            : 'text-emerald-700 hover:bg-emerald-50'
+                        }`}
+                        title="Show accounts with zero balance"
+                      >
+                        Cleared ({debtorCounts.cleared})
+                      </button>
+                      <button
+                        onClick={() => setDebtorFilter('overpaid')}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                          debtorFilter === 'overpaid'
+                            ? 'bg-amber-600 text-white font-semibold shadow-xs'
+                            : 'text-amber-700 hover:bg-amber-50'
+                        }`}
+                        title="Show accounts with credit/overpayment"
+                      >
+                        Overpaid ({debtorCounts.overpaid})
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Quick toggle for Site Column */}
+                  {isMultiSource && (
+                    <button
+                      onClick={() => {
+                        if (selectedColumns.includes('s_site')) {
+                          setSelectedColumns(prev => prev.filter(c => c !== 's_site'));
+                        } else {
+                          setSelectedColumns(prev => {
+                            const idx = prev.indexOf('s_client');
+                            if (idx !== -1) {
+                              const copy = [...prev];
+                              copy.splice(idx + 1, 0, 's_site');
+                              return copy;
+                            }
+                            return [...prev, 's_site'];
+                          });
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all ${
+                        selectedColumns.includes('s_site')
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      title="Toggle the Site column in the report"
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                      {selectedColumns.includes('s_site') ? 'Site Column: On' : 'Site Column: Off'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Search filter */}
+                <div className="relative w-full sm:w-60">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    type="text"
+                    placeholder={isMultiSource ? "Search client or site…" : "Search records…"}
+                    value={tableSearch}
+                    onChange={e => setTableSearch(e.target.value)}
+                    className="pl-8 pr-7 h-7 text-xs bg-white border-slate-200 focus-visible:ring-indigo-500 rounded-lg"
+                  />
+                  {tableSearch && (
+                    <button
+                      onClick={() => setTableSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2384,12 +2974,14 @@ export function AccountsReportBuilder({
                     <p className="text-sm mt-1">Use the sidebar or click a preset above.</p>
                   </div>
                 </div>
-              ) : rowCount === 0 ? (
+              ) : (isMultiSource ? displayedAggregatedRows.length : displayedRecordsToPrint.length) === 0 ? (
                 <div className="flex items-center justify-center py-24 text-slate-400">
                   <div className="text-center">
                     <div className="text-5xl mb-4">🔍</div>
                     <p className="font-semibold text-slate-600">No records match your filters</p>
-                    <p className="text-sm mt-1">Adjust year, months, clients, or sources.</p>
+                    <p className="text-sm mt-1">
+                      {debtorFilter !== 'all' ? `No accounts match the "${debtorFilter}" filter.` : 'Adjust year, months, clients, or sources.'}
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -2407,19 +2999,18 @@ export function AccountsReportBuilder({
                     </thead>
                     <tbody>
                       {isMultiSource ? (
-                        aggregatedRows.map((row, rowIdx) => {
-                          const bal = row.balance;
-                          const isOwing = bal > 0;
+                        displayedAggregatedRows.map((row, rowIdx) => {
                           return (
-                            <tr key={rowIdx} className={`border-b border-slate-100 hover:bg-indigo-50/20 transition-colors ${rowIdx % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
+                            <tr key={row.key || rowIdx} className={`border-b border-slate-100 hover:bg-indigo-50/20 transition-colors ${rowIdx % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
                               {orderedCols.map(col => {
                                 const val = getAggValue(col.id, row, rowIdx);
                                 const isNum = typeof val === 'number';
                                 const isNeg = isNum && (val as number) < 0;
-                                const isPos = isNum && (val as number) > 0 && col.id === 's_balance';
+                                const isDebtorBal = isNum && col.id === 's_balance' && (val as number) >= 0.01;
+                                const isCreditBal = isNum && col.id === 's_balance' && (val as number) <= -0.01;
                                 return (
                                   <td key={col.id}
-                                    className={`px-3 py-2 text-xs border-r border-slate-100 ${isNum ? 'text-right tabular-nums font-medium' : 'text-left'} ${isNeg ? 'text-rose-600' : ''} ${isPos ? 'text-emerald-700 font-bold' : ''}`}>
+                                    className={`px-3 py-2 text-xs border-r border-slate-100 ${isNum ? 'text-right tabular-nums font-medium' : 'text-left'} ${isNeg ? 'text-rose-600' : ''} ${isDebtorBal ? 'text-rose-600 font-bold bg-rose-50/30' : ''} ${isCreditBal ? 'text-amber-600 font-semibold' : ''}`}>
                                     {isNum
                                       ? (['s_sn','s_inv_count','s_pay_count','s_vat_count'].includes(col.id)
                                           ? String(Math.round(val as number))
@@ -2432,7 +3023,7 @@ export function AccountsReportBuilder({
                           );
                         })
                       ) : (
-                        recordsToPrint.map((rec, rowIdx) => (
+                        displayedRecordsToPrint.map((rec, rowIdx) => (
                           <tr key={rowIdx} className={`border-b border-slate-100 hover:brightness-95 transition-colors ${rowIdx % 2 === 0 ? '' : 'bg-slate-50/60'} ${ROW_TINT[rec._source]}`}>
                             {orderedCols.map(col => {
                               const val = getTxnValue(col.id, rec, rowIdx);

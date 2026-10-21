@@ -228,7 +228,7 @@ function AppContent() {
           '/onboarding', '/leaves', '/salary-loans', '/hmo', '/evaluations', '/interviews',
           '/performance-conduct', '/operations', '/operations/assets', '/operations/waybills',
           '/operations/checkout', '/operations/maintenance', '/operations/vehicles', '/operations/sites',
-          '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/company-expenses',
+          '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/vendor-invoices',
           '/reports', '/financial-reports', '/tasks/reports', '/weekly-report', '/users',
           '/settings', '/activity-log', '/profile', '/operations/site-analytics', '/site-analytics',
           '/operations/site-requests'
@@ -267,13 +267,13 @@ function AppContent() {
             <Route path="organogram" element={<Page label="Organogram"><ProtectedRoute requiredModule="employees"><Organogram /></ProtectedRoute></Page>} />
             <Route path="sites" element={<Page label="Sites"><ProtectedRoute requiredModule="sites"><Sites /></ProtectedRoute></Page>} />
             <Route path="client-360" element={<Page label="Client 360"><ProtectedRoute requiredModule="sites"><Client360 /></ProtectedRoute></Page>} />
-            <Route path="clients/phonebook" element={<Page label="Phonebook"><ProtectedRoute requiredModule="sites"><Phonebook /></ProtectedRoute></Page>} />
+            <Route path="clients/phonebook" element={<Page label="Phonebook"><ProtectedRoute requiredModule={['phonebook', 'sites', 'clients']}><Phonebook /></ProtectedRoute></Page>} />
             <Route path="phonebook" element={<Navigate to="/clients/phonebook" replace />} />
             <Route path="sites/diary/:siteId" element={<Page label="Site Diary"><ProtectedRoute requiredModule="sites"><SiteDiary /></ProtectedRoute></Page>} />
             <Route path="sites/conversations/:siteId" element={<Page label="Site Conversations"><ProtectedRoute requiredModule="sites"><SiteConversations /></ProtectedRoute></Page>} />
             <Route path="sites/onboarding/:id" element={<Page label="Site Onboarding"><ProtectedRoute requiredModule="sites"><SiteOnboarding /></ProtectedRoute></Page>} />
             <Route path="payroll" element={<Page label="Payroll"><ProtectedRoute requiredModule="payroll"><Payroll /></ProtectedRoute></Page>} />
-            <Route path="client-accounts" element={<Page label="Client Accounts"><ProtectedRoute requiredModule="sites"><ClientAccounts /></ProtectedRoute></Page>} />
+            <Route path="client-accounts" element={<Page label="Client Accounts"><ProtectedRoute requiredModule={['billing', 'payments', 'sites']}><ClientAccounts /></ProtectedRoute></Page>} />
             <Route path="invoices" element={<Navigate to="/client-accounts" replace />} />
             <Route path="payments" element={<Navigate to="/client-accounts" replace />} />
             <Route path="vat" element={<Navigate to="/client-accounts" replace />} />
@@ -335,8 +335,8 @@ function AppContent() {
 
         {/* ── Shared Routes (Available in Web Build) ─────────────────────────── */}
         <Route path="profile" element={<Page label="Profile"><ProtectedRoute><Profile /></ProtectedRoute></Page>} />
-        <Route path="company-expenses" element={<Page label="Vendor Invoices"><ProtectedRoute requiredModule="ledger"><VendorInvoices /></ProtectedRoute></Page>} />
-        <Route path="vendor-invoices" element={<Page label="Vendor Invoices"><ProtectedRoute requiredModule="ledger"><VendorInvoices /></ProtectedRoute></Page>} />
+        <Route path="company-expenses" element={<Navigate to="/vendor-invoices" replace />} />
+        <Route path="vendor-invoices" element={<Page label="Vendor Invoices"><ProtectedRoute requiredModule={['vendorInvoices', 'ledger']}><VendorInvoices /></ProtectedRoute></Page>} />
         
         <Route path="tasks" element={<Page label="Task Register"><ProtectedRoute requiredModule="tasks"><Tasks /></ProtectedRoute></Page>} />
         <Route path="tasks/dashboard" element={<Page label="Task Dashboard"><ProtectedRoute requiredModule="tasks"><TaskDashboard /></ProtectedRoute></Page>} />

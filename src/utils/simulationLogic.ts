@@ -103,6 +103,10 @@ export interface PlacedComponent {
   rotation?: number; // Optional rotation in degrees for directional assets
   levelId?: string; // Links this component to a specific elevation level
   layerId?: string;
+  flowRate?: number; // Pump flow rate / capacity in m³/h (defaults to 150)
+  flipped?: boolean; // Flip suction & discharge orientation (suction on right, discharge on left)
+  label?: string; // Custom asset label / identifier
+  locked?: boolean;
 }
 
 export interface DewateringSimulationResult {
@@ -121,6 +125,7 @@ export interface DewateringSimulationResult {
   suctionHoses: number;
   dischargeHoseMeters: number;
   totalLengthMeters: number;
+  totalPumpCapacity: number; // Total dewatering capacity in m³/h
 }
 
 export const DEFAULT_HEADER_LENGTH_METERS = 6; 
@@ -246,6 +251,12 @@ export function calculateBOM(
     ? Math.round(drawnDischargeLengthMeters * 10) / 10 
     : (pumps * 30);
 
+  // Total dewatering pump flow capacity (m³/h)
+  const manualPumpsList = placedComponents.filter(c => c.type === 'pump');
+  const totalPumpCapacity = manualPumpsList.length > 0
+    ? manualPumpsList.reduce((sum, p) => sum + (p.flowRate || 150), 0)
+    : (pumps * 150);
+
   return {
     headers: totalHeaders,
     headers6m,
@@ -261,6 +272,7 @@ export function calculateBOM(
     couplings,
     suctionHoses,
     dischargeHoseMeters,
-    totalLengthMeters
+    totalLengthMeters,
+    totalPumpCapacity
   };
 }

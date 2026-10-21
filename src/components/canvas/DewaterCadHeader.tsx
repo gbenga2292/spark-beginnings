@@ -3,10 +3,10 @@ import {
   FileText, Edit3, Eye, Wrench, Download, Share2, Save,
   FilePlus, FolderOpen, Upload, Trash2, Undo2, Redo2,
   ZoomIn, ZoomOut, Maximize2, Grid3x3, Layout, Calculator,
-  ChevronDown, Box, Pencil, X, Loader2, Settings
+  ChevronDown, Box, Pencil, X, Loader2, Settings, Ruler, HardDrive, Check, Sparkles, Layers
 } from 'lucide-react';
 
-export type ViewMode = '2d' | '3d' | 'calc';
+export type ViewMode = '2d' | '3d' | 'section' | 'calc';
 
 interface DewaterCadHeaderProps {
   currentLayoutName: string;
@@ -39,6 +39,10 @@ interface DewaterCadHeaderProps {
   isSaving: boolean;
   isDirty: boolean;
   hasLayout: boolean;
+  hasBlueprint?: boolean;
+  onStartReferenceScale?: () => void;
+  onOpenAiAssistant?: () => void;
+  lastAutoSavedAt?: string | null;
 }
 
 interface DropdownItem {
@@ -82,6 +86,9 @@ export function DewaterCadHeader({
   showBOQ, onToggleBOQ,
   boqResults, onClearBOQ,
   isSaving, isDirty, hasLayout,
+  hasBlueprint, onStartReferenceScale,
+  onOpenAiAssistant,
+  lastAutoSavedAt,
 }: DewaterCadHeaderProps) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const isBoqOpen = openMenu === 'boq';
@@ -157,7 +164,8 @@ export function DewaterCadHeader({
     { label: 'Save', icon: <Save size={12} />, onClick: onSave, shortcut: 'Ctrl+S', divider: true },
     { label: 'Save / Update', icon: <Save size={12} />, onClick: onUpdate, disabled: !hasLayout },
     { label: 'Import Blueprint', icon: <Upload size={12} />, onClick: onUploadBlueprint, divider: true },
-    { label: 'Export Sheet (PDF)', icon: <Download size={12} />, onClick: onExport },
+    ...(hasBlueprint ? [{ label: 'Calibrate Blueprint Scale', icon: <Ruler size={12} />, onClick: () => { if (onStartReferenceScale) onStartReferenceScale(); } }] : []),
+    { label: 'Export Sheet (PDF)', icon: <Download size={12} />, onClick: onExport, divider: hasBlueprint },
   ];
 
   const editItems: DropdownItem[] = [
@@ -177,8 +185,11 @@ export function DewaterCadHeader({
 
   const toolsItems: DropdownItem[] = [
     { label: 'Switch to 3D View', icon: <Box size={12} />, onClick: () => onViewModeChange('3d') },
+    { label: 'Switch to Section View', icon: <Layers size={12} />, onClick: () => onViewModeChange('section') },
     { label: 'Switch to 2D Draft', icon: <Pencil size={12} />, onClick: () => onViewModeChange('2d') },
-    { label: 'Open Calculator', icon: <Calculator size={12} />, onClick: () => onViewModeChange('calc') },
+    { label: 'Open Calculator', icon: <Calculator size={12} />, onClick: () => onViewModeChange('calc'), divider: true },
+    { label: 'Calibrate Blueprint Scale', icon: <Ruler size={12} />, onClick: () => { if (onStartReferenceScale) onStartReferenceScale(); }, disabled: !hasBlueprint },
+    ...(onOpenAiAssistant ? [{ label: 'AI Dewatering Assistant...', icon: <Sparkles size={12} />, onClick: onOpenAiAssistant }] : []),
   ];
 
   const menus = [
@@ -224,8 +235,30 @@ export function DewaterCadHeader({
         ))}
       </div>
 
-      {/* Active File Pill */}
-      <div className="flex-1 flex justify-center">
+      {/* Quick Undo / Redo Toolbar */}
+      <div className="flex items-center gap-0.5 ml-1 pl-1.5 border-l border-gray-200">
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="Undo (Ctrl+Z)"
+          className="flex items-center justify-center p-1 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Undo2 size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="Redo (Ctrl+Y)"
+          className="flex items-center justify-center p-1 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+        >
+          <Redo2 size={13} />
+        </button>
+      </div>
+
+      {/* Active File Pill & Auto-Save Badge */}
+      <div className="flex-1 flex items-center justify-center gap-2">
         {editingName ? (
           <input
             ref={nameInputRef}
@@ -255,6 +288,17 @@ export function DewaterCadHeader({
             <Edit3 size={9} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
           </button>
         )}
+
+        {/* Local Auto-Saved Offline Badge */}
+        {lastAutoSavedAt && (
+          <div
+            title={`Saved locally in offline storage at ${new Date(lastAutoSavedAt).toLocaleTimeString()}`}
+            className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[9.5px] font-medium text-emerald-700"
+          >
+            <HardDrive size={10} className="text-emerald-600 flex-shrink-0" />
+            <span>Saved locally</span>
+          </div>
+        )}
       </div>
 
       {/* Segmented View Switcher */}
@@ -262,6 +306,7 @@ export function DewaterCadHeader({
         {([
           { mode: '2d' as ViewMode, label: '2D Draft', icon: <Pencil size={10} /> },
           { mode: '3d' as ViewMode, label: '3D Iso', icon: <Box size={10} /> },
+          { mode: 'section' as ViewMode, label: 'Section', icon: <Layers size={10} /> },
           { mode: 'calc' as ViewMode, label: 'Calc', icon: <Calculator size={10} /> },
         ] as const).map(({ mode, label, icon }) => (
           <button
@@ -278,6 +323,19 @@ export function DewaterCadHeader({
           </button>
         ))}
       </div>
+
+      {/* AI Dewatering Assistant Header Button */}
+      {onOpenAiAssistant && (
+        <button
+          type="button"
+          onClick={onOpenAiAssistant}
+          title="AI Dewatering Assistant: Auto-design system from blueprint"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all cursor-pointer bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white shadow-xs mr-2"
+        >
+          <Sparkles size={11} className="text-sky-200 animate-pulse" />
+          <span>AI Assistant</span>
+        </button>
+      )}
 
       {/* BOQ Quantities Dropdown in Title Bar */}
       <div className="relative mr-2" ref={boqDropdownRef}>

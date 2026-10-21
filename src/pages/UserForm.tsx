@@ -75,6 +75,14 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canViewCommsTab', label: 'Comms Tab' },
           { key: 'canViewContactsTab', label: 'Contacts Tab' },
         ] },
+      { key: 'phonebook', label: 'Phonebook Directory', parentKey: 'phonebook', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Phonebook' },
+          { key: 'canAdd', label: 'Add Contact' },
+          { key: 'canEdit', label: 'Edit Contact' },
+          { key: 'canDelete', label: 'Delete Contact', danger: true },
+          { key: 'canExport', label: 'Export Contacts' },
+        ] },
     ]
   },
   {
@@ -85,6 +93,7 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canView', label: 'Master View Tasks' },
           { key: 'canViewMyTasks', label: 'Task Register' },
           { key: 'canViewReminders', label: 'Reminders' },
+          { key: 'canViewArchive', label: 'Task Archive' },
           { key: 'canCreateTasks', label: 'Create Tasks' },
           { key: 'canEditTasks', label: 'Edit Tasks' },
           { key: 'canDeleteTasks', label: 'Delete Tasks', danger: true },
@@ -250,6 +259,16 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canDelete', label: 'Delete Drafts', danger: true }
         ]
       },
+      { key: 'vendorInvoices', label: 'Vendor Invoices', parentKey: 'vendorInvoices', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Invoices' },
+          { key: 'canAdd', label: 'Add / Upload Invoice' },
+          { key: 'canEdit', label: 'Edit Invoice' },
+          { key: 'canDelete', label: 'Delete Invoice', danger: true },
+          { key: 'canRecordPayment', label: 'Record Payments / Disbursements', special: true },
+          { key: 'canDirectApprove', label: 'Direct Approve Invoices', special: true },
+        ]
+      },
       { key: 'payments', label: 'Payments & VAT (Legacy)', parentKey: 'payments', masterField: 'canView',
         fields: [{ key: 'canView', label: 'View' }, { key: 'canAdd', label: 'Add' }, { key: 'canEdit', label: 'Edit' }, { key: 'canDelete', label: 'Delete', danger: true }, { key: 'canViewAmounts', label: 'View Amounts', special: true }, { key: 'canViewVat', label: 'View VAT Tab' }, { key: 'canManageVat', label: 'Manage VAT' }, { key: 'canImport', label: 'Import' }, { key: 'canExport', label: 'Export' }] },
       { key: 'budget', label: 'Budget', parentKey: 'budget', masterField: 'canView',
@@ -383,6 +402,29 @@ export function UserForm() {
     (Object.keys(base) as (keyof UserPrivileges)[]).forEach((k) => {
       base[k] = { ...base[k], ...(editingUser.privileges[k] ?? {}) } as any;
     });
+
+    // Smart prefill for newly decoupled modules if editing an existing user
+    if (!editingUser.privileges?.vendorInvoices && editingUser.privileges?.ledger) {
+      base.vendorInvoices = {
+        canView: !!editingUser.privileges.ledger.canView,
+        canAdd: !!editingUser.privileges.ledger.canAdd,
+        canEdit: !!editingUser.privileges.ledger.canEdit,
+        canDelete: !!editingUser.privileges.ledger.canDelete,
+        canRecordPayment: !!editingUser.privileges.ledger.canAdd,
+        canDirectApprove: !!editingUser.privileges.ledger.canDirectApprove,
+      };
+    }
+    if (!editingUser.privileges?.phonebook && (editingUser.privileges?.sites || editingUser.privileges?.clients)) {
+      const s = editingUser.privileges.sites || editingUser.privileges.clients;
+      base.phonebook = {
+        canView: !!s?.canView,
+        canAdd: !!(s as any)?.canAdd || !!(s as any)?.canAddClient,
+        canEdit: !!(s as any)?.canEdit || !!(s as any)?.canEditClient,
+        canDelete: !!(s as any)?.canDelete || !!(s as any)?.canDeleteClient,
+        canExport: !!(s as any)?.canExport,
+      };
+    }
+
     return base;
   });
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Tasks', 'HR']));

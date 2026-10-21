@@ -16,10 +16,13 @@ import {
   Eye,
 } from 'lucide-react';
 import { DewateringSimulationResult } from '../../utils/simulationLogic';
+import { DewateringSectionView } from './DewateringSectionView';
+import { DewateringInput, DewateringCalculationResult, DEFAULT_DEWATERING_INPUT } from '../../utils/dewateringCalculator';
 
 export interface ExportOptions {
-  layoutFormat: 'combined' | 'pure-2d' | 'pure-3d';
+  layoutFormat: 'combined' | 'multi-view' | 'plan-section' | 'pure-section' | 'pure-2d' | 'pure-3d';
   includeSitePlan: boolean;
+  includeSectionView: boolean;
   include3DView: boolean;
   includeBOM: boolean;
   includeLegend: boolean;
@@ -126,6 +129,8 @@ interface DrawingSheetPreviewProps {
   activeLegendItems?: string[];
   sheetDetails?: SheetDetails;
   onWidthsChange?: (widths: { logoWidth?: number; companyWidth?: number; metaWidth?: number }) => void;
+  calculatorInputs?: DewateringInput | null;
+  calculationResult?: DewateringCalculationResult | null;
 }
 
 interface LegendDef {
@@ -558,11 +563,11 @@ const CombinedSheet: React.FC<DrawingSheetPreviewProps> = ({
       <div className="flex-1 flex border-b-0 min-h-0">
         {/* Site Plan */}
         {sitePlanDataUrl && (
-          <div className={`${hasRightColumn ? 'flex-[3] border-r-[2px] border-black' : 'flex-1'} relative flex flex-col bg-slate-50 overflow-hidden`}>
+          <div className={`${hasRightColumn ? 'flex-[3] border-r-[2px] border-black' : 'flex-1'} relative flex flex-col bg-white overflow-hidden items-center justify-center`}>
             <div className="absolute top-1.5 left-2 z-10 bg-white/80 backdrop-blur-sm px-1.5 py-0.5 border border-gray-300 rounded-sm">
               <span className="text-[9px] font-bold uppercase tracking-widest text-gray-700">Site Plan — Plan View</span>
             </div>
-            <img src={sitePlanDataUrl} alt="Site Plan" className="w-full h-full object-contain p-2" />
+            <img src={sitePlanDataUrl} alt="Site Plan" className="w-full h-full object-contain p-1" />
           </div>
         )}
 
@@ -794,6 +799,302 @@ const Pure3DSheet: React.FC<DrawingSheetPreviewProps> = ({
 };
 
 /* ─────────────────────────────────────────────────────────────
+   SHEET A-103: Multi-View Master (Plan + Section + 3D + BOM + Legend)
+───────────────────────────────────────────────────────── */
+const MultiViewSheet: React.FC<DrawingSheetPreviewProps> = ({
+  companyInfo,
+  logoSrc,
+  layoutName,
+  sitePlanDataUrl,
+  perspectiveDataUrl,
+  bomResults,
+  dateStr,
+  exportOptions,
+  activeLegendItems,
+  sheetDetails,
+  onWidthsChange,
+  calculatorInputs,
+  calculationResult,
+}) => {
+  const showBOM = exportOptions.includeBOM !== false;
+  const showLegend = exportOptions.includeLegend !== false;
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
+  const showSection = exportOptions.includeSectionView !== false;
+
+  const effectiveInputs = calculatorInputs || DEFAULT_DEWATERING_INPUT;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-white">
+      {/* Drawing Grid: Left Column (Plan + Section) | Right Column (3D + BOM + Legend) */}
+      <div className="flex-1 flex border-b-0 min-h-0">
+        {/* Left Side: 2D Plan View + Section Profile stacked */}
+        <div className="flex-[3] flex flex-col divide-y-[2px] divide-black border-r-[2px] border-black min-w-0">
+          {/* Upper: 2D Plan View */}
+          <div className="flex-1 relative bg-white flex flex-col items-center justify-center overflow-hidden min-h-0">
+            <div className="absolute top-1.5 left-2 z-10 bg-white/90 backdrop-blur-sm px-2 py-0.5 border border-gray-300 rounded-sm">
+              <span className="text-[8.5px] font-black uppercase tracking-wider text-gray-800">
+                1. Plan View — Dewatering Wellpoint Grid
+              </span>
+            </div>
+            {sitePlanDataUrl ? (
+              <img src={sitePlanDataUrl} alt="Site Plan" className="w-full h-full object-contain p-0.5" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                No 2D Plan Available
+              </div>
+            )}
+          </div>
+
+          {/* Lower: Hydraulic Section Profile */}
+          {showSection && (
+            <div className="flex-1 relative bg-white flex flex-col overflow-hidden min-h-0">
+              <div className="absolute top-1.5 left-2 z-10 bg-white/90 backdrop-blur-sm px-2 py-0.5 border border-gray-300 rounded-sm">
+                <span className="text-[8.5px] font-black uppercase tracking-wider text-gray-800">
+                  2. Section Profile — Formation Level & Drawdown Cone
+                </span>
+              </div>
+              <div className="w-full h-full p-1 flex items-center justify-center overflow-hidden">
+                <DewateringSectionView
+                  inputs={effectiveInputs}
+                  result={calculationResult}
+                  theme="print"
+                  hideControls={true}
+                  readOnly={true}
+                  className="scale-90 origin-center"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side: 3D Perspective + BOM + Legend */}
+        <div className="flex-1 flex flex-col divide-y-[2px] divide-black min-w-0 bg-white">
+          {perspectiveDataUrl && exportOptions.include3DView !== false ? (
+            <div className="flex-[2] relative bg-slate-900 flex flex-col overflow-hidden min-h-0">
+              <div className="absolute top-1.5 left-2 z-10 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded-sm">
+                <span className="text-[8px] font-bold uppercase tracking-widest text-white/90">3. 3D Isometric View</span>
+              </div>
+              <img src={perspectiveDataUrl} alt="3D View" className="w-full h-full object-cover" />
+            </div>
+          ) : null}
+
+          {showBOM && (
+            <div className="flex-[2] p-1.5 overflow-auto">
+              <BOMTable bomResults={bomResults} compact />
+            </div>
+          )}
+
+          {showLegend && (
+            <div className="flex-[2] p-1.5 overflow-auto">
+              <LegendPanel compact activeLegendItems={activeLegendItems} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ISO Title Block */}
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={layoutName}
+          dateStr={dateStr}
+          sheetNo="A-103"
+          drawingType="Multi-View Master: Plan + Section Profile + 3D Isometric"
+          scale="NTS"
+          sheetDetails={sheetDetails}
+          onWidthsChange={onWidthsChange}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────
+   SHEET A-104: Plan + Section Profile Sheet
+───────────────────────────────────────────────────────── */
+const PlanSectionSheet: React.FC<DrawingSheetPreviewProps> = ({
+  companyInfo,
+  logoSrc,
+  layoutName,
+  sitePlanDataUrl,
+  bomResults,
+  dateStr,
+  exportOptions,
+  activeLegendItems,
+  sheetDetails,
+  onWidthsChange,
+  calculatorInputs,
+  calculationResult,
+}) => {
+  const showBOM = exportOptions.includeBOM !== false;
+  const showLegend = exportOptions.includeLegend !== false;
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
+
+  const effectiveInputs = calculatorInputs || DEFAULT_DEWATERING_INPUT;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-white">
+      {/* Drawing Area: Left Plan + Section | Right BOM + Legend */}
+      <div className="flex-1 flex border-b-0 min-h-0">
+        <div className="flex-[3] flex flex-col divide-y-[2px] divide-black border-r-[2px] border-black min-w-0">
+          {/* Plan View */}
+          <div className="flex-1 relative bg-white flex flex-col items-center justify-center overflow-hidden min-h-0">
+            <div className="absolute top-1.5 left-2 z-10 bg-white/90 backdrop-blur-sm px-2 py-0.5 border border-gray-300 rounded-sm">
+              <span className="text-[9px] font-black uppercase tracking-wider text-gray-800">
+                Site Plan — 2D Wellpoint Grid Layout
+              </span>
+            </div>
+            {sitePlanDataUrl ? (
+              <img src={sitePlanDataUrl} alt="Site Plan" className="w-full h-full object-contain p-0.5" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                No Plan Available
+              </div>
+            )}
+          </div>
+
+          {/* Section Profile */}
+          <div className="flex-1 relative bg-white flex flex-col overflow-hidden min-h-0">
+            <div className="absolute top-1.5 left-2 z-10 bg-white/90 backdrop-blur-sm px-2 py-0.5 border border-gray-300 rounded-sm">
+              <span className="text-[9px] font-black uppercase tracking-wider text-gray-800">
+                Hydraulic Section Profile — Drawdown Cone & Filter Tips
+              </span>
+            </div>
+            <div className="w-full h-full p-1.5 flex items-center justify-center overflow-hidden">
+              <DewateringSectionView
+                inputs={effectiveInputs}
+                result={calculationResult}
+                theme="print"
+                hideControls={true}
+                readOnly={true}
+                className="scale-95 origin-center"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar: BOM & Legend */}
+        <div className="flex-1 flex flex-col divide-y-[2px] divide-black min-w-0 bg-white">
+          {showBOM && (
+            <div className="flex-1 p-2 overflow-auto">
+              <BOMTable bomResults={bomResults} compact />
+            </div>
+          )}
+          {showLegend && (
+            <div className="flex-1 p-2 overflow-auto">
+              <LegendPanel compact activeLegendItems={activeLegendItems} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Title Block */}
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={layoutName}
+          dateStr={dateStr}
+          sheetNo="A-104"
+          drawingType="Construction Drawings: Site Plan & Cross-Section Profile"
+          scale="NTS"
+          sheetDetails={sheetDetails}
+          onWidthsChange={onWidthsChange}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────
+   SHEET A-105: Cross-Section Blueprint (Full Width Section Profile)
+───────────────────────────────────────────────────────── */
+const PureSectionSheet: React.FC<DrawingSheetPreviewProps> = ({
+  companyInfo,
+  logoSrc,
+  layoutName,
+  bomResults,
+  dateStr,
+  exportOptions,
+  activeLegendItems,
+  sheetDetails,
+  onWidthsChange,
+  calculatorInputs,
+  calculationResult,
+}) => {
+  const showBOM = exportOptions.includeBOM !== false;
+  const showLegend = exportOptions.includeLegend !== false;
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
+
+  const effectiveInputs = calculatorInputs || DEFAULT_DEWATERING_INPUT;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-white">
+      {/* Drawing area */}
+      <div className="flex-1 flex border-b-0 min-h-0 relative">
+        <div className="flex-1 relative flex flex-col bg-white overflow-hidden">
+          {/* Blueprint header info */}
+          <div className="absolute top-2 left-3 z-10 flex flex-col gap-1">
+            <div className="bg-white/90 border border-gray-300 px-2 py-0.5 inline-block">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-800">
+                Section Profile — Dewatering Hydraulic Cross-Section
+              </span>
+            </div>
+            <div className="bg-white/90 border border-gray-200 px-2 py-0.5 inline-block">
+              <span className="text-[8px] text-gray-500 font-mono">
+                FORMATION LEVEL: -{effectiveInputs.excavationDepth.toFixed(2)}m · STATIC WT: -{effectiveInputs.waterTableDepth.toFixed(2)}m · ALL DIM IN METRES
+              </span>
+            </div>
+          </div>
+
+          {/* Section View */}
+          <div className="w-full h-full p-4 flex items-center justify-center overflow-hidden">
+            <DewateringSectionView
+              inputs={effectiveInputs}
+              result={calculationResult}
+              theme="print"
+              hideControls={true}
+              readOnly={true}
+              className="w-full h-full"
+            />
+          </div>
+
+          {/* Floating BOM and Legend */}
+          {(showBOM || showLegend) && (
+            <div className="absolute bottom-2 right-3 z-10 flex flex-col gap-2 max-h-[85%] overflow-hidden">
+              {showBOM && (
+                <div className="bg-white/95 backdrop-blur-sm border border-gray-400 p-2 shadow-md rounded-sm overflow-auto max-w-[200px]">
+                  <BOMTable bomResults={bomResults} compact />
+                </div>
+              )}
+              {showLegend && (
+                <LegendPanel compact activeLegendItems={activeLegendItems} />
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Title Block */}
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={layoutName}
+          dateStr={dateStr}
+          sheetNo="A-105"
+          drawingType="Civil Cross-Section: Aquifer Drawdown & Wellpoint Profile"
+          scale="NTS"
+          sheetDetails={sheetDetails}
+          onWidthsChange={onWidthsChange}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────
    Root Component
 ───────────────────────────────────────────────────────── */
 export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) => {
@@ -901,7 +1202,12 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
     regNumber: props.companyInfo?.regNumber || 'RC-141299',
     layoutName: props.layoutName || 'Dewatering System Layout',
     dateStr: props.dateStr || new Date().toLocaleDateString(),
-    sheetNo: layoutFormat === 'combined' ? 'A-100' : layoutFormat === 'pure-2d' ? 'A-101' : 'A-102',
+    sheetNo: layoutFormat === 'combined' ? 'A-100'
+      : layoutFormat === 'pure-2d' ? 'A-101'
+      : layoutFormat === 'pure-3d' ? 'A-102'
+      : layoutFormat === 'multi-view' ? 'A-103'
+      : layoutFormat === 'plan-section' ? 'A-104'
+      : 'A-105',
     scale: 'NTS',
     revNo: '00',
     marginSize: '3mm',
@@ -910,7 +1216,10 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
   const sheetLabel =
     layoutFormat === 'combined' ? 'A-100 — Combined Sheet'
     : layoutFormat === 'pure-2d' ? 'A-101 — 2D Floor Plan'
-    : 'A-102 — 3D Perspective';
+    : layoutFormat === 'pure-3d' ? 'A-102 — 3D Perspective'
+    : layoutFormat === 'multi-view' ? 'A-103 — Multi-View (Plan + Section + 3D)'
+    : layoutFormat === 'plan-section' ? 'A-104 — Plan + Section Profile'
+    : 'A-105 — Cross-Section Blueprint';
 
   const handlePrint = () => window.print();
 
@@ -947,7 +1256,34 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
     <div className="fixed inset-0 z-[100] bg-gray-600/95 overflow-auto print:bg-white print:overflow-visible flex flex-col items-center justify-center p-6 print:p-0 print-area-modal">
       {/* Non-print interactive toolbar */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 flex items-center gap-2.5 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl px-4 py-2 border border-gray-200 print:hidden z-[120] max-w-[98vw]">
-        <div className="text-xs font-bold text-gray-700 uppercase tracking-widest whitespace-nowrap">{sheetLabel}</div>
+        {/* Layout Format Selector */}
+        <select
+          value={layoutFormat}
+          onChange={(e) => {
+            const nextFmt = e.target.value as ExportOptions['layoutFormat'];
+            if (onExportOptionsChange) {
+              onExportOptionsChange({ ...exportOptions, layoutFormat: nextFmt });
+            }
+            setSheetDetails(prev => ({
+              ...prev,
+              sheetNo: nextFmt === 'combined' ? 'A-100'
+                : nextFmt === 'pure-2d' ? 'A-101'
+                : nextFmt === 'pure-3d' ? 'A-102'
+                : nextFmt === 'multi-view' ? 'A-103'
+                : nextFmt === 'plan-section' ? 'A-104'
+                : 'A-105'
+            }));
+          }}
+          className="bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-sm"
+        >
+          <option value="multi-view">A-103: Multi-View (Plan + Section + 3D)</option>
+          <option value="plan-section">A-104: Plan + Section Profile</option>
+          <option value="pure-section">A-105: Cross-Section Blueprint</option>
+          <option value="combined">A-100: Combined Sheet</option>
+          <option value="pure-2d">A-101: 2D Floor Plan</option>
+          <option value="pure-3d">A-102: 3D Perspective</option>
+        </select>
+
         <div className="w-px h-5 bg-gray-300" />
         
         {/* View Options Dropdown */}
@@ -957,11 +1293,11 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-md transition-colors whitespace-nowrap"
             title="Toggle Sheet View Options"
           >
-            <Eye size={13} className="text-indigo-600" /> View Options
+            <Eye size={13} className="text-blue-600" /> View Options
           </button>
 
           {showDisplayOptions && (
-            <div className="absolute top-full mt-2.5 left-0 w-52 bg-white rounded-xl shadow-2xl border border-gray-200 p-2.5 z-[150] text-xs space-y-1">
+            <div className="absolute top-full mt-2.5 left-0 w-56 bg-white rounded-xl shadow-2xl border border-gray-200 p-2.5 z-[150] text-xs space-y-1">
               <div className="font-bold text-[10px] uppercase text-gray-500 px-1 pb-1 flex items-center justify-between border-b mb-1">
                 <span>Sheet Elements</span>
                 <button onClick={() => setShowDisplayOptions(false)} className="text-gray-400 hover:text-gray-600">
@@ -969,33 +1305,43 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
                 </button>
               </div>
 
-              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-indigo-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
+              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-blue-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
+                <span>Section Profile</span>
+                <input
+                  type="checkbox"
+                  checked={exportOptions.includeSectionView !== false}
+                  onChange={() => toggleOption('includeSectionView')}
+                  className="rounded text-blue-600 focus:ring-blue-500"
+                />
+              </label>
+
+              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-blue-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
                 <span>BOM Table</span>
                 <input
                   type="checkbox"
                   checked={exportOptions.includeBOM !== false}
                   onChange={() => toggleOption('includeBOM')}
-                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-blue-600 focus:ring-blue-500"
                 />
               </label>
 
-              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-indigo-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
+              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-blue-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
                 <span>Legend Panel</span>
                 <input
                   type="checkbox"
                   checked={exportOptions.includeLegend !== false}
                   onChange={() => toggleOption('includeLegend')}
-                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-blue-600 focus:ring-blue-500"
                 />
               </label>
 
-              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-indigo-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
+              <label className="flex items-center justify-between px-2 py-1 rounded hover:bg-blue-50 cursor-pointer text-xs font-medium text-gray-700 select-none">
                 <span>ISO Title Block</span>
                 <input
                   type="checkbox"
                   checked={exportOptions.includeTitleBlock !== false}
                   onChange={() => toggleOption('includeTitleBlock')}
-                  className="rounded text-indigo-600 focus:ring-indigo-500"
+                  className="rounded text-blue-600 focus:ring-blue-500"
                 />
               </label>
 
@@ -1377,6 +1723,9 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
             {layoutFormat === 'combined' && <CombinedSheet {...updatedProps} />}
             {layoutFormat === 'pure-2d' && <Pure2DSheet {...updatedProps} />}
             {layoutFormat === 'pure-3d' && <Pure3DSheet {...updatedProps} />}
+            {layoutFormat === 'multi-view' && <MultiViewSheet {...updatedProps} />}
+            {layoutFormat === 'plan-section' && <PlanSectionSheet {...updatedProps} />}
+            {layoutFormat === 'pure-section' && <PureSectionSheet {...updatedProps} />}
           </div>
         </div>
       </div>

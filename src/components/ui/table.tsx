@@ -95,7 +95,7 @@ const TableBody = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes
 TableBody.displayName = "TableBody"
 
 const TableFooter = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(({ className, ...props }, ref) => (
-  <tfoot ref={ref} className={cn("border-t bg-slate-100/50 dark:bg-slate-800/50 font-medium [&>tr]:last:border-b-0", className)} {...props} />
+  <tfoot ref={ref} className={cn("border-t bg-slate-900 sticky bottom-0 z-20 font-medium [&>tr]:last:border-b-0", className)} {...props} />
 ))
 TableFooter.displayName = "TableFooter"
 

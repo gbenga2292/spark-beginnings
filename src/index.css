@@ -1763,3 +1763,31 @@ table:not([class*="bg-"]) thead:not([class*="bg-"]) th:not([class*="bg-"]) {
   background-color: #0f172a;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL STICKY TABLE FOOTERS
+   Guarantees table footers (Grand Totals) stay pinned at the bottom when scrolling.
+   ══════════════════════════════════════════════════════════════════════ */
+table tfoot,
+.table-sticky-footer tfoot,
+tfoot.sticky-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+}
+
+table tfoot tr,
+tfoot.sticky-footer tr {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+}
+
+table tfoot td,
+table tfoot th,
+tfoot.sticky-footer td,
+tfoot.sticky-footer th {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+}
+

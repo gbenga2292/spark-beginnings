@@ -16,6 +16,7 @@ export interface TasksPriv {
   canEditTasks: boolean;
   canDeleteTasks: boolean;
   isExternalHr: boolean;
+  canViewArchive?: boolean;
 }
 
 // ─── HR ──────────────────────────────────────────────────────
@@ -40,6 +41,14 @@ export interface SitesPriv {
   canImport: boolean;
   canExport: boolean;
   canViewDecisionIntelligence: boolean;
+}
+
+export interface PhonebookPriv {
+  canView: boolean;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canExport: boolean;
 }
 
 // ─── Operations ──────────────────────────────────────────────
@@ -91,6 +100,15 @@ export interface BankImportPriv {
   canReconcile: boolean;
   canSave: boolean;
   canDelete: boolean;
+}
+
+export interface VendorInvoicesPriv {
+  canView: boolean;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canRecordPayment?: boolean;
+  canDirectApprove?: boolean;
 }
 
 // ─── Budget ──────────────────────────────────────────────────
@@ -233,6 +251,8 @@ export interface UserPrivileges {
   dewateringCalculator: DewateringCalculatorPriv;
   vatCalculator:        VatCalculatorPriv;
   estimator:            EstimatorPriv;
+  vendorInvoices?:   VendorInvoicesPriv;
+  phonebook?:        PhonebookPriv;
   budget:            BudgetPriv;
   aiCopilot?:        AiCopilotPriv;
   client360?:        Client360Priv;
@@ -284,7 +304,7 @@ export const FULL_ACCESS: UserPrivileges = {
   bankImport:       { canView: true, canUpload: true, canReconcile: true, canSave: true, canDelete: true },
   variables:        { canView: true, canEdit: true, canImport: true, canExport: true, canBackup: true, canRestore: true },
   users:            { canView: true, canManage: true, canOverrideDiaryDelete: true },
-  tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true, isExternalHr: false },
+  tasks:            { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: true, isExternalHr: false, canViewArchive: true },
   operations:       { canView: true, canViewAnalytics: true, canDeleteLogs: true },
   opsInventory:     { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true },
   opsWaybills:      { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
@@ -313,6 +333,8 @@ export const FULL_ACCESS: UserPrivileges = {
   dewateringCalculator: { canView: true, canExport: true },
   vatCalculator:    { canView: true, canExport: true },
   estimator:        { canView: true },
+  vendorInvoices:   { canView: true, canAdd: true, canEdit: true, canDelete: true, canRecordPayment: true, canDirectApprove: true },
+  phonebook:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
   aiCopilot:        { canAccess: true },
   client360: {
@@ -366,7 +388,7 @@ export const NO_ACCESS: UserPrivileges = {
   bankImport:       { canView: false, canUpload: false, canReconcile: false, canSave: false, canDelete: false },
   variables:        { canView: false, canEdit: false, canImport: false, canExport: false, canBackup: false, canRestore: false },
   users:            { canView: false, canManage: false, canOverrideDiaryDelete: false },
-  tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
+  tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false, canViewArchive: false },
   operations:       { canView: false, canViewAnalytics: false, canDeleteLogs: false },
   opsInventory:     { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   opsWaybills:      { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
@@ -395,6 +417,8 @@ export const NO_ACCESS: UserPrivileges = {
   dewateringCalculator: { canView: false, canExport: false },
   vatCalculator:    { canView: false, canExport: false },
   estimator:        { canView: false },
+  vendorInvoices:   { canView: false, canAdd: false, canEdit: false, canDelete: false, canRecordPayment: false, canDirectApprove: false },
+  phonebook:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   budget:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
   aiCopilot:        { canAccess: false },
   client360: {
@@ -449,6 +473,8 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       weeklyReport: { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },
       budget:       { canView: true, canAdd: true, canEdit: true, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
       minute:       { canView: true, canAdd: true, canEdit: true, canDelete: true, canConvertTasks: true, canExport: true },
+      phonebook:    { canView: true, canAdd: true, canEdit: true, canDelete: false, canExport: true },
+      vendorInvoices: { canView: false, canAdd: false, canEdit: false, canDelete: false, canRecordPayment: false, canDirectApprove: false },
     },
   },
   {
@@ -463,6 +489,8 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
       ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       bankImport:       { canView: true, canUpload: true, canReconcile: true, canSave: true, canDelete: false },
+      vendorInvoices:   { canView: true, canAdd: true, canEdit: true, canDelete: false, canRecordPayment: true, canDirectApprove: true },
+      phonebook:        { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       reports:          { canView: true, canExport: true },
       tasks:            { canView: false, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
       budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
@@ -487,6 +515,8 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       financialReports: { canView: true, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
       ledger:           { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
       bankImport:       { canView: true, canUpload: false, canReconcile: false, canSave: false, canDelete: false },
+      vendorInvoices:   { canView: true, canAdd: false, canEdit: false, canDelete: false, canRecordPayment: false, canDirectApprove: false },
+      phonebook:        { canView: true, canAdd: false, canEdit: false, canDelete: false, canExport: false },
       tasks:            { canView: true, canViewMyTasks: false, canViewDashboard: false, canViewReminders: false, canViewReports: false, canCreateTasks: false, canEditTasks: false, canDeleteTasks: false, isExternalHr: false },
       operations:       { canView: true, canViewAnalytics: false, canDeleteLogs: false },
       opsInventory:     { canView: true, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },

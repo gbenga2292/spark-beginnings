@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { db, fetchAttendanceByYear } from '@/src/lib/supabaseService';
+import { db, fetchAttendanceByYear, fetchLedgerByYear } from '@/src/lib/supabaseService';
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType, ConsumableUsageLog } from '@/src/types/operations';
 import { InterviewCandidate } from '@/src/types/interviews';
@@ -158,6 +158,7 @@ export interface LedgerVendor {
   tinNumber?: string;
   address?: string;
   phone?: string;
+  servicesRendered?: string;
   accountNumber?: string;
   bankName?: string;
   notes?: string;
@@ -864,6 +865,7 @@ export interface PaymentAllocation {
   amount: number;
   withholdingTax?: number;
   discount?: number;
+  site?: string;
 }
 
 export interface Payment {
@@ -992,6 +994,12 @@ interface AppState {
   ledgerBanks: LedgerBank[];
   ledgerBeneficiaryBanks: LedgerBeneficiaryBank[];
   ledgerEntries: LedgerEntry[];
+  loadedLedgerYears: number[];
+  ledgerYearLoading: boolean;
+  dbLedgerCount: number | null;
+  ledgerSyncError: string | null;
+  fetchLedgerYearIfNeeded: (year: number) => Promise<void>;
+  syncLedgerCurrentYear: () => Promise<void>;
   companyExpenses: CompanyExpense[];
   pendingLedgerEntries: CompanyExpense[];
   vendorInvoices: VendorInvoice[];
@@ -1300,6 +1308,10 @@ export const useAppStore = create<AppState>()(
       ledgerBanks: [],
       ledgerBeneficiaryBanks: [],
       ledgerEntries: [],
+      loadedLedgerYears: [],
+      ledgerYearLoading: false,
+      dbLedgerCount: null,
+      ledgerSyncError: null,
       companyExpenses: [],
       pendingLedgerEntries: [],
       vendorInvoices: [],
@@ -1485,13 +1497,18 @@ export const useAppStore = create<AppState>()(
 
       // Sites
       addSite: (site) => {
-        const enriched: Site = { ...site };
+        const now = new Date().toISOString();
+        const enriched: Site = { 
+          ...site,
+          createdAt: site.createdAt || now,
+          created_at: site.created_at || now,
+        };
         if (enriched.endDate && enriched.endDate.trim() !== '') {
           enriched.status = 'Ended';
           enriched.currentProgressPercentage = 100;
           enriched.currentDewateringStage = 'demobilisation';
         }
-        set((s) => ({ sites: [...s.sites, enriched] }));
+        set((s) => ({ sites: [enriched, ...s.sites] }));
         db.insertSite(enriched);
       },
       setSites: (sites) => {
@@ -1661,17 +1678,25 @@ export const useAppStore = create<AppState>()(
       removeLedgerBeneficiaryBank: (id) => { set(s => ({ ledgerBeneficiaryBanks: s.ledgerBeneficiaryBanks.filter(c => c.id !== id) })); db.deleteLedgerBeneficiaryBank(id); },
 
       // Ledger Entries
-      addLedgerEntry: (e) => { set(s => ({ ledgerEntries: [...s.ledgerEntries, e] })); db.insertLedgerEntry(e); },
+      addLedgerEntry: (e) => {
+        set(s => ({
+          ledgerEntries: [...s.ledgerEntries, e],
+          dbLedgerCount: s.dbLedgerCount !== null ? s.dbLedgerCount + 1 : null
+        }));
+        db.insertLedgerEntry(e);
+      },
       updateLedgerEntry: (id, e) => { set(s => ({ ledgerEntries: s.ledgerEntries.map(c => c.id === id ? { ...c, ...e } : c) })); db.updateLedgerEntry(id, e); },
       deleteLedgerEntry: (id: string) => {
         set((state) => ({
-          ledgerEntries: state.ledgerEntries.filter((e) => e.id !== id)
+          ledgerEntries: state.ledgerEntries.filter((e) => e.id !== id),
+          dbLedgerCount: state.dbLedgerCount !== null ? Math.max(0, state.dbLedgerCount - 1) : null
         }));
         db.deleteLedgerEntry(id);
       },
       bulkAddLedgerEntries: (entries: LedgerEntry[]) => {
         set((state) => ({
-          ledgerEntries: [...entries, ...state.ledgerEntries]
+          ledgerEntries: [...entries, ...state.ledgerEntries],
+          dbLedgerCount: state.dbLedgerCount !== null ? state.dbLedgerCount + entries.length : null
         }));
         db.bulkInsertLedgerEntries(entries);
       },
@@ -1682,6 +1707,55 @@ export const useAppStore = create<AppState>()(
           )
         }));
         db.bulkUpdateLedgerEntries(ids, update);
+      },
+      fetchLedgerYearIfNeeded: async (year: number) => {
+        if (!year || isNaN(year)) return;
+        if (get().loadedLedgerYears.includes(year)) return;
+
+        set({ ledgerYearLoading: true, ledgerSyncError: null });
+        try {
+          const { ledgerEntries: newEntries, dbCount } = await fetchLedgerByYear(year);
+          set((s) => {
+            const newIds = new Set(newEntries.map(e => e.id));
+            const filtered = s.ledgerEntries.filter(e => !newIds.has(e.id));
+            return {
+              ledgerEntries: [...filtered, ...newEntries],
+              loadedLedgerYears: [...s.loadedLedgerYears, year],
+              dbLedgerCount: (s.dbLedgerCount ?? 0) + dbCount,
+              ledgerSyncError: null,
+            };
+          });
+        } catch (error: any) {
+          console.error(`Failed to fetch ledger entries for year ${year}:`, error);
+          set({ ledgerSyncError: error?.message || `Failed to sync ledger records for ${year}.` });
+        } finally {
+          set({ ledgerYearLoading: false });
+        }
+      },
+      syncLedgerCurrentYear: async () => {
+        const currentYear = new Date().getFullYear();
+        set({ ledgerYearLoading: true, ledgerSyncError: null });
+        try {
+          const { ledgerEntries: newEntries, dbCount } = await fetchLedgerByYear(currentYear);
+          set((s) => {
+            const newIds = new Set(newEntries.map(e => e.id));
+            const filtered = s.ledgerEntries.filter(e => !newIds.has(e.id));
+            const years = s.loadedLedgerYears.includes(currentYear)
+              ? s.loadedLedgerYears
+              : [...s.loadedLedgerYears, currentYear];
+            return {
+              ledgerEntries: [...filtered, ...newEntries],
+              loadedLedgerYears: years,
+              dbLedgerCount: dbCount,
+              ledgerSyncError: null,
+            };
+          });
+        } catch (error: any) {
+          console.error(`Failed to re-sync current year ledger entries:`, error);
+          set({ ledgerSyncError: error?.message || 'Failed to re-sync current year ledger records.' });
+        } finally {
+          set({ ledgerYearLoading: false });
+        }
       },
 
       // Expenses VAT Remittances
@@ -2177,6 +2251,16 @@ export const useAppStore = create<AppState>()(
     {
       name: 'dcel-hr-storage',
       storage: createJSONStorage(() => idbStorage),
+      partialize: (state) => {
+        const {
+          pendingLedgerEntries,
+          ledgerYearLoading,
+          ledgerSyncError,
+          attendanceYearLoading,
+          ...rest
+        } = state;
+        return rest;
+      },
     }
   )
 );

@@ -42,7 +42,7 @@ export interface ActiveSiteInvoiceDetail {
   isLapsed: boolean;
   hasNextInvoice: boolean;
   nextInvoiceNumber?: string;
-  urgency: 'overdue' | 'today' | 'soon' | 'safe';
+  urgency: 'overdue' | 'today' | 'soon' | 'safe' | 'stopped';
   urgencyLabel: string;
   urgencyBadgeClass: string;
   isConcurrent: boolean;
@@ -75,7 +75,7 @@ export interface ActiveSiteInvoiceSummary {
   activeMachinesCount: number;
   calendarRunwayDays: number;
   progressPct: number;
-  urgency: 'overdue' | 'today' | 'soon' | 'safe';
+  urgency: 'overdue' | 'today' | 'soon' | 'safe' | 'stopped';
   urgencyLabel: string;
   urgencyBadgeClass: string;
   siteMachines: ActiveSiteInvoiceMachineDetail[];
@@ -627,12 +627,17 @@ export function useActiveSiteInvoices() {
         const liveEndDate = currentDate.toISOString().split('T')[0];
 
         // Calculate days remaining from today to liveEndDate
-        const liveTarget = new Date(liveEndDate);
+        const parts = liveEndDate.split('-').map(Number);
+        const liveTarget = parts.length === 3 && !parts.some(isNaN)
+          ? new Date(parts[0], parts[1] - 1, parts[2])
+          : new Date(liveEndDate);
         liveTarget.setHours(0, 0, 0, 0);
         const diffMs = liveTarget.getTime() - today.getTime();
         const daysRemaining = Math.round(diffMs / (1000 * 60 * 60 * 24));
 
-        let urgency: 'overdue' | 'today' | 'soon' | 'safe' = 'safe';
+        const allInvoiceMachinesStopped = machinesDetail.length > 0 && machinesDetail.every(m => m.isStopped);
+
+        let urgency: 'overdue' | 'today' | 'soon' | 'safe' | 'stopped' = 'safe';
         let urgencyLabel = '';
         let urgencyBadgeClass = '';
 
@@ -641,6 +646,10 @@ export function useActiveSiteInvoices() {
           const calDays = Math.max(1, Math.abs(daysRemaining));
           urgencyLabel = `+${calDays}d Overdue`;
           urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+        } else if (allInvoiceMachinesStopped) {
+          urgency = 'stopped';
+          urgencyLabel = 'Stopped (On Schedule)';
+          urgencyBadgeClass = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
         } else if (!hasNextInvoice && projectedConsumedDays >= totalContractedDays) {
           urgency = 'today';
           urgencyLabel = 'Due Today';
@@ -795,10 +804,10 @@ export function useActiveSiteInvoices() {
 
       const activePumps = poolMachines.filter(m => !m.isStopped && !isAuxiliaryAsset(m));
       const activeAuxMachines = poolMachines.filter(m => !m.isStopped && isAuxiliaryAsset(m));
-      const activeMachinesCount = Math.max(
-        1,
-        activePumps.length || (pumpRunningInvoices[0]?.machineCount || runningInvoices[0]?.machineCount || 1)
-      );
+      const hasMachinesInPool = poolMachines.length > 0;
+      const activeMachinesCount = hasMachinesInPool
+        ? activePumps.length
+        : Math.max(1, pumpRunningInvoices[0]?.machineCount || runningInvoices[0]?.machineCount || 1);
 
       // Collect missing log dates across active running pumps
       const siteMissingDatesSet = new Set<string>();
@@ -901,10 +910,38 @@ export function useActiveSiteInvoices() {
         m.overDays = m.isOver ? Number((slotWithUnlogged - m.contractedDays).toFixed(1)) : 0;
       });
 
-      // For active auxiliary machines (e.g. Sedimentation Tank), allocate their contracted quota from aux running invoices
-      const totalAuxBilledDays = auxRunningInvoices.reduce((sum, inv) => sum + inv.totalContractedDays, 0);
+      // For active auxiliary machines (e.g. Sedimentation Tank), allocate their contracted quota
+      // from ALL running invoices covering this auxiliary equipment (including combo invoices like #317)
+      const legacyTotalAuxBilledDays = auxRunningInvoices.reduce((sum, inv) => sum + inv.totalContractedDays, 0);
       activeAuxMachines.forEach(m => {
-        m.contractedDays = totalAuxBilledDays > 0 ? totalAuxBilledDays : m.contractedDays;
+        const mNameLower = (m.name || '').trim().toLowerCase();
+        let mBilledDays = 0;
+
+        runningInvoices.forEach(inv => {
+          const auxList = inv.invoice?.auxiliaryEquipment || [];
+          if (auxList.length > 0) {
+            const matchingItems = auxList.filter(item => {
+              if ((item as any).assetId && (item as any).assetId === m.id) return true;
+              const itemNameLower = (item.name || '').trim().toLowerCase();
+              return mNameLower && itemNameLower && (mNameLower.includes(itemNameLower) || itemNameLower.includes(mNameLower));
+            });
+
+            if (matchingItems.length > 0) {
+              const itemSum = matchingItems.reduce((sum, item) => {
+                const itemDur = parseFloat(String(item.duration ?? 0)) || inv.duration || 0;
+                return sum + itemDur;
+              }, 0);
+              mBilledDays += itemSum;
+            } else if (checkIsInvoiceAuxOnly(inv.invoice)) {
+              mBilledDays += inv.totalContractedDays;
+            }
+          } else if (checkIsInvoiceAuxOnly(inv.invoice)) {
+            mBilledDays += inv.totalContractedDays;
+          }
+        });
+
+        const finalContracted = mBilledDays > 0 ? mBilledDays : (legacyTotalAuxBilledDays > 0 ? legacyTotalAuxBilledDays : m.contractedDays);
+        m.contractedDays = Number(finalContracted.toFixed(1));
         m.slotConsumedDays = m.consumedDays;
         m.isOver = m.contractedDays > 0 && m.consumedDays > m.contractedDays;
         m.overDays = m.isOver ? Number((m.consumedDays - m.contractedDays).toFixed(1)) : 0;
@@ -943,30 +980,49 @@ export function useActiveSiteInvoices() {
       // Calculate calendar days remaining to live target
       let calendarDaysToTarget = 999;
       if (latestLiveEndDate) {
-        const targetDateObj = new Date(latestLiveEndDate);
+        const parts = latestLiveEndDate.split('-').map(Number);
+        const targetDateObj = parts.length === 3 && !parts.some(isNaN)
+          ? new Date(parts[0], parts[1] - 1, parts[2])
+          : new Date(latestLiveEndDate);
         targetDateObj.setHours(0, 0, 0, 0);
         calendarDaysToTarget = Math.round((targetDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       }
 
+      const allPumpsStopped = hasMachinesInPool && activePumps.length === 0;
+
       let calendarRunwayDays = 0;
       if (isOverrun) {
-        calendarRunwayDays = -Math.max(1, Math.ceil(overrunDays / activeMachinesCount));
+        calendarRunwayDays = -Math.max(1, Math.ceil(overrunDays / Math.max(1, activeMachinesCount)));
+      } else if (allPumpsStopped) {
+        // When all pumps are stopped without overrun, no active machines are consuming runway today
+        calendarRunwayDays = 0;
       } else if (calendarDaysToTarget < 0) {
         calendarRunwayDays = calendarDaysToTarget;
       } else if (remainingDays <= 0) {
         calendarRunwayDays = 0;
+      } else if (calendarDaysToTarget !== 999) {
+        // When a live target date exists, the calendar runway is exactly the calendar days remaining to that date
+        calendarRunwayDays = calendarDaysToTarget;
       } else {
-        const capacityRunway = Math.ceil(remainingDays / activeMachinesCount);
-        calendarRunwayDays = Math.min(capacityRunway, Math.max(0, calendarDaysToTarget));
+        calendarRunwayDays = Math.ceil(remainingDays / Math.max(1, activeMachinesCount));
       }
 
       const progressPct = totalBilledDays > 0 ? Math.min(100, (totalProjectedDays / totalBilledDays) * 100) : 0;
 
-      let urgency: 'overdue' | 'today' | 'soon' | 'safe' = 'safe';
+      let urgency: 'overdue' | 'today' | 'soon' | 'safe' | 'stopped' = 'safe';
       let urgencyLabel = '';
       let urgencyBadgeClass = '';
 
-      if (isOverrun || calendarRunwayDays < 0) {
+      if (isOverrun) {
+        urgency = 'overdue';
+        const calOverdueDays = Math.max(1, Math.abs(calendarRunwayDays));
+        urgencyLabel = `+${calOverdueDays}d Overdue`;
+        urgencyBadgeClass = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
+      } else if (allPumpsStopped) {
+        urgency = 'stopped';
+        urgencyLabel = 'Stopped (On Schedule)';
+        urgencyBadgeClass = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+      } else if (calendarRunwayDays < 0) {
         urgency = 'overdue';
         const calOverdueDays = Math.max(1, Math.abs(calendarRunwayDays));
         urgencyLabel = `+${calOverdueDays}d Overdue`;

@@ -33,7 +33,6 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/interviews': () => import('@/src/pages/InterviewManager'),
   '/ledger': () => import('@/src/pages/Ledger'),
   '/bank-import': () => import('@/src/pages/BankImport'),
-  '/company-expenses': () => import('@/src/pages/VendorInvoices'),
   '/vendor-invoices': () => import('@/src/pages/VendorInvoices'),
   '/tasks': () => import('@/src/pages/Tasks'),
   '/tasks/dashboard': () => import('@/src/pages/TaskDashboard'),
@@ -120,7 +119,7 @@ if (typeof window !== 'undefined') {
       '/daily-journal',
       '/weekly-report',
       '/ledger',
-      '/company-expenses',
+      '/vendor-invoices',
     ];
     let idx = 0;
     const interval = setInterval(() => {

@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, startTransition, useCallback, useEffe
 import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/src/components/ui/table';
 import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
@@ -320,7 +320,7 @@ export function FinancialReports() {
   const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()));
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
-  const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('none');
+  const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('all');
   const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat' | 'owed-services'>('client-account');
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
@@ -619,6 +619,7 @@ export function FinancialReports() {
   }, [proratedMonthsPayroll, MONTHS]);
 
   const [summaryTab, setSummaryTab] = useState<'client' | 'site' | 'vat' | 'expenses-vat'>('client');
+  const [showDebtorsOnly, setShowDebtorsOnly] = useState(false);
   const expensesVatScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (summaryTab !== 'expenses-vat') return;
@@ -965,6 +966,10 @@ export function FinancialReports() {
       bfMap.set(key, (bfMap.get(key) || 0) + (inv.amount || 0));
     });
 
+    // Build invoice lookup map for historical payment allocations without explicit site
+    const invMapBf = new Map<string, any>();
+    rawInvoices.forEach(inv => invMapBf.set(inv.id, inv));
+
     rawPayments.forEach(pay => {
       const normalized = normalizeDate(pay.date);
       if (!normalized) return;
@@ -973,11 +978,60 @@ export function FinancialReports() {
 
       const matchC = filterClient === 'All' || (pay.client || '').trim() === filterClient;
       if (!matchC) return;
-      const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
-      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
-      const cleared = (pay.amount || 0) + (pay.withholdingTax || 0) + (pay.discount || 0);
-      bfMap.set(key, (bfMap.get(key) || 0) - cleared);
+
+      if (summaryTab === 'client' || summaryTab === 'vat') {
+        const key = clientName;
+        const cleared = (pay.amount || 0) + (pay.withholdingTax || 0) + (pay.discount || 0);
+        bfMap.set(key, (bfMap.get(key) || 0) - cleared);
+        return;
+      }
+
+      // summaryTab === 'site'
+      if (pay.allocations && pay.allocations.length > 0) {
+        let allocatedCash = 0;
+        let allocatedWht = 0;
+        let allocatedDisc = 0;
+
+        pay.allocations.forEach(alloc => {
+          const invObj = invMapBf.get(alloc.invoiceId);
+          const allocSite = (
+            alloc.site ||
+            (invObj as any)?.siteName ||
+            (invObj as any)?.site ||
+            (invObj as any)?.project ||
+            pay.site ||
+            'Unknown Site'
+          ).trim();
+
+          const aCash = Number(alloc.amount || 0);
+          const aWht = Number(alloc.withholdingTax || 0);
+          const aDisc = Number(alloc.discount || 0);
+          allocatedCash += aCash;
+          allocatedWht += aWht;
+          allocatedDisc += aDisc;
+
+          const key = `${clientName} - ${allocSite}`;
+          const cleared = aCash + aWht + aDisc;
+          bfMap.set(key, (bfMap.get(key) || 0) - cleared);
+        });
+
+        // Any unapplied cash or residual wht/discount remains with the payment's primary site
+        const remCash = Math.max(0, (pay.amount || 0) - allocatedCash);
+        const remWht = Math.max(0, (pay.withholdingTax || 0) - allocatedWht);
+        const remDisc = Math.max(0, (pay.discount || 0) - allocatedDisc);
+        const remCleared = remCash + remWht + remDisc;
+        if (remCleared > 0.001) {
+          const primarySite = (pay.site || invMapBf.get(pay.invoiceId)?.siteName || invMapBf.get(pay.invoiceId)?.site || 'Unknown Site').trim();
+          const key = `${clientName} - ${primarySite}`;
+          bfMap.set(key, (bfMap.get(key) || 0) - remCleared);
+        }
+      } else {
+        const siteName = (pay.site || invMapBf.get(pay.invoiceId)?.siteName || invMapBf.get(pay.invoiceId)?.site || 'Unknown Site').trim();
+        const key = `${clientName} - ${siteName}`;
+        const cleared = (pay.amount || 0) + (pay.withholdingTax || 0) + (pay.discount || 0);
+        bfMap.set(key, (bfMap.get(key) || 0) - cleared);
+      }
     });
 
     return bfMap;
@@ -1202,6 +1256,11 @@ export function FinancialReports() {
         rowMap.get(key)!.noOfInvoices += 1;
         rowMap.get(key)!.totalInvoices += (inv.amount || 0);
         rowMap.get(key)!.vatInvoiced += (inv.vat || 0);
+
+        const invDateNorm = normalizeDate(inv.date);
+        if (invDateNorm && (!rowMap.get(key)!.latestActivityDate || invDateNorm > rowMap.get(key)!.latestActivityDate)) {
+          rowMap.get(key)!.latestActivityDate = invDateNorm;
+        }
       });
     }
     // O(1) Site Lookup to prevent O(N*M) loop - consistent with globalStats
@@ -1222,42 +1281,148 @@ export function FinancialReports() {
     rawInvoices.forEach(inv => invIndex.set(inv.id, inv));
 
     payments.forEach(pay => {
-      const siteName = (pay.site || 'Unknown Site').trim();
       const clientName = (pay.client || '').trim();
-      const key = (summaryTab === 'client' || summaryTab === 'vat') ? clientName : `${clientName} - ${siteName}`;
-      if (!rowMap.has(key)) rowMap.set(key, { 
-        client: clientName, 
-        site: siteName, 
-        key, 
-        noOfInvoices: 0, 
-        totalInvoices: 0, 
-        totalPayment: 0, 
-        discount: 0, 
-        withholdingTax: 0, 
-        vatInvoiced: 0, 
-        vatPaid: 0, 
-        amountForVat: 0,
-        vatPolicy: 'No',
-        vatRemitted: 0 
-      });
-      
-      const r = rowMap.get(key)!;
-      r.totalPayment += (pay.amount || 0);
-      r.discount += (pay.discount || 0);
-      r.withholdingTax += (pay.withholdingTax || 0);
-      
-      // Resolve VAT using invoice ratio when stored vat is 0 but policy is active
-      const siteKey = `${clientName}|${siteName}`;
-      const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
-      const { vat, amountForVat } = resolvePaymentVat(pay, payVatSetting, invIndex);
+      const payDateNorm = normalizeDate(pay.date);
 
-      if (r.vatPolicy === 'No') {
-        r.vatPolicy = payVatSetting;
-      } else if (r.vatPolicy !== payVatSetting) {
-        r.vatPolicy = 'Mixed';
+      const ensureRow = (siteName: string, key: string) => {
+        if (!rowMap.has(key)) rowMap.set(key, { 
+          client: clientName, 
+          site: siteName, 
+          key, 
+          noOfInvoices: 0, 
+          totalInvoices: 0, 
+          totalPayment: 0, 
+          discount: 0, 
+          withholdingTax: 0, 
+          vatInvoiced: 0, 
+          vatPaid: 0, 
+          amountForVat: 0, 
+          vatPolicy: 'No', 
+          vatRemitted: 0, 
+          latestActivityDate: '' 
+        });
+        const r = rowMap.get(key)!;
+        if (payDateNorm && (!r.latestActivityDate || payDateNorm > r.latestActivityDate)) {
+          r.latestActivityDate = payDateNorm;
+        }
+        return r;
+      };
+
+      if (summaryTab === 'client' || summaryTab === 'vat') {
+        const key = clientName;
+        const r = ensureRow(pay.site || 'Unknown Site', key);
+        r.totalPayment += (pay.amount || 0);
+        r.discount += (pay.discount || 0);
+        r.withholdingTax += (pay.withholdingTax || 0);
+
+        const siteKey = `${clientName}|${(pay.site || '').trim()}`;
+        const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
+        const { vat, amountForVat } = resolvePaymentVat(pay, payVatSetting, invIndex);
+        if (r.vatPolicy === 'No') {
+          r.vatPolicy = payVatSetting;
+        } else if (r.vatPolicy !== payVatSetting) {
+          r.vatPolicy = 'Mixed';
+        }
+        r.vatPaid += (vat || 0);
+        r.amountForVat += (amountForVat || 0);
+        return;
       }
-      r.vatPaid += (vat || 0);
-      r.amountForVat += (amountForVat || 0);
+
+      // summaryTab === 'site'
+      if (pay.allocations && pay.allocations.length > 0) {
+        let allocatedCash = 0;
+        let allocatedWht = 0;
+        let allocatedDisc = 0;
+
+        pay.allocations.forEach(alloc => {
+          const invObj = invIndex.get(alloc.invoiceId);
+          const allocSite = (
+            alloc.site ||
+            (invObj as any)?.siteName ||
+            (invObj as any)?.site ||
+            (invObj as any)?.project ||
+            pay.site ||
+            'Unknown Site'
+          ).trim();
+
+          const key = `${clientName} - ${allocSite}`;
+          const r = ensureRow(allocSite, key);
+
+          const aCash = Number(alloc.amount || 0);
+          const aWht = Number(alloc.withholdingTax || 0);
+          const aDisc = Number(alloc.discount || 0);
+          allocatedCash += aCash;
+          allocatedWht += aWht;
+          allocatedDisc += aDisc;
+
+          r.totalPayment += aCash;
+          r.withholdingTax += aWht;
+          r.discount += aDisc;
+
+          // Compute VAT for this allocation chunk
+          const siteKey = `${clientName}|${allocSite}`;
+          const payVatSetting = (invObj as any)?.vatInc || pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
+          const allocPaySub = {
+            amount: aCash,
+            damages: 0,
+            payVat: payVatSetting,
+            invoiceId: alloc.invoiceId,
+          };
+          const { vat, amountForVat } = resolvePaymentVat(allocPaySub, payVatSetting, invIndex);
+          if (r.vatPolicy === 'No') {
+            r.vatPolicy = payVatSetting;
+          } else if (r.vatPolicy !== payVatSetting) {
+            r.vatPolicy = 'Mixed';
+          }
+          r.vatPaid += (vat || 0);
+          r.amountForVat += (amountForVat || 0);
+        });
+
+        // Any unapplied cash or residual wht/discount remains with payment's header site
+        const remCash = Math.max(0, (pay.amount || 0) - allocatedCash);
+        const remWht = Math.max(0, (pay.withholdingTax || 0) - allocatedWht);
+        const remDisc = Math.max(0, (pay.discount || 0) - allocatedDisc);
+        if (remCash > 0 || remWht > 0 || remDisc > 0) {
+          const primarySite = (pay.site || invIndex.get(pay.invoiceId)?.siteName || invIndex.get(pay.invoiceId)?.site || 'Unknown Site').trim();
+          const key = `${clientName} - ${primarySite}`;
+          const r = ensureRow(primarySite, key);
+          r.totalPayment += remCash;
+          r.withholdingTax += remWht;
+          r.discount += remDisc;
+
+          const siteKey = `${clientName}|${primarySite}`;
+          const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
+          const remPaySub = { amount: remCash, damages: (pay as any).damages || 0, payVat: payVatSetting };
+          const { vat, amountForVat } = resolvePaymentVat(remPaySub, payVatSetting, invIndex);
+          if (r.vatPolicy === 'No') {
+            r.vatPolicy = payVatSetting;
+          } else if (r.vatPolicy !== payVatSetting) {
+            r.vatPolicy = 'Mixed';
+          }
+          r.vatPaid += (vat || 0);
+          r.amountForVat += (amountForVat || 0);
+        }
+      } else {
+        const siteName = (pay.site || invIndex.get(pay.invoiceId)?.siteName || invIndex.get(pay.invoiceId)?.site || 'Unknown Site').trim();
+        const key = `${clientName} - ${siteName}`;
+        const r = ensureRow(siteName, key);
+
+        r.totalPayment += (pay.amount || 0);
+        r.discount += (pay.discount || 0);
+        r.withholdingTax += (pay.withholdingTax || 0);
+
+        const siteKey = `${clientName}|${siteName}`;
+        const payVatSetting = pay.payVat || siteIndex.get(siteKey)?.vat || 'No';
+        const { vat, amountForVat } = resolvePaymentVat(pay, payVatSetting, invIndex);
+
+        if (r.vatPolicy === 'No') {
+          r.vatPolicy = payVatSetting;
+        } else if (r.vatPolicy !== payVatSetting) {
+          r.vatPolicy = 'Mixed';
+        }
+        r.vatPaid += (vat || 0);
+        r.amountForVat += (amountForVat || 0);
+      }
     });
 
     // Add VAT Remitted (Payments to FIRS)
@@ -1279,10 +1444,48 @@ export function FinancialReports() {
         const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
         rowMap.set(key, { 
           client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
-          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0 
+          discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0,
+          latestActivityDate: ''
         });
       }
     });
+
+    // Seed registered sites when on site summary tab so new sites appear even without invoices
+    if (summaryTab === 'site') {
+      sites.forEach(s => {
+        const clientName = (s.client || '').trim();
+        const siteName = (s.name || '').trim();
+        if (!clientName || !siteName) return;
+        if (filterClient !== 'All' && clientName.toLowerCase() !== filterClient.trim().toLowerCase()) return;
+
+        if (filterYear !== 'All') {
+          const sDate = normalizeDate(s.startDate) || normalizeDate(s.createdAt) || normalizeDate((s as any).created_at);
+          const siteYear = sDate ? sDate.substring(0, 4) : '';
+          if (siteYear && !selectedYears.includes(siteYear) && s.status !== 'Active') return;
+        }
+
+        const key = `${clientName} - ${siteName}`;
+        if (!rowMap.has(key)) {
+          const sDate = normalizeDate(s.startDate) || normalizeDate(s.createdAt) || normalizeDate((s as any).created_at) || '';
+          rowMap.set(key, { 
+            client: clientName, 
+            site: siteName, 
+            key, 
+            noOfInvoices: 0, 
+            totalInvoices: 0, 
+            totalPayment: 0, 
+            discount: 0, 
+            withholdingTax: 0, 
+            vatInvoiced: 0, 
+            vatPaid: 0, 
+            amountForVat: 0, 
+            vatPolicy: s.vat || 'No', 
+            vatRemitted: 0,
+            latestActivityDate: sDate
+          });
+        }
+      });
+    }
 
     if (priorPeriodLimit !== 'none') {
       bfVatData.bfVatOwedMap.forEach((bfVatVal, key) => {
@@ -1292,7 +1495,8 @@ export function FinancialReports() {
           const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
           rowMap.set(key, { 
             client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
-            discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0 
+            discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0,
+            latestActivityDate: ''
           });
         }
       });
@@ -1309,14 +1513,56 @@ export function FinancialReports() {
         : balance === 0 && (r.totalInvoices > 0 || bf !== 0) ? 'FULLY PAID'
         : balance < 0 ? 'OVER PAID' : '-';
 
-      if (balance < 0) {
-        balance = 0;
-        status = 'FULLY PAID';
-      }
       const rawVatOwed = (priorPeriodLimit !== 'none' ? bfVatOwed : 0) + r.vatPaid - r.vatRemitted;
       const vatOwed = Math.abs(rawVatOwed) < 0.01 ? 0 : Math.round(rawVatOwed * 100) / 100;
       return { ...r, bf, balance, status, vatOwed, bfVatOwed };
     });
+
+    if (summaryTab === 'site') {
+      // Reconcile client-level overpayments / discounts across sites
+      // This ensures that discounts and credits granted to the client properly reflect in their debtor sites
+      const clientRows = new Map<string, typeof result>();
+      result.forEach(r => {
+        if (!clientRows.has(r.client)) clientRows.set(r.client, []);
+        clientRows.get(r.client)!.push(r);
+      });
+
+      clientRows.forEach(rows => {
+        const debtorRows = rows.filter(r => r.balance >= 0.01);
+        const creditRows = rows.filter(r => r.balance <= -0.01);
+        if (debtorRows.length > 0 && creditRows.length > 0) {
+          creditRows.forEach(credRow => {
+            let availableCredit = Math.abs(credRow.balance);
+            const discountPortion = Math.min(availableCredit, credRow.discount);
+            let remCredit = availableCredit;
+            let remDisc = discountPortion;
+
+            for (const debRow of debtorRows) {
+              if (remCredit <= 0.001) break;
+              const applyAmt = Math.min(remCredit, debRow.balance);
+              const applyDisc = Math.min(remDisc, applyAmt);
+
+              debRow.totalPayment += (applyAmt - applyDisc);
+              debRow.discount += applyDisc;
+              debRow.balance = Math.round((debRow.balance - applyAmt) * 100) / 100;
+              if (debRow.balance <= 0.001) debRow.status = 'FULLY PAID';
+              else debRow.status = 'PART PAID';
+
+              credRow.totalPayment -= (applyAmt - applyDisc);
+              credRow.discount -= applyDisc;
+              credRow.balance = Math.round((credRow.balance + applyAmt) * 100) / 100;
+              if (Math.abs(credRow.balance) <= 0.001) {
+                credRow.balance = 0;
+                credRow.status = 'FULLY PAID';
+              }
+
+              remCredit -= applyAmt;
+              remDisc -= applyDisc;
+            }
+          });
+        }
+      });
+    }
 
     if (filterMonth !== 'All') {
       if (priorPeriodLimit !== 'none') {
@@ -1342,8 +1588,56 @@ export function FinancialReports() {
       );
     }
 
+    if (summaryTab === 'site') {
+      const getSiteSortDate = (row: any) => {
+        const siteKey = `${(row.client || '').trim()}|${(row.site || '').trim()}`;
+        const siteObj = siteIndex.get(siteKey);
+        const dates = [
+          row.latestActivityDate,
+          normalizeDate(siteObj?.startDate),
+          normalizeDate(siteObj?.createdAt),
+          normalizeDate((siteObj as any)?.created_at),
+        ].filter(Boolean) as string[];
+
+        if (dates.length === 0) return '';
+        dates.sort();
+        return dates[dates.length - 1]; // Return most recent date
+      };
+
+      return result.sort((a, b) => {
+        if (filterClient === 'All') {
+          const clientCmp = a.client.localeCompare(b.client);
+          if (clientCmp !== 0) return clientCmp;
+        }
+        const dateA = getSiteSortDate(a);
+        const dateB = getSiteSortDate(b);
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA); // Newest site at the top!
+        }
+        return a.site.localeCompare(b.site);
+      });
+    }
+
     return result.sort((a, b) => a.client.localeCompare(b.client));
-  }, [invoices, payments, vatPayments, summaryTab, bfData, bfVatData, filterMonth, priorPeriodLimit, rawInvoices, sites, pendingSites, vatRate]);
+  }, [invoices, payments, vatPayments, summaryTab, bfData, bfVatData, filterMonth, filterYear, filterClient, selectedYears, priorPeriodLimit, rawInvoices, sites, pendingSites, vatRate]);
+
+  // Filtered summary data for debtor-only toggle
+  const displayedSummaryData = useMemo(() => {
+    if (!showDebtorsOnly) return summaryData;
+    return summaryData.filter(r => {
+      if (summaryTab === 'vat') {
+        return (r.vatOwed || 0) >= 0.01 || (r.balance || 0) >= 0.01;
+      }
+      return (r.balance || 0) >= 0.01;
+    });
+  }, [summaryData, showDebtorsOnly, summaryTab]);
+
+  const debtorCount = useMemo(() => {
+    if (summaryTab === 'vat') {
+      return summaryData.filter(r => (r.vatOwed || 0) >= 0.01 || (r.balance || 0) >= 0.01).length;
+    }
+    return summaryData.filter(r => (r.balance || 0) >= 0.01).length;
+  }, [summaryData, summaryTab]);
 
   // VAT Pie
   const vatPieData = useMemo(() => [
@@ -1632,7 +1926,7 @@ export function FinancialReports() {
         ? ["Client", "VAT Policy", "Payment Made (₦)", "AMT FOR VAT (₦)", "VAT ON PAYMENTS (₦)", "AMT FOR VAT (REMITTED) (₦)", "VAT REMIT (₦)", "AMT FOR VAT (OWED) (₦)", "VAT OWED (₦)"]
         : ["Client", summaryTab === 'site' ? "Site" : "", filterYear !== 'All' ? "B/F (₦)" : "", "Inv. Qty", "Total Invoiced (₦)", "Total Payments (₦)", "Balance Due (₦)", "WHT (₦)", ...(summaryTab === 'client' ? ["AMT FOR VAT", "VAT PAID", "VAT REMIT", "VAT OWED"] : []), "Status"].filter(Boolean)
     ];
-    const body = summaryData.map(r => {
+    const body = displayedSummaryData.map(r => {
       if (summaryTab === 'vat') {
         const amtForVatRemitted = r.vatRemitted !== 0 && vatRate > 0 ? ((r.vatRemitted / (vatRate / 100)) || 0) : 0;
         const amtForVatOwed = r.vatOwed !== 0 && vatRate > 0 ? ((r.vatOwed / (vatRate / 100)) || 0) : 0;
@@ -1665,14 +1959,17 @@ export function FinancialReports() {
       ].filter(v => v !== undefined);
     });
     
+    const pdfTitle = showDebtorsOnly ? "Financial Summary Ledger (Debtors Only)" : "Financial Summary Ledger";
+    const pdfFilename = showDebtorsOnly ? "financial_ledger_debtors.pdf" : "financial_ledger.pdf";
+
     setPreviewModal({
       isOpen: true,
-      title: "Financial Summary Ledger",
+      title: pdfTitle,
       type: 'pdf',
       data: body,
       headers: head as unknown as string[],
-      filename: "financial_ledger.pdf",
-      onConfirm: () => generatePdf("Financial Summary Ledger", head as string[][], body, "financial_ledger.pdf")
+      filename: pdfFilename,
+      onConfirm: () => generatePdf(pdfTitle, head as string[][], body, pdfFilename)
     });
   };
 
@@ -2199,11 +2496,38 @@ export function FinancialReports() {
                 </select>
               </div>
               
+              <div className="w-px h-4 bg-slate-200" />
+              <label 
+                className={cn(
+                  "flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold cursor-pointer select-none transition-all",
+                  showDebtorsOnly 
+                    ? "border-rose-300 bg-rose-50 text-rose-700 font-bold" 
+                    : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
+                )}
+                title="Only show debtors with balance due"
+              >
+                <input
+                  type="checkbox"
+                  checked={showDebtorsOnly}
+                  onChange={(e) => startTransition(() => setShowDebtorsOnly(e.target.checked))}
+                  className="w-3.5 h-3.5 rounded accent-rose-600 cursor-pointer"
+                />
+                <span>Debtors Only</span>
+                {debtorCount > 0 && (
+                  <span className={cn(
+                    "px-1 py-0.2 rounded-full text-[9px] font-bold",
+                    showDebtorsOnly ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-600"
+                  )}>
+                    {debtorCount}
+                  </span>
+                )}
+              </label>
+
               {/* Reset Desktop */}
-              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'all' || showDebtorsOnly) && (
                 <>
                   <div className="w-px h-4 bg-slate-200" />
-                  <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); }); }}
+                  <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('all'); setShowDebtorsOnly(false); }); }}
                     className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-500 hover:text-rose-700 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
                     <X className="w-3.5 h-3.5" /> Reset
                   </button>
@@ -2271,9 +2595,34 @@ export function FinancialReports() {
                   <option value="all">All Prior</option>
                 </select>
               </div>
+              <label 
+                className={cn(
+                  "flex items-center gap-2 h-8 px-2.5 rounded-md border text-[11px] font-semibold cursor-pointer select-none transition-all",
+                  showDebtorsOnly 
+                    ? "border-rose-300 bg-rose-50 text-rose-700 font-bold" 
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={showDebtorsOnly}
+                  onChange={(e) => startTransition(() => setShowDebtorsOnly(e.target.checked))}
+                  className="w-3.5 h-3.5 rounded accent-rose-600 cursor-pointer"
+                />
+                <span>Debtors Only</span>
+                {debtorCount > 0 && (
+                  <span className={cn(
+                    "ml-auto px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                    showDebtorsOnly ? "bg-rose-200 text-rose-800" : "bg-slate-200 text-slate-600"
+                  )}>
+                    {debtorCount}
+                  </span>
+                )}
+              </label>
+
               {/* Reset Mobile */}
-              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'none') && (
-                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('none'); setFiltersOpen(false); }); }}
+              {(filterYear !== 'All' || filterMonth !== 'All' || filterClient !== 'All' || priorPeriodLimit !== 'all' || showDebtorsOnly) && (
+                <button onClick={() => { startTransition(() => { setFilterYear(String(new Date().getFullYear())); setFilterMonth('All'); setFilterClient('All'); setPriorPeriodLimit('all'); setShowDebtorsOnly(false); setFiltersOpen(false); }); }}
                   className="flex items-center justify-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-md py-2 transition-colors mt-1 border border-rose-100">
                   <X className="w-3.5 h-3.5" /> Reset Filters
                 </button>
@@ -2831,6 +3180,36 @@ export function FinancialReports() {
               <CardTitle className="text-xs sm:text-sm text-slate-800 dark:text-slate-100 uppercase tracking-wide truncate">Financial Summary Ledger</CardTitle>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <label 
+                htmlFor="ledger-debtors-only"
+                className={cn(
+                  "flex items-center gap-1.5 sm:gap-2 h-8 px-2.5 sm:px-3 rounded-md border text-xs font-semibold cursor-pointer select-none transition-all shadow-2xs",
+                  showDebtorsOnly
+                    ? "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300 ring-1 ring-rose-300/50"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300"
+                )}
+                title="Filter to show only debtors with outstanding balances"
+              >
+                <input
+                  id="ledger-debtors-only"
+                  type="checkbox"
+                  checked={showDebtorsOnly}
+                  onChange={(e) => setShowDebtorsOnly(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer"
+                />
+                <span className="whitespace-nowrap">Debtors Only</span>
+                {debtorCount > 0 && (
+                  <span className={cn(
+                    "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                    showDebtorsOnly
+                      ? "bg-rose-200/80 text-rose-800 dark:bg-rose-900 dark:text-rose-200"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                  )}>
+                    {debtorCount}
+                  </span>
+                )}
+              </label>
+
               {priv.canExport && (
                 <Button 
                   variant="outline" 
@@ -2866,15 +3245,45 @@ export function FinancialReports() {
         </CardHeader>
         
         {fullScreenTable === 'ledger' && (
-          <Button 
-            variant="default" 
-            size="icon" 
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
-            onClick={() => toggleFullScreen('ledger')}
-            title="Exit Full Screen"
-          >
-            <Minimize2 className="h-5 w-5" />
-          </Button>
+          <>
+            <div className="fixed top-4 left-4 z-[110] flex items-center gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xl">
+              <label 
+                htmlFor="fullscreen-debtors-only"
+                className={cn(
+                  "flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-xs font-semibold cursor-pointer select-none transition-all",
+                  showDebtorsOnly
+                    ? "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300"
+                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300"
+                )}
+              >
+                <input
+                  id="fullscreen-debtors-only"
+                  type="checkbox"
+                  checked={showDebtorsOnly}
+                  onChange={(e) => setShowDebtorsOnly(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer"
+                />
+                <span className="whitespace-nowrap">Debtors Only</span>
+                {debtorCount > 0 && (
+                  <span className={cn(
+                    "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                    showDebtorsOnly ? "bg-rose-200/80 text-rose-800" : "bg-slate-100 text-slate-600"
+                  )}>
+                    {debtorCount}
+                  </span>
+                )}
+              </label>
+            </div>
+            <Button 
+              variant="default" 
+              size="icon" 
+              className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
+              onClick={() => toggleFullScreen('ledger')}
+              title="Exit Full Screen"
+            >
+              <Minimize2 className="h-5 w-5" />
+            </Button>
+          </>
         )}
 
         {summaryTab === 'expenses-vat' ? (
@@ -3025,24 +3434,102 @@ export function FinancialReports() {
                     );
                   });
 
-                  return (
-                    <>
-                      {rows}
-                      <tr className="bg-slate-900 border-t-4 border-emerald-500 sticky bottom-0 z-10">
-                        <td className="sticky left-0 z-20 bg-slate-900 py-3.5 px-5 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700" colSpan={6}>Grand Total — {vatEntries.length} entries</td>
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-200 tabular-nums">{grandLineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-slate-300 tabular-nums">{grandAmtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-emerald-400 tabular-nums">{grandVatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="py-3.5 px-5 text-right font-mono font-bold text-sky-400 tabular-nums">{grandRemitted > 0 ? grandRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
-                        <td className={`py-3.5 px-5 text-right font-mono font-bold tabular-nums ${grandOwed <= 0.01 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {grandOwed <= 0.01 ? '✓ Cleared' : grandOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    </>
-                  );
-                })()}
-              </tbody>
-            </table>
+                    return (
+                      <>
+                        {rows}
+                      </>
+                    );
+                  })()}
+                </tbody>
+                <tfoot className="sticky bottom-0 z-30 bg-slate-900 border-t-4 border-emerald-500 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]">
+                  <tr className="bg-slate-900">
+                    <td className="sticky left-0 z-40 bg-slate-900 py-3.5 px-5 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700" colSpan={6}>Grand Total</td>
+                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-slate-200 tabular-nums">
+                      {ledgerEntries
+                        .filter(e => {
+                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                          if (!isVat || !e.date) return false;
+                          if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                          if (filterMonth !== 'All') {
+                            const d = new Date(e.date);
+                            if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                          }
+                          return true;
+                        })
+                        .reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
+                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-slate-300 tabular-nums">
+                      {ledgerEntries
+                        .filter(e => {
+                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                          if (!isVat || !e.date) return false;
+                          if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                          if (filterMonth !== 'All') {
+                            const d = new Date(e.date);
+                            if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                          }
+                          return true;
+                        })
+                        .reduce((acc, e) => {
+                          const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                          const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                          return acc + (e.amountForVat ?? calc.amountForVat);
+                        }, 0)
+                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-emerald-400 tabular-nums">
+                      {ledgerEntries
+                        .filter(e => {
+                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                          if (!isVat || !e.date) return false;
+                          if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                          if (filterMonth !== 'All') {
+                            const d = new Date(e.date);
+                            if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                          }
+                          return true;
+                        })
+                        .reduce((acc, e) => {
+                          const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                          const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                          return acc + (e.vatAmount ?? calc.vatAmount);
+                        }, 0)
+                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-sky-400 tabular-nums">
+                      {(expenseVatRemittances || [])
+                        .reduce((acc, r) => acc + (Number(r.amount) || 0), 0) > 0
+                        ? (expenseVatRemittances || [])
+                            .reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+                            .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        : '—'}
+                    </td>
+                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-rose-400 tabular-nums">
+                      {Math.max(
+                        0,
+                        ledgerEntries
+                          .filter(e => {
+                            const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                            if (!isVat || !e.date) return false;
+                            if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                            if (filterMonth !== 'All') {
+                              const d = new Date(e.date);
+                              if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                            }
+                            return true;
+                          })
+                          .reduce((acc, e) => {
+                            const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                            const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                            return acc + (e.vatAmount ?? calc.vatAmount);
+                          }, 0) -
+                          (expenseVatRemittances || []).reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+                      ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
           </div>
         ) : (
         <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
@@ -3087,7 +3574,7 @@ export function FinancialReports() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {summaryData.map((row, i) => (
+              {displayedSummaryData.map((row, i) => (
                 <TableRow key={i} className={`hover:bg-slate-50 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                   <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
                   {summaryTab === 'vat' && <TableCell className={`px-5 py-3 text-slate-500 font-medium ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.vatPolicy || 'No'}</TableCell>}
@@ -3114,7 +3601,7 @@ export function FinancialReports() {
                   <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
                   {summaryTab !== 'vat' && (
                     <>
-                      <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance >= 0.01 ? 'text-rose-600' : row.balance <= -0.01 ? 'text-slate-500' : 'text-emerald-600'}`}>
+                      <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance >= 0.01 ? 'text-rose-600' : row.balance <= -0.01 ? 'text-blue-600' : 'text-emerald-600'}`}>
                         {Math.abs(row.balance) >= 0.01 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
                       </TableCell>
                       <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
@@ -3149,25 +3636,30 @@ export function FinancialReports() {
                   )}
                 </TableRow>
               ))}
-              {summaryData.length > 0 && (() => {
-                const totalBF = summaryData.reduce((sum, r) => sum + (r.bf || 0), 0);
-                const totalBalance = summaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
-                const totalInvoices = summaryData.reduce((sum, r) => sum + (r.totalInvoices || 0), 0);
-                const totalPayment = summaryData.reduce((sum, r) => sum + (r.totalPayment || 0), 0);
-                const totalDiscount = summaryData.reduce((sum, r) => sum + (r.discount || 0), 0);
-                const totalWHT = summaryData.reduce((sum, r) => sum + (r.withholdingTax || 0), 0);
-                const totalAmountForVat = summaryData.reduce((sum, r) => sum + (r.amountForVat || 0), 0);
-                const totalVATPaid = summaryData.reduce((sum, r) => sum + (r.vatPaid || 0), 0);
-                const totalVATRemitted = summaryData.reduce((sum, r) => sum + (r.vatRemitted || 0), 0);
-                const totalVATOwed = summaryData.reduce((sum, r) => sum + (r.vatOwed || 0), 0);
+              {displayedSummaryData.length === 0 && (
+                <TableRow><TableCell colSpan={15} className="px-4 py-12 text-center text-slate-500 font-medium">{showDebtorsOnly ? 'No debtor records found for the selected period.' : 'No data available.'}</TableCell></TableRow>
+              )}
+            </TableBody>
+            {displayedSummaryData.length > 0 && (() => {
+              const totalBF = displayedSummaryData.reduce((sum, r) => sum + (r.bf || 0), 0);
+              const totalBalance = displayedSummaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
+              const totalInvoices = displayedSummaryData.reduce((sum, r) => sum + (r.totalInvoices || 0), 0);
+              const totalPayment = displayedSummaryData.reduce((sum, r) => sum + (r.totalPayment || 0), 0);
+              const totalDiscount = displayedSummaryData.reduce((sum, r) => sum + (r.discount || 0), 0);
+              const totalWHT = displayedSummaryData.reduce((sum, r) => sum + (r.withholdingTax || 0), 0);
+              const totalAmountForVat = displayedSummaryData.reduce((sum, r) => sum + (r.amountForVat || 0), 0);
+              const totalVATPaid = displayedSummaryData.reduce((sum, r) => sum + (r.vatPaid || 0), 0);
+              const totalVATRemitted = displayedSummaryData.reduce((sum, r) => sum + (r.vatRemitted || 0), 0);
+              const totalVATOwed = displayedSummaryData.reduce((sum, r) => sum + (r.vatOwed || 0), 0);
 
-                return (
-                  <TableRow className="bg-slate-900 hover:bg-slate-900 border-t-4 border-slate-700 relative z-10">
-                    <TableCell className="sticky left-0 z-20 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase">Grand Total</TableCell>
+              return (
+                <TableFooter className="sticky bottom-0 z-30 bg-slate-900 border-t-4 border-slate-700 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]">
+                  <TableRow className="bg-slate-900 hover:bg-slate-900 border-none">
+                    <TableCell className="sticky left-0 z-40 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700/50">Grand Total</TableCell>
                     {summaryTab === 'vat' && <TableCell className="bg-slate-900 px-5 py-4"></TableCell>}
-                    {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-20 bg-slate-900 px-5 py-4"></TableCell>}
+                    {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-40 bg-slate-900 px-5 py-4 border-r border-slate-700/50"></TableCell>}
                     {summaryTab !== 'vat' && filterYear !== 'All' && (
-                      <TableCell className={`px-5 py-4 text-right font-mono font-bold ${
+                      <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold ${
                         !totalBF || totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
                       }`}>
                         {totalBF && totalBF !== 0
@@ -3179,14 +3671,14 @@ export function FinancialReports() {
                     )}
                     {summaryTab !== 'vat' && (
                       <>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{summaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
+                        <TableCell className="bg-slate-900 px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{displayedSummaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
                         <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-slate-200">{totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       </>
                     )}
                     <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-emerald-400">{totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                     {summaryTab !== 'vat' && (
                       <>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-rose-400 bg-rose-950/20">
+                        <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold ${totalBalance >= 0.01 ? 'text-rose-400 bg-rose-950/20' : totalBalance <= -0.01 ? 'text-blue-400 bg-blue-950/20' : 'text-emerald-400'}`}>
                           {Math.abs(totalBalance) >= 0.01
                             ? (totalBalance < 0
                               ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
@@ -3219,12 +3711,9 @@ export function FinancialReports() {
                       <TableCell className="bg-slate-900 px-5 py-4"></TableCell>
                     )}
                   </TableRow>
-                );
-              })()}
-              {summaryData.length === 0 && (
-                <TableRow><TableCell colSpan={15} className="px-4 py-12 text-center text-slate-500 font-medium">No data available.</TableCell></TableRow>
-              )}
-            </TableBody>
+                </TableFooter>
+              );
+            })()}
           </Table>
         </div>
         )}

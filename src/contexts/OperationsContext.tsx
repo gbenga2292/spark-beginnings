@@ -163,6 +163,7 @@ interface OperationsContextType {
   // Diesel Refills
   dieselRefills: DieselRefill[];
   addDieselRefill: (refill: Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addBatchDieselRefills: (refills: Array<Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
   updateDieselRefill: (id: string, updates: Partial<Omit<DieselRefill, 'id' | 'created_at'>>) => Promise<void>;
   deleteDieselRefill: (id: string) => Promise<void>;
   
@@ -281,14 +282,17 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // Resolve current site by checking net inventory (dispatches - returns)
-        // across all active operational sites to align with the active sites table.
+        // across all active operational sites.
+        // A pump is considered ON-SITE from the moment any dispatch waybill is created
+        // until a return_completed waybill brings it back. 'outstanding' dispatch waybills
+        // are intentionally included here — they represent pumps in transit.
         const activeSites = sites.filter(s => s.status === 'Active' && !isInternalSite(s));
         const candidateSites: { siteName: string; latestDate: string }[] = [];
 
         activeSites.forEach(s => {
+          // Include ALL waybill statuses for dispatch — outstanding means "in transit", still on site
           const siteWaybills = waybills.filter(w =>
-            (w.siteName?.toLowerCase() === s.name.toLowerCase() || w.siteId === s.id) &&
-            (w.status !== 'outstanding' || w.type === 'return')
+            w.siteName?.toLowerCase() === s.name.toLowerCase() || w.siteId === s.id
           );
 
           let qtyOnSite = 0;
@@ -298,16 +302,21 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             const item = wb.items.find(i => i.assetId === a.id);
             if (item) {
               const wbDate = wb.sentToSiteDate || wb.issueDate || '';
-              if (wb.type === 'waybill' && wb.status !== 'outstanding') {
+              if (wb.type === 'waybill') {
+                // Count any dispatch waybill (including outstanding/in-transit)
                 qtyOnSite += item.quantity;
                 if (wbDate && wbDate > latestDate) {
                   latestDate = wbDate;
                 }
               } else if (wb.type === 'return' && wb.status === 'return_completed') {
+                // Only subtract when the return is fully confirmed
                 qtyOnSite = Math.max(0, qtyOnSite - item.quantity);
                 if (wbDate && wbDate > latestDate) {
                   latestDate = wbDate;
                 }
+              } else if (wb.transferSiteId && wb.status !== 'outstanding') {
+                // Transfer moves machine from this site to another
+                qtyOnSite = Math.max(0, qtyOnSite - item.quantity);
               }
             }
           });
@@ -319,11 +328,11 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
         let resolvedSite = 'Warehouse';
         if (candidateSites.length > 0) {
-          // Sort by latest waybill date descending to get the most recent deployment
+          // Most recently dispatched site wins
           candidateSites.sort((x, y) => y.latestDate.localeCompare(x.latestDate));
           resolvedSite = candidateSites[0].siteName;
         } else {
-          // If not found in active sites inventory, fall back to the most recent waybill/log logic
+          // Fallback: check all waybills for this asset (including inactive/closed sites)
           const allAssetWaybills = waybills
             .filter(wb => wb.items.some(item => item.assetId === a.id))
             .sort((x, y) => {
@@ -334,13 +343,15 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
           if (allAssetWaybills.length > 0) {
             const latest = allAssetWaybills[0];
+            // If most recent waybill is a dispatch (not a completed return), pump is still there
             if (
               latest.type === 'waybill' &&
-              ['sent_to_site', 'partial_returned', 'outstanding', 'open'].includes(latest.status)
+              latest.status !== 'return_completed'
             ) {
               resolvedSite = latest.siteName || 'Warehouse';
             }
           } else {
+            // Final fallback: most recent daily log within 45 days
             const recentLog = dailyMachineLogs
               .filter(log => log.assetId === a.id)
               .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
@@ -3167,6 +3178,38 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           toast.warning('Refill saved locally — sync failed');
         }
       },
+      addBatchDieselRefills: async (refills) => {
+        if (!refills || refills.length === 0) return;
+        const newRefills: DieselRefill[] = refills.map(refill => ({
+          ...refill,
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+        setDieselRefills(prev => [...newRefills, ...prev]);
+        try {
+          const rows = newRefills.map(r => ({
+            id: r.id,
+            date: r.date,
+            site_id: r.siteId,
+            site_name: r.siteName,
+            total_litres: r.totalLitres,
+            price_per_litre: r.pricePerLitre ?? null,
+            total_cost: r.totalCost ?? null,
+            purchased_by: r.purchasedBy ?? null,
+            supplier: r.supplier ?? null,
+            notes: r.notes ?? null,
+            linked_ledger_ids: r.linkedLedgerIds ?? null,
+            machine_allocations: r.machineAllocations,
+          }));
+          const { error } = await supabase.from('diesel_refills').insert(rows);
+          if (error) throw error;
+          toast.success(`Successfully reconciled ${newRefills.length} diesel purchases`);
+        } catch (err: any) {
+          console.error('Failed to batch save diesel refills:', err);
+          toast.warning(`Saved ${newRefills.length} refills locally — sync failed`);
+        }
+      },
       updateDieselRefill: async (id, updates) => {
         setDieselRefills(prev => prev.map(r => r.id === id ? { ...r, ...updates, updated_at: new Date().toISOString() } : r));
         try {
@@ -3265,6 +3308,7 @@ export const useOperations = () => {
       bulkAddDailyMachineLogs: () => {},
       logDailyActivitiesBulk: async () => {},
       addDieselRefill: () => {},
+      addBatchDieselRefills: async () => {},
       updateDieselRefill: () => {},
       deleteDieselRefill: () => {},
       addVehicle: () => {},

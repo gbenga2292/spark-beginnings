@@ -91,9 +91,9 @@ const CameraController: React.FC<{
 // ──────────────────────────────────────────────────────────────────────────────
 
 // Detailed 3D GEHO ZD 900 Double-Acting Dewatering Piston Pump
-const GehoPump3D: React.FC<{ position: [number, number, number] }> = ({ position }) => {
+const GehoPump3D: React.FC<{ position: [number, number, number]; rotationY?: number; flipped?: boolean }> = ({ position, rotationY = 0, flipped = false }) => {
   return (
-    <group position={position}>
+    <group position={position} rotation={[0, rotationY, 0]} scale={[flipped ? -1 : 1, 1, 1]}>
       {/* 1. Heavy Black Steel Skid Frame Chassis */}
       <mesh position={[0, -0.4, 0]}>
         <boxGeometry args={[2.2, 0.15, 1.1]} />
@@ -1801,7 +1801,14 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
           );
 
           if (comp.type === 'pump') {
-            return compGroup(<GehoPump3D key={comp.id} position={[pos.x, groundElevation + 0.45, pos.z]} />);
+            return compGroup(
+              <GehoPump3D
+                key={comp.id}
+                position={[pos.x, groundElevation + 0.45, pos.z]}
+                rotationY={-rotationRad}
+                flipped={comp.flipped}
+              />
+            );
           }
           if (comp.type === 'elbow') {
             return compGroup(<Elbow3D key={comp.id} position={[pos.x, componentY, pos.z]} rotationY={-rotationRad} />);

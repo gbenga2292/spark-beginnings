@@ -745,14 +745,29 @@ export function DailyJournal() {
     combinedJournals.forEach(j => { if (!groups[j.date]) groups[j.date] = []; groups[j.date].push(j); });
     return Object.keys(groups)
       .filter(d => {
-        const matchesTerm = !searchTerm || d.includes(searchTerm) || groups[d].some(j => j.loggedBy.toLowerCase().includes(searchTerm.toLowerCase()));
+        if (!searchTerm) {
+          const matchesFrom = !dateFrom || d >= dateFrom;
+          const matchesTo   = !dateTo   || d <= dateTo;
+          return matchesFrom && matchesTo;
+        }
+        const q = searchTerm.toLowerCase();
+        // Search date string and author
+        const matchesJournal = d.includes(q) || groups[d].some(j => (j.loggedBy || '').toLowerCase().includes(q));
+        // Search site name, client name, and narration in entries for this day
+        const dayEntries = combinedEntries.filter(e => groups[d].some(j => j.id === e.journalId));
+        const matchesEntry = dayEntries.some(e =>
+          (e.siteName || '').toLowerCase().includes(q) ||
+          (e.clientName || '').toLowerCase().includes(q) ||
+          (e.narration || '').toLowerCase().includes(q)
+        );
+        const matchesTerm = matchesJournal || matchesEntry;
         const matchesFrom = !dateFrom || d >= dateFrom;
         const matchesTo   = !dateTo   || d <= dateTo;
         return matchesTerm && matchesFrom && matchesTo;
       })
       .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
       .map(d => ({ date: d, journals: groups[d] }));
-  }, [combinedJournals, searchTerm, dateFrom, dateTo]);
+  }, [combinedJournals, combinedEntries, searchTerm, dateFrom, dateTo]);
 
   // Logic to find journals matching the advanced export filters
   const matchingExportJournals = useMemo(() => {

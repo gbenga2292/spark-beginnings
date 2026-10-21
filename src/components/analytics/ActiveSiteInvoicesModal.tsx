@@ -98,11 +98,17 @@ export function ActiveSiteInvoicesModal({
         'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
       let urgencyLabel = `${calendarRunwayDays}d runway`;
 
+      const allSitesStopped = sites.length > 0 && sites.every(s => s.urgency === 'stopped' || s.activeMachinesCount === 0);
+
       if (hasAnyOverrun || isOverrun || calendarRunwayDays < 0) {
         urgencyBadgeClass =
           'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';
         const calDays = Math.max(1, Math.abs(calendarRunwayDays));
         urgencyLabel = `+${calDays}d Overdue`;
+      } else if (allSitesStopped && !isOverrun) {
+        urgencyBadgeClass =
+          'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+        urgencyLabel = 'Stopped (On Schedule)';
       } else if (calendarRunwayDays <= 0 || remainingDays === 0) {
         urgencyBadgeClass =
           'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800';

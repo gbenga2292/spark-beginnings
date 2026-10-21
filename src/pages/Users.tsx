@@ -39,11 +39,11 @@ const MODULE_ICONS: Record<string, any> = {
 const GROUP_CHECK: { name: string; keys: (keyof UserPrivileges)[]; field: string }[] = [
   { name: 'Dashboard',   keys: ['dashboard'], field: 'canView' },
   { name: 'HR',          keys: ['employees', 'onboarding', 'attendance', 'leaves', 'salaryLoans', 'evaluations', 'interviews', 'disciplinary', 'reports', 'minute'], field: 'canView' },
-  { name: 'Operations',  keys: ['operations', 'simulator'], field: 'canView' },
-  { name: 'Clients',     keys: ['sites'], field: 'canView' },
+  { name: 'Operations',  keys: ['operations', 'simulator', 'dewateringCalculator', 'vatCalculator', 'estimator', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites', 'opsDiesel', 'opsSiteRequests', 'opsMachineRecon'], field: 'canView' },
+  { name: 'Clients',     keys: ['sites', 'clients', 'client360', 'site360', 'phonebook'], field: 'canView' },
   { name: 'Tasks',       keys: ['tasks'], field: 'canView' },
-  { name: 'Account',     keys: ['billing', 'payments', 'payroll', 'financialReports', 'ledger'], field: 'canView' },
-  { name: 'Settings',    keys: ['variables', 'users'], field: 'canView' },
+  { name: 'Account',     keys: ['billing', 'payments', 'payroll', 'financialReports', 'ledger', 'bankImport', 'budget', 'vendorInvoices'], field: 'canView' },
+  { name: 'Settings',    keys: ['variables', 'users', 'activityLog'], field: 'canView' },
   { name: 'AI Co-Pilot', keys: ['aiCopilot'], field: 'canAccess' },
 ];
 

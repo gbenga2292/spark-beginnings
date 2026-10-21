@@ -671,12 +671,73 @@ export function Client360() {
         isWithinReportDate(i.date)
       );
 
-      const sitePayments = payments.filter(p => 
-        matchesClient(p.client) &&
-        (p.site?.trim().toLowerCase() === site.name?.trim().toLowerCase() || 
-         p.site?.trim().toLowerCase() === site.id.toLowerCase()) &&
-        isWithinReportDate(p.date)
-      );
+      // Resolve payments allocated to this site (including split multi-invoice payments)
+      const sitePayments = payments.flatMap(p => {
+        if (!matchesClient(p.client) || !isWithinReportDate(p.date)) return [];
+
+        const isHeaderSite =
+          p.site?.trim().toLowerCase() === site.name?.trim().toLowerCase() ||
+          p.site?.trim().toLowerCase() === site.id.toLowerCase();
+
+        if (p.allocations && p.allocations.length > 0) {
+          let allocatedToThisSiteCash = 0;
+          let totalAllocatedCash = 0;
+          const matchingInvoices: string[] = [];
+
+          p.allocations.forEach(alloc => {
+            const invObj = invoices.find(inv => inv.id === alloc.invoiceId);
+            const allocSite = (
+              alloc.site ||
+              invObj?.siteName ||
+              (invObj as any)?.site ||
+              (invObj as any)?.project ||
+              p.site ||
+              ''
+            ).trim().toLowerCase();
+
+            const isThisSite = allocSite === site.name?.trim().toLowerCase() || allocSite === site.id.toLowerCase();
+            const aCash = Number(alloc.amount || 0);
+            totalAllocatedCash += aCash;
+
+            if (isThisSite && aCash > 0) {
+              allocatedToThisSiteCash += aCash;
+              if (alloc.invoiceNumber) matchingInvoices.push(alloc.invoiceNumber);
+            }
+          });
+
+          const results: any[] = [];
+          if (allocatedToThisSiteCash > 0) {
+            results.push({
+              ...p,
+              id: `${p.id}-site-${site.id}`,
+              amount: allocatedToThisSiteCash,
+              isSplitAllocation: true,
+              splitInvoiceRef: matchingInvoices.length > 0 ? matchingInvoices.join(', ') : undefined,
+            });
+          }
+
+          // If this site is the payment header site and there was unapplied/leftover cash
+          if (isHeaderSite) {
+            const remCash = Math.max(0, (p.amount || 0) - totalAllocatedCash);
+            if (remCash > 0.001) {
+              results.push({
+                ...p,
+                id: `${p.id}-unapplied`,
+                amount: remCash,
+                isUnappliedBalance: true,
+              });
+            }
+          }
+
+          return results;
+        }
+
+        // Standard payment (single invoice or unallocated)
+        if (isHeaderSite) {
+          return [p];
+        }
+        return [];
+      });
 
       const siteTotalInvoiced = siteInvoices.reduce((sum, i) => sum + (i.totalCharge || i.amount || 0), 0);
       const siteTotalCollected = sitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -691,7 +752,12 @@ export function Client360() {
       `).join('') : `<tr><td colspan="4" class="empty-cell">No invoices recorded for this site</td></tr>`;
 
       const paymentsRows = sitePayments.length > 0 ? sitePayments.map(pay => {
-        const methodDisplay = pay.payVat === 'Add' ? 'Bank Transfer (Add VAT)' : pay.payVat === 'Yes' ? 'Direct Transfer (VAT Incl.)' : 'Bank Transfer / ACH';
+        let methodDisplay = pay.payVat === 'Add' ? 'Bank Transfer (Add VAT)' : pay.payVat === 'Yes' ? 'Direct Transfer (VAT Incl.)' : 'Bank Transfer / ACH';
+        if (pay.isSplitAllocation) {
+          methodDisplay += ` · Split Allocated${pay.splitInvoiceRef ? ` (Inv: ${pay.splitInvoiceRef})` : ''}`;
+        } else if (pay.isUnappliedBalance) {
+          methodDisplay += ' · Unapplied Remainder';
+        }
         return `
           <tr>
             <td>${pay.date ? new Date(normalizeDate(pay.date)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
@@ -4077,12 +4143,71 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                   isWithinReportDate(i.date)
                                 );
 
-                                const sitePayments = payments.filter(p => 
-                                  matchesClient(p.client) &&
-                                  (p.site?.trim().toLowerCase() === site.name?.trim().toLowerCase() || 
-                                   p.site?.trim().toLowerCase() === site.id.toLowerCase()) &&
-                                  isWithinReportDate(p.date)
-                                );
+                                // Resolve payments allocated to this site (including split multi-invoice payments)
+                                const sitePayments = payments.flatMap(p => {
+                                  if (!matchesClient(p.client) || !isWithinReportDate(p.date)) return [];
+
+                                  const isHeaderSite =
+                                    p.site?.trim().toLowerCase() === site.name?.trim().toLowerCase() || 
+                                    p.site?.trim().toLowerCase() === site.id.toLowerCase();
+
+                                  if (p.allocations && p.allocations.length > 0) {
+                                    let allocatedToThisSiteCash = 0;
+                                    let totalAllocatedCash = 0;
+                                    const matchingInvoices: string[] = [];
+
+                                    p.allocations.forEach(alloc => {
+                                      const invObj = invoices.find(inv => inv.id === alloc.invoiceId);
+                                      const allocSite = (
+                                        alloc.site ||
+                                        invObj?.siteName ||
+                                        (invObj as any)?.site ||
+                                        (invObj as any)?.project ||
+                                        p.site ||
+                                        ''
+                                      ).trim().toLowerCase();
+
+                                      const isThisSite = allocSite === site.name?.trim().toLowerCase() || allocSite === site.id.toLowerCase();
+                                      const aCash = Number(alloc.amount || 0);
+                                      totalAllocatedCash += aCash;
+
+                                      if (isThisSite && aCash > 0) {
+                                        allocatedToThisSiteCash += aCash;
+                                        if (alloc.invoiceNumber) matchingInvoices.push(alloc.invoiceNumber);
+                                      }
+                                    });
+
+                                    const results: any[] = [];
+                                    if (allocatedToThisSiteCash > 0) {
+                                      results.push({
+                                        ...p,
+                                        id: `${p.id}-site-${site.id}`,
+                                        amount: allocatedToThisSiteCash,
+                                        isSplitAllocation: true,
+                                        splitInvoiceRef: matchingInvoices.length > 0 ? matchingInvoices.join(', ') : undefined,
+                                      });
+                                    }
+
+                                    if (isHeaderSite) {
+                                      const remCash = Math.max(0, (p.amount || 0) - totalAllocatedCash);
+                                      if (remCash > 0.001) {
+                                        results.push({
+                                          ...p,
+                                          id: `${p.id}-unapplied`,
+                                          amount: remCash,
+                                          isUnappliedBalance: true,
+                                        });
+                                      }
+                                    }
+
+                                    return results;
+                                  }
+
+                                  if (isHeaderSite) {
+                                    return [p];
+                                  }
+                                  return [];
+                                });
 
                                 const siteTotalInvoiced = siteInvoices.reduce((sum, i) => sum + (i.totalCharge || i.amount || 0), 0);
                                 const siteTotalCollected = sitePayments.reduce((sum, p) => sum + (p.amount || 0), 0);
@@ -4171,11 +4296,16 @@ EXECUTIVE ASSISTANT BRIEFING INSTRUCTIONS (MANDATORY):
                                               </thead>
                                               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11px]">
                                                 {sitePayments.map((pay, idx) => {
-                                                  const methodDisplay = pay.payVat === 'Add' 
+                                                  let methodDisplay = pay.payVat === 'Add' 
                                                     ? 'Bank Transfer (Add VAT)' 
                                                     : pay.payVat === 'Yes' 
                                                     ? 'Direct Transfer (VAT Incl.)' 
                                                     : 'Bank Transfer / ACH';
+                                                  if (pay.isSplitAllocation) {
+                                                    methodDisplay += ` · Split Allocated${pay.splitInvoiceRef ? ` (Inv: ${pay.splitInvoiceRef})` : ''}`;
+                                                  } else if (pay.isUnappliedBalance) {
+                                                    methodDisplay += ' · Unapplied Remainder';
+                                                  }
                                                   return (
                                                     <tr key={pay.id || idx} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                                                       <td className="p-2.5 text-slate-600 dark:text-slate-400 font-medium">

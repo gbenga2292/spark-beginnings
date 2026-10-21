@@ -72,6 +72,16 @@ export async function cacheTimestamp(key: string): Promise<string | null> {
   return entry?.lastUpdated ?? null;
 }
 
+/** Delete a specific cached key. */
+export async function cacheDelete(key: string): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.delete(STORE_NAME, key);
+  } catch (err) {
+    console.warn('[OfflineCache] Failed to delete cache for', key, err);
+  }
+}
+
 /** Clear all cached data. */
 export async function cacheClear(): Promise<void> {
   try {

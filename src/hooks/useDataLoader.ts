@@ -220,6 +220,10 @@ export function useDataLoader(isAuthenticated: boolean) {
           ...(appData.monthValues && Object.keys(appData.monthValues as any).length > 0 ? { monthValues: appData.monthValues as any } : {}),
           // Mark the current year as fully loaded if we fetched attendance
           loadedAttendanceYears: appData.attendanceRecords && appData.attendanceRecords.length > 0 ? [new Date().getFullYear()] : [],
+          // Mark the current year as fully loaded if we fetched ledger entries
+          loadedLedgerYears: (appData as any).loadedLedgerYears || (appData.ledgerEntries && appData.ledgerEntries.length > 0 ? [new Date().getFullYear()] : []),
+          dbLedgerCount: (appData as any).dbLedgerCount ?? (appData.ledgerEntries ? appData.ledgerEntries.length : null),
+          ledgerSyncError: null,
         };
 
         // Hydrate appStore
@@ -783,13 +787,19 @@ export function useRealtimeData(isAuthenticated: boolean) {
               const current = appState.ledgerEntries;
               if (eventType === 'INSERT') {
                 if (!current.some(e => e.id === newRow.id)) {
-                  useAppStore.setState({ ledgerEntries: [dbToLedgerEntry(newRow), ...current] });
+                  useAppStore.setState({ 
+                    ledgerEntries: [dbToLedgerEntry(newRow), ...current],
+                    dbLedgerCount: appState.dbLedgerCount !== null ? appState.dbLedgerCount + 1 : null,
+                  });
                 }
               } else if (eventType === 'UPDATE') {
                 const updated = dbToLedgerEntry(newRow);
                 useAppStore.setState({ ledgerEntries: current.map(e => e.id === updated.id ? updated : e) });
               } else if (eventType === 'DELETE') {
-                useAppStore.setState({ ledgerEntries: current.filter(e => e.id !== oldRow.id) });
+                useAppStore.setState({ 
+                  ledgerEntries: current.filter(e => e.id !== oldRow.id),
+                  dbLedgerCount: appState.dbLedgerCount !== null ? Math.max(0, appState.dbLedgerCount - 1) : null,
+                });
               }
               break;
             }

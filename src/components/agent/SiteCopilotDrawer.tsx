@@ -217,7 +217,7 @@ export function SiteCopilotDrawer({ isOpen, onClose }: Props) {
         'Generate VAT inclusive invoice',
       ];
     }
-    if (path.includes('/ledger') || path.includes('/company-expenses')) {
+    if (path.includes('/ledger') || path.includes('/vendor-invoices')) {
       return [
         'Record ₦250,000 diesel expense from GTBank',
         'Log equipment maintenance voucher for ₦180,000',

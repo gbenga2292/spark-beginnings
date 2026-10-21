@@ -5,7 +5,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
 import { TabsContent } from '@/src/components/ui/tabs';
-import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, ChevronUp, Filter, Plus, Users, Edit2, Receipt, Percent, Calendar, Building2, Calculator, Link, AlertCircle, Clock, ArrowUpRight, Layers } from 'lucide-react';
+import { Search, Download, Upload, FileText, ChevronLeft, ChevronRight, X, Eye, BookOpen, RotateCcw, Trash2, LayoutGrid, BarChart2, CheckCircle2, History, ChevronDown, ChevronUp, Filter, Plus, Users, Edit2, Receipt, Percent, Calendar, Building2, Calculator, Link, AlertCircle, Clock, ArrowUpRight, Layers, Loader2, RefreshCw } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
@@ -93,13 +93,18 @@ export function Ledger() {
   const updateLedgerVendor = useAppStore((state) => state.updateLedgerVendor);
   const removeLedgerVendor = useAppStore((state) => state.removeLedgerVendor);
 
+  const loadedLedgerYears = useAppStore((state) => state.loadedLedgerYears);
+  const ledgerYearLoading = useAppStore((state) => state.ledgerYearLoading);
+  const dbLedgerCount = useAppStore((state) => state.dbLedgerCount);
+  const ledgerSyncError = useAppStore((state) => state.ledgerSyncError);
+  const fetchLedgerYearIfNeeded = useAppStore((state) => state.fetchLedgerYearIfNeeded);
+  const syncLedgerCurrentYear = useAppStore((state) => state.syncLedgerCurrentYear);
+
+  // Initial load: ensure current year records are fetched if not already cached
   useEffect(() => {
-    if (ledgerEntries.length === 0) {
-      fetchLedgerData().then(data => {
-        useAppStore.setState(data);
-      }).catch(console.error);
-    }
-  }, [ledgerEntries.length]);
+    const currentYear = new Date().getFullYear();
+    fetchLedgerYearIfNeeded(currentYear);
+  }, [fetchLedgerYearIfNeeded]);
 
   const [tab, setTab] = useState<'entry' | 'records' | 'vat'>('entry');
   const [vatSearch, setVatSearch] = useState('');
@@ -315,20 +320,18 @@ export function Ledger() {
     return Array.from(vSet).sort();
   }, [ledgerEntries]);
 
-  const pendingLedgerEntries = useAppStore((state) => state.pendingLedgerEntries);
-  const clearPendingLedgerEntries = useAppStore((state) => state.clearPendingLedgerEntries);
-  const updateCompanyExpense = useAppStore((state) => state.updateCompanyExpense);
   const setLedgerDirty = useAppStore((state) => state.setLedgerDirty);
 
-  const [hasUnsavedPending, setHasUnsavedPending] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const [quickVendor, setQuickVendor] = useState('');
   const [quickTin, setQuickTin] = useState('');
+  const [quickServices, setQuickServices] = useState('');
   const [showVendorDialog, setShowVendorDialog] = useState(false);
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [vendorRenameValue, setVendorRenameValue] = useState('');
   const [tinRenameValue, setTinRenameValue] = useState('');
+  const [servicesRenameValue, setServicesRenameValue] = useState('');
 
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [quickCategory, setQuickCategory] = useState('');
@@ -362,9 +365,15 @@ export function Ledger() {
       toast.error('Vendor already exists');
       return;
     }
-    addLedgerVendor({ id: generateId(), name: quickVendor.trim(), tinNumber: quickTin.trim() });
+    addLedgerVendor({
+      id: generateId(),
+      name: quickVendor.trim(),
+      tinNumber: quickTin.trim() || undefined,
+      servicesRendered: quickServices.trim() || undefined
+    });
     setQuickVendor('');
     setQuickTin('');
+    setQuickServices('');
     toast.success(`Vendor "${quickVendor.trim()}" added`);
   };
 
@@ -372,11 +381,13 @@ export function Ledger() {
     if (!vendorRenameValue.trim()) return;
     updateLedgerVendor(id, { 
       name: vendorRenameValue.trim(),
-      tinNumber: tinRenameValue.trim()
+      tinNumber: tinRenameValue.trim() || undefined,
+      servicesRendered: servicesRenameValue.trim() || undefined
     });
     setEditingVendorId(null);
     setVendorRenameValue('');
     setTinRenameValue('');
+    setServicesRenameValue('');
     toast.success('Vendor updated');
   };
 
@@ -428,8 +439,8 @@ export function Ledger() {
 
 
   const isLedgerDirty = useMemo(() => {
-    return JSON.stringify(items) !== originalItemsJSON || hasUnsavedPending;
-  }, [items, originalItemsJSON, hasUnsavedPending]);
+    return JSON.stringify(items) !== originalItemsJSON;
+  }, [items, originalItemsJSON]);
 
   useEffect(() => {
     setLedgerDirty(isLedgerDirty);
@@ -459,33 +470,7 @@ export function Ledger() {
     return `${prefix}${newSeq}`;
   }, [voucherDate, ledgerEntries]);
 
-  // Handle pending entries from CompanyExpenses
-  useEffect(() => {
-    if (pendingLedgerEntries && pendingLedgerEntries.length > 0) {
-      setHasUnsavedPending(true);
-      setTab('entry');
-      setActiveVoucherNo('');
-      setVoucherDate(new Date().toISOString().split('T')[0]);
-      
-      const firstEntry = pendingLedgerEntries[0];
-      if (firstEntry && firstEntry.paidFrom) {
-        setPaidFrom(firstEntry.paidFrom);
-      }
 
-      const newItems = Array(8).fill(null).map(() => getEmptyItem());
-      pendingLedgerEntries.slice(0, 8).forEach((exp, idx) => {
-        newItems[idx] = {
-          ...newItems[idx],
-          transactionDate: exp.date,
-          description: exp.description + (exp.paidToBankName ? ` (To: ${exp.paidToBankName} ${exp.paidToAccountNo})` : ''),
-          amount: String(exp.amount),
-        };
-      });
-      setItems(newItems);
-      
-      toast.info('Loaded pending expenses. Please assign categories and save.');
-    }
-  }, [pendingLedgerEntries]);
 
   // Warn on tab close/reload
   useEffect(() => {
@@ -574,10 +559,6 @@ export function Ledger() {
   const handlePrevVoucher = () => navigateSequence('prev');
 
   const handleClear = () => {
-    if (hasUnsavedPending) {
-      toast.error('You cannot clear the form while you have unsaved pending expenses.');
-      return;
-    }
     setActiveVoucherNo('');
     setLoadedVoucherNo('');
     const newItems = Array(8).fill(null).map(() => getEmptyItem());
@@ -739,18 +720,7 @@ export function Ledger() {
       }
     });
 
-    if (hasUnsavedPending) {
-      pendingLedgerEntries.forEach(exp => {
-        updateCompanyExpense(exp.id, { status: 'Saved to Ledger' });
-        const hasVip = useAppStore.getState().vendorInvoicePayments.some(p => p.id === exp.id);
-        if (hasVip) {
-          useAppStore.getState().updateVendorInvoicePayment(exp.id, { ledgerEntryId: targetVoucherNo });
-        }
-      });
-      clearPendingLedgerEntries();
-      setHasUnsavedPending(false);
-      toast.success('Pending expenses/payments moved to ledger and marked as saved.');
-    }
+
 
     toast.success(`Saved voucher ${targetVoucherNo}.`);
     // After submit, clear the form for the next voucher
@@ -855,12 +825,32 @@ export function Ledger() {
   const [toDate, setToDate] = useState('');
   const [dateFilterType, setDateFilterType] = useState<'transaction' | 'voucher'>('transaction');
 
+  // Dynamically load any requested historical year on-demand when filters change
+  useEffect(() => {
+    const yearsToLoad = new Set<number>();
+    if (fromDate) {
+      const y = parseInt(fromDate.slice(0, 4), 10);
+      if (!isNaN(y) && y > 2000 && y < 2100) yearsToLoad.add(y);
+    }
+    if (toDate) {
+      const y = parseInt(toDate.slice(0, 4), 10);
+      if (!isNaN(y) && y > 2000 && y < 2100) yearsToLoad.add(y);
+    }
+    if (tab === 'vat' && selectedVatMonth && selectedVatMonth !== 'all') {
+      const y = parseInt(selectedVatMonth.slice(0, 4), 10);
+      if (!isNaN(y) && y > 2000 && y < 2100) yearsToLoad.add(y);
+    }
+    yearsToLoad.forEach(yr => {
+      fetchLedgerYearIfNeeded(yr);
+    });
+  }, [fromDate, toDate, tab, selectedVatMonth, fetchLedgerYearIfNeeded]);
+
   const filteredEntries = useMemo(() => {
     return ledgerEntries.filter(e => {
       if (fromDate || toDate) {
-        let targetDate = e.date;
+        let targetDate = (e.date || '').split('T')[0].trim();
         if (dateFilterType === 'voucher') {
-          const match = e.voucherNo.match(/^VN(\d{2})-(\d{2})-(\d{2})/);
+          const match = (e.voucherNo || '').match(/^VN(\d{2})-(\d{2})-(\d{2})/);
           if (match) targetDate = `20${match[1]}-${match[2]}-${match[3]}`;
         }
         if (fromDate && targetDate < fromDate) return false;
@@ -1222,7 +1212,7 @@ export function Ledger() {
         )}
       </div>
     </div>,
-    [tab, priv, hasUnsavedPending, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, showMobileFilters]
+    [tab, priv, activeVoucherNo, ledgerEntries, voucherDate, paidFrom, items, currentUser, voucherSummaries.length, showMobileFilters]
   );
 
   if (!priv?.canView) {
@@ -1352,7 +1342,7 @@ export function Ledger() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className={`h-9 px-4 gap-2 border-slate-300 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight ${hasUnsavedPending ? 'opacity-40 pointer-events-none' : 'hover:bg-slate-50'}`} 
+                  className="h-9 px-4 gap-2 border-slate-300 bg-white text-slate-600 font-bold text-[11px] uppercase tracking-tight hover:bg-slate-50 cursor-pointer" 
                   onClick={handleClear}
                 >
                   <X className="h-3.5 w-3.5" /> Clear
@@ -1385,7 +1375,8 @@ export function Ledger() {
             </Button>
           </div>
 
-          {/* Grid Table */}
+
+
           {/* Grid Table */}
           <div className="overflow-x-auto select-none">
             {/* Mobile View */}
@@ -1849,16 +1840,51 @@ export function Ledger() {
                 )}
               </div>
               
-              <div className="flex items-center gap-2 py-1.5 px-3 bg-blue-50/80 dark:bg-blue-950/40 rounded-sm border border-blue-200 dark:border-blue-800 ml-auto">
+              <div className="flex flex-wrap items-center gap-2 py-1.5 px-3 bg-blue-50/80 dark:bg-blue-950/40 rounded-sm border border-blue-200 dark:border-blue-800 ml-auto">
                 <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">
                   Filtered Total:
                 </span>
-                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 font-mono tabular-nums tabular-nums">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100 font-mono tabular-nums">
                   ₦{filteredTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
+                {ledgerYearLoading ? (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 bg-blue-100/70 dark:bg-blue-900/40 px-2 py-0.5 rounded-full">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" /> Syncing...
+                  </span>
+                ) : ledgerSyncError ? (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-100/80 dark:bg-amber-950/60 px-2 py-0.5 rounded-full" title="Database unreachable; showing local cache">
+                    ⚠️ Unverified / Reconnecting
+                  </span>
+                ) : (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full">
+                    ✓ Complete ({filteredEntries.length} items)
+                  </span>
+                )}
               </div>
             </div>
           </CardHeader>
+
+          {ledgerSyncError && (
+            <div className="mx-6 mt-4 p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-md flex flex-wrap items-center justify-between gap-3 text-amber-900 dark:text-amber-200">
+              <div className="flex items-center gap-2 text-xs font-medium">
+                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                <span>
+                  <strong>Database Connection Warning:</strong> {ledgerSyncError}. Previously loaded records remain visible below as <span className="font-semibold underline">Unverified / Reconnecting</span>.
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => syncLedgerCurrentYear()}
+                disabled={ledgerYearLoading}
+                className="h-7 text-xs border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-900 font-bold"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1.5 ${ledgerYearLoading ? 'animate-spin' : ''}`} />
+                Retry Sync
+              </Button>
+            </div>
+          )}
+
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               {historyViewMode === 'detailed' ? (
@@ -1916,9 +1942,19 @@ export function Ledger() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedEntries.length === 0 ? (
+                    {ledgerYearLoading ? (
                       <tr>
-                        <td colSpan={10} className="py-12 text-center text-slate-400 italic text-sm">
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                            <p className="text-xs font-semibold text-slate-600">Loading ledger records from database...</p>
+                            <p className="text-[11px] text-slate-400">Fetching complete partition for selected date range</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : sortedEntries.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-12 text-center text-slate-400 italic text-sm">
                           No entries found.
                         </td>
                       </tr>
@@ -2025,7 +2061,12 @@ export function Ledger() {
                 <>
                   {/* Mobile card list */}
                   <div className="md:hidden divide-y divide-slate-100">
-                    {voucherSummaries.length === 0 ? (
+                    {ledgerYearLoading ? (
+                      <div className="py-12 text-center text-slate-500">
+                        <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-slate-600">Loading vouchers...</p>
+                      </div>
+                    ) : voucherSummaries.length === 0 ? (
                       <div className="py-12 text-center text-slate-400 text-sm italic">No vouchers found.</div>
                     ) : (
                       voucherSummaries.map((v, i) => (
@@ -2090,7 +2131,17 @@ export function Ledger() {
                       </tr>
                     </thead>
                     <tbody>
-                      {voucherSummaries.length === 0 ? (
+                      {ledgerYearLoading ? (
+                        <tr>
+                          <td colSpan={6} className="py-12 text-center text-slate-500">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                              <p className="text-xs font-semibold text-slate-600">Loading vouchers from database...</p>
+                              <p className="text-[11px] text-slate-400">Fetching complete partition for selected date range</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : voucherSummaries.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="py-12 text-center text-slate-400 italic text-sm">No vouchers found.</td>
                         </tr>
@@ -2312,7 +2363,14 @@ export function Ledger() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {paginatedVatEntries.length === 0 ? (
+                  {ledgerYearLoading ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-500">
+                        <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-slate-600">Loading VAT expenses records...</p>
+                      </td>
+                    </tr>
+                  ) : paginatedVatEntries.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-slate-400 italic">
                         <Receipt className="h-8 w-8 mx-auto text-slate-300 mb-1.5 stroke-[1.5]" />
@@ -3110,7 +3168,7 @@ export function Ledger() {
                 <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
                   <Plus className="h-3 w-3 text-blue-600" /> Add New Vendor
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-[1.5fr_1.5fr_auto] gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_1fr_1.2fr_auto] gap-3 items-end">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-semibold text-slate-500">Vendor Name</label>
                     <Input 
@@ -3118,7 +3176,7 @@ export function Ledger() {
                       value={quickVendor}
                       onChange={e => setQuickVendor(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
-                      className="h-9 text-xs  border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                      className="h-9 text-xs border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -3128,10 +3186,20 @@ export function Ledger() {
                       value={quickTin}
                       onChange={e => setQuickTin(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
-                      className="h-9 text-xs  border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono transition-colors"
+                      className="h-9 text-xs border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono transition-colors"
                     />
                   </div>
-                  <Button onClick={handleAddVendor} className="h-9 bg-blue-600 hover:bg-blue-700 text-white  gap-2 px-6 w-full sm:w-auto">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500">Services Rendered <span className="text-slate-400 font-normal">(Optional)</span></label>
+                    <Input 
+                      placeholder="e.g. Haulage, Equipment..." 
+                      value={quickServices}
+                      onChange={e => setQuickServices(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddVendor()}
+                      className="h-9 text-xs border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                    />
+                  </div>
+                  <Button onClick={handleAddVendor} className="h-9 bg-blue-600 hover:bg-blue-700 text-white gap-2 px-6 w-full sm:w-auto">
                     Add Vendor
                   </Button>
                 </div>
@@ -3148,6 +3216,7 @@ export function Ledger() {
                   <TableHeader className="bg-slate-50">
                     <TableRow>
                       <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 px-4">Vendor Name</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 px-4">Services Rendered</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 px-4">TIN Number</TableHead>
                       <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-10 text-right px-4">Actions</TableHead>
                     </TableRow>
@@ -3155,7 +3224,7 @@ export function Ledger() {
                   <TableBody>
                     {sortedVendors.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} className="h-24 text-center text-slate-400 text-xs italic">No vendors registered yet.</TableCell>
+                        <TableCell colSpan={4} className="h-24 text-center text-slate-400 text-xs italic">No vendors registered yet.</TableCell>
                       </TableRow>
                     ) : (
                       sortedVendors.map(v => (
@@ -3174,6 +3243,22 @@ export function Ledger() {
                               />
                             ) : (
                               <span className="font-semibold text-slate-700 text-sm">{v.name}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-2 px-4">
+                            {editingVendorId === v.id ? (
+                              <Input 
+                                value={servicesRenameValue} 
+                                onChange={e => setServicesRenameValue(e.target.value)}
+                                className="h-8 text-xs focus:ring-blue-500/20"
+                                placeholder="Services..."
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleRenameVendor(v.id);
+                                  if (e.key === 'Escape') setEditingVendorId(null);
+                                }}
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-600 dark:text-slate-400">{v.servicesRendered || '—'}</span>
                             )}
                           </TableCell>
                           <TableCell className="py-2 px-4">
@@ -3208,6 +3293,7 @@ export function Ledger() {
                                     setEditingVendorId(v.id);
                                     setVendorRenameValue(v.name);
                                     setTinRenameValue(v.tinNumber || '');
+                                    setServicesRenameValue(v.servicesRendered || '');
                                   }}
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />

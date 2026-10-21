@@ -71,9 +71,62 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
     );
     const totalBilled = siteInvoices.reduce((a, i) => a + (i.totalCharge || i.amount || 0), 0);
 
-    const sitePayments = payments.filter(p =>
-      p.site?.trim() === site.name.trim() && isWithinFilter(p.date)
-    );
+    const sitePayments = payments.flatMap(p => {
+      if (!isWithinFilter(p.date)) return [];
+      const isHeaderSite = p.site?.trim() === site.name.trim();
+
+      if (p.allocations && p.allocations.length > 0) {
+        let allocatedToThisSiteCash = 0;
+        let totalAllocatedCash = 0;
+
+        p.allocations.forEach(alloc => {
+          const invObj = invoices.find(inv => inv.id === alloc.invoiceId);
+          const allocSite = (
+            alloc.site ||
+            invObj?.siteName ||
+            (invObj as any)?.site ||
+            (invObj as any)?.project ||
+            p.site ||
+            ''
+          ).trim().toLowerCase();
+
+          const isThisSite = allocSite === site.name.trim().toLowerCase();
+          const aCash = Number(alloc.amount || 0);
+          totalAllocatedCash += aCash;
+
+          if (isThisSite) {
+            allocatedToThisSiteCash += aCash;
+          }
+        });
+
+        const results: any[] = [];
+        if (allocatedToThisSiteCash > 0) {
+          results.push({
+            ...p,
+            id: `${p.id}-site-${site.id || site.name}`,
+            amount: allocatedToThisSiteCash,
+          });
+        }
+
+        if (isHeaderSite) {
+          const remCash = Math.max(0, (p.amount || 0) - totalAllocatedCash);
+          if (remCash > 0.001) {
+            results.push({
+              ...p,
+              id: `${p.id}-unapplied`,
+              amount: remCash,
+            });
+          }
+        }
+
+        return results;
+      }
+
+      if (isHeaderSite) {
+        return [p];
+      }
+      return [];
+    });
     const totalReceived = sitePayments.reduce((a, p) => a + (p.amount || 0), 0);
     const outstanding = totalBilled - totalReceived;
 

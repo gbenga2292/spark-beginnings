@@ -138,7 +138,7 @@ export function useAgentContext() {
       };
     }
 
-    if (p.includes('/ledger') || p.includes('/company-expenses') || p.includes('/bank-import') || p.includes('/financial-reports')) {
+    if (p.includes('/ledger') || p.includes('/vendor-invoices') || p.includes('/bank-import') || p.includes('/financial-reports')) {
       return {
         path: p,
         moduleName: 'Financial Ledger & Expenses',

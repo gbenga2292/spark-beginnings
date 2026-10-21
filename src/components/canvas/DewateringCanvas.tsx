@@ -8,6 +8,7 @@ import { Check, X } from 'lucide-react';
 import { ActiveTool } from './Toolbar';
 import { DraggablePanel } from './DraggablePanel';
 import { toast } from '../ui/toast';
+import { AssetQuickToolbar, AssetPropertiesModal, AssetContextMenu, AutoFittingQuickToolbar, AutoFittingItem } from './AssetControlOverlay';
 
 interface DewateringCanvasProps {
   lines: LineData[];
@@ -384,6 +385,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   
   // Drag cancellation tracking
   const dragInfoRef = useRef<{ node: any, startX: number, startY: number, cancelled: boolean } | null>(null);
+  const selectedFittingRef = useRef<AutoFittingItem | null>(null);
+  const handleDeleteAutoFittingRef = useRef<((fit: AutoFittingItem, mode?: 'disconnect' | 'straighten') => void) | null>(null);
 
   const cancelCurrentDrag = useCallback(() => {
     if (dragInfoRef.current) {
@@ -410,6 +413,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // AutoCAD-style window/crossing marquee selection box
   const [selectionBox, setSelectionBox] = useState<{ start: Point; current: Point } | null>(null);
+
+  // Asset Configuration Modal & Context Menu State
+  const [editingAsset, setEditingAsset] = useState<PlacedComponent | null>(null);
+  const [assetContextMenu, setAssetContextMenu] = useState<{ x: number; y: number; comp: PlacedComponent } | null>(null);
+  const [hoveredFittingId, setHoveredFittingId] = useState<string | null>(null);
 
   const toggleSelectElement = (id: string, e?: any) => {
     if (e) {
@@ -447,6 +455,31 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const selectedArea = areas.find((a: any) => a.id === selectedId);
   const selectedLine = lines.find((l: any) => l.id === selectedId);
   const selectedHose = hoses.find((h: any) => h.id === selectedId);
+  const selectedComp = placedComponents.find((c: any) => c.id === selectedId);
+
+  const handleUpdateComponent = (id: string, updates: Partial<PlacedComponent>) => {
+    onPlacedComponentsChange(placedComponents.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const handleDeleteComponent = (id: string) => {
+    onPlacedComponentsChange(placedComponents.filter(c => c.id !== id));
+    if (selectedId === id) selectSingleElement(null);
+  };
+
+  const handleDuplicateComponent = (id: string) => {
+    const comp = placedComponents.find(c => c.id === id);
+    if (comp) {
+      const newComp: PlacedComponent = {
+        ...comp,
+        id: crypto.randomUUID(),
+        x: comp.x + 30,
+        y: comp.y + 30,
+      };
+      onPlacedComponentsChange([...placedComponents, newComp]);
+      selectSingleElement(newComp.id);
+      toast.success("Component duplicated.");
+    }
+  };
 
   // Are we currently dragging the whole line body (not a vertex)?
   const lineDragStartRef = useRef<{ points: Point[]; mouseX: number; mouseY: number } | null>(null);
@@ -867,12 +900,17 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
       placedComponents.forEach((c: any) => {
         if (c.type === 'pump' && isConnTool) {
-          // Always offer both suction and discharge ports for connection/select tools
-          const suctionPt = { x: c.x - 20, y: c.y };
+          // Calculate suction and discharge based on flipped state and rotation
+          const sOffset = c.flipped ? { x: 20, y: 0 } : { x: -20, y: 0 };
+          const dOffset = c.flipped ? { x: -20, y: 0 } : { x: 20, y: 0 };
+          const sRot = rotatePort(sOffset.x, sOffset.y, c.rotation || 0);
+          const dRot = rotatePort(dOffset.x, dOffset.y, c.rotation || 0);
+          const suctionPt = { x: c.x + sRot.x, y: c.y + sRot.y };
+          const dischargePt = { x: c.x + dRot.x, y: c.y + dRot.y };
+
           connectionPorts.push({ id: `pump-suction-${c.id}`, pt: suctionPt });
           snapLines.push({ id: `pump-suction-${c.id}`, points: [suctionPt, suctionPt] });
 
-          const dischargePt = { x: c.x + 20, y: c.y };
           connectionPorts.push({ id: `pump-discharge-${c.id}`, pt: dischargePt });
           snapLines.push({ id: `pump-discharge-${c.id}`, points: [dischargePt, dischargePt] });
         }
@@ -1483,7 +1521,12 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       }
 
       if (e.key === 'Shift') { setShiftHeld(true); e.preventDefault(); return; }
-      if (e.key === 'Delete') {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedFittingRef.current && handleDeleteAutoFittingRef.current) {
+          handleDeleteAutoFittingRef.current(selectedFittingRef.current, 'disconnect');
+          e.preventDefault();
+          return;
+        }
         if (selectedIds.size > 0) {
           if (onPlacedComponentsChange) {
             onPlacedComponentsChange(placedComponents.filter(c => !selectedIds.has(c.id)));
@@ -1704,10 +1747,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         type: activeTool as ComponentType,
         x: pt.x,
         y: pt.y,
+        rotation: 0,
+        flowRate: activeTool === 'pump' ? 150 : undefined,
+        flipped: false,
         levelId: activeLevelId,
         layerId: getToolLayerId(activeTool)
       };
       onPlacedComponentsChange([...placedComponents, newComp]);
+      selectSingleElement(newComp.id);
       return;
     }
 
@@ -2449,8 +2496,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
   const resolvedDistM = !isNaN(typedMeters) && typedMeters > 0 ? typedMeters : liveDistM;
 
   // --- Auto fittings logic ---
-  const autoFittings = useMemo(() => {
-    const fittings: { type: 'elbow' | 'tee'; x: number; y: number; rotation: number }[] = [];
+  const autoFittings = useMemo<AutoFittingItem[]>(() => {
+    const fittings: AutoFittingItem[] = [];
     const threshold = 12; // Snap distance in pixels (~8-12px)
 
     // Helper: point distance
@@ -2467,11 +2514,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     };
 
     // 1. Elbow detection: Two header pipe endpoints meet
-    const headerEndpoints: { pt: Point; parentId: string }[] = [];
+    const headerEndpoints: { pt: Point; parentId: string; endType: 'start' | 'end' }[] = [];
     lines.forEach(l => {
       if (l.points.length > 1) {
-        headerEndpoints.push({ pt: l.points[0], parentId: l.id });
-        headerEndpoints.push({ pt: l.points[l.points.length - 1], parentId: l.id });
+        headerEndpoints.push({ pt: l.points[0], parentId: l.id, endType: 'start' });
+        headerEndpoints.push({ pt: l.points[l.points.length - 1], parentId: l.id, endType: 'end' });
       }
     });
 
@@ -2481,7 +2528,13 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         if (headerEndpoints[i].parentId !== headerEndpoints[j].parentId) {
           if (ptDist(headerEndpoints[i].pt, headerEndpoints[j].pt) < threshold) {
             fittings.push({
+              id: `auto-elbow-meet-${headerEndpoints[i].parentId}-${headerEndpoints[j].parentId}`,
               type: 'elbow',
+              sourceType: 'meeting',
+              lineId: headerEndpoints[i].parentId,
+              lineIdB: headerEndpoints[j].parentId,
+              endTypeA: headerEndpoints[i].endType,
+              endTypeB: headerEndpoints[j].endType,
               x: (headerEndpoints[i].pt.x + headerEndpoints[j].pt.x) / 2,
               y: (headerEndpoints[i].pt.y + headerEndpoints[j].pt.y) / 2,
               rotation: 0
@@ -2504,7 +2557,13 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
               const { dist, proj } = distToSegment(hept.pt, a, b);
               if (dist < threshold) {
                 fittings.push({
+                  id: `auto-tee-${l.id}-${hept.parentId}-${i}`,
                   type: 'tee',
+                  sourceType: 'tee-branch',
+                  lineId: l.id,
+                  lineIdB: hept.parentId,
+                  pointIndex: i,
+                  endTypeB: hept.endType,
                   x: proj.x,
                   y: proj.y,
                   rotation: Math.atan2(b.y - a.y, b.x - a.x) * (180 / Math.PI)
@@ -2542,7 +2601,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           }
           
           fittings.push({
+            id: `auto-elbow-${l.id}-pt${i}`,
             type: 'elbow',
+            sourceType: 'internal',
+            lineId: l.id,
+            pointIndex: i,
             x: curr.x,
             y: curr.y,
             rotation: rot
@@ -2576,7 +2639,11 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
           }
 
           fittings.push({
+            id: `auto-elbow-closing-${l.id}`,
             type: 'elbow',
+            sourceType: 'closing',
+            lineId: l.id,
+            pointIndex: l.points.length - 1,
             x: curr.x,
             y: curr.y,
             rotation: rot
@@ -2586,7 +2653,7 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     });
 
     // Deduplicate fittings that land at the exact same pixel coord
-    const uniqueFittings: typeof fittings = [];
+    const uniqueFittings: AutoFittingItem[] = [];
     fittings.forEach(fit => {
       const isDup = uniqueFittings.some(uf => ptDist(uf, fit) < 5);
       if (!isDup) uniqueFittings.push(fit);
@@ -2594,6 +2661,155 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
     return uniqueFittings;
   }, [lines]);
+
+  const selectedFitting = useMemo(() => {
+    return autoFittings.find(f => f.id === selectedId) || null;
+  }, [autoFittings, selectedId]);
+
+  const handleDeleteAutoFitting = useCallback((fit: AutoFittingItem, mode: 'disconnect' | 'straighten' = 'disconnect') => {
+    if (fit.type === 'tee') {
+      if (fit.lineIdB) {
+        const branchLine = lines.find(l => l.id === fit.lineIdB);
+        if (branchLine && branchLine.points.length > 1) {
+          const isStart = fit.endTypeB === 'start';
+          const pMeeting = branchLine.points[isStart ? 0 : branchLine.points.length - 1];
+          const pNeighbor = branchLine.points[isStart ? 1 : branchLine.points.length - 2];
+          const dx = pNeighbor.x - pMeeting.x;
+          const dy = pNeighbor.y - pMeeting.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > 0) {
+            const shift = Math.min(15, dist / 2);
+            const newPt = { x: pMeeting.x + (dx / dist) * shift, y: pMeeting.y + (dy / dist) * shift };
+            const newPts = branchLine.points.map((p, idx) => (isStart ? idx === 0 : idx === branchLine.points.length - 1) ? newPt : p);
+            onLinesChange(lines.map(l => l.id === branchLine.id ? { ...l, points: newPts } : l));
+            selectSingleElement(null);
+            toast.success("Tee branch disconnected.");
+          }
+        }
+      }
+      return;
+    }
+
+    // --- Elbow Deletion ---
+    if (fit.sourceType === 'meeting') {
+      const lineA = lines.find(l => l.id === fit.lineId);
+      if (lineA && lineA.points.length > 1) {
+        const isStart = fit.endTypeA === 'start';
+        const pMeeting = lineA.points[isStart ? 0 : lineA.points.length - 1];
+        const pNeighbor = lineA.points[isStart ? 1 : lineA.points.length - 2];
+        const dx = pNeighbor.x - pMeeting.x;
+        const dy = pNeighbor.y - pMeeting.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0) {
+          const shift = Math.min(15, dist / 2);
+          const newPt = { x: pMeeting.x + (dx / dist) * shift, y: pMeeting.y + (dy / dist) * shift };
+          const newPts = lineA.points.map((p, idx) => (isStart ? idx === 0 : idx === lineA.points.length - 1) ? newPt : p);
+          onLinesChange(lines.map(l => l.id === lineA.id ? { ...l, points: newPts } : l));
+          selectSingleElement(null);
+          toast.success("Meeting elbow removed (lines disconnected).");
+        }
+      }
+      return;
+    }
+
+    if (fit.sourceType === 'closing') {
+      const line = lines.find(l => l.id === fit.lineId);
+      if (line && line.points.length > 3) {
+        const newPoints = line.points.slice(0, -1);
+        onLinesChange(lines.map(l => l.id === line.id ? { ...l, points: newPoints } : l));
+        selectSingleElement(null);
+        toast.success("Closing elbow removed (perimeter loop opened).");
+      }
+      return;
+    }
+
+    if (fit.sourceType === 'internal' && fit.pointIndex !== undefined) {
+      const line = lines.find(l => l.id === fit.lineId);
+      if (!line) return;
+      const idx = fit.pointIndex;
+
+      if (mode === 'straighten') {
+        const newPts = line.points.filter((_, i) => i !== idx);
+        if (newPts.length < 2) {
+          onLinesChange(lines.filter(l => l.id !== line.id));
+        } else {
+          onLinesChange(lines.map(l => l.id === line.id ? { ...l, points: newPts } : l));
+        }
+        selectSingleElement(null);
+        toast.success("Bend removed and line straightened.");
+        return;
+      }
+
+      // Mode: disconnect (open / break the corner)
+      const pFirst = line.points[0];
+      const pLast = line.points[line.points.length - 1];
+      const isClosedLoop = line.points.length >= 4 && Math.sqrt((pFirst.x - pLast.x) ** 2 + (pFirst.y - pLast.y) ** 2) < 15;
+
+      if (isClosedLoop) {
+        const basePts = line.points.slice(0, -1);
+        const n = basePts.length;
+        const rotated: Point[] = [];
+        for (let k = 0; k < n; k++) {
+          rotated.push(basePts[(idx + k) % n]);
+        }
+        const pStart = rotated[0];
+        const pSecond = rotated[1];
+        const dStart = Math.sqrt((pSecond.x - pStart.x) ** 2 + (pSecond.y - pStart.y) ** 2);
+        const shiftStart = dStart > 0 ? Math.min(10, dStart / 2) : 0;
+        const newStart = dStart > 0 ? {
+          x: pStart.x + ((pSecond.x - pStart.x) / dStart) * shiftStart,
+          y: pStart.y + ((pSecond.y - pStart.y) / dStart) * shiftStart
+        } : pStart;
+
+        const pEnd = rotated[rotated.length - 1];
+        const pPenult = rotated[rotated.length - 2];
+        const dEnd = Math.sqrt((pEnd.x - pPenult.x) ** 2 + (pEnd.y - pPenult.y) ** 2);
+        const shiftEnd = dEnd > 0 ? Math.min(10, dEnd / 2) : 0;
+        const newEnd = dEnd > 0 ? {
+          x: pEnd.x - ((pEnd.x - pPenult.x) / dEnd) * shiftEnd,
+          y: pEnd.y - ((pEnd.y - pPenult.y) / dEnd) * shiftEnd
+        } : pEnd;
+
+        const openPoints = [newStart, ...rotated.slice(1, -1), newEnd];
+        onLinesChange(lines.map(l => l.id === line.id ? { ...l, points: openPoints } : l));
+        selectSingleElement(null);
+        toast.success("Corner elbow removed (perimeter loop disconnected at corner).");
+      } else {
+        const pCurr = line.points[idx];
+        const pPrev = line.points[idx - 1];
+        const pNext = line.points[idx + 1];
+
+        const dPrev = Math.sqrt((pCurr.x - pPrev.x) ** 2 + (pCurr.y - pPrev.y) ** 2);
+        const shiftPrev = dPrev > 0 ? Math.min(10, dPrev / 2) : 0;
+        const newEnd1 = dPrev > 0 ? {
+          x: pCurr.x - ((pCurr.x - pPrev.x) / dPrev) * shiftPrev,
+          y: pCurr.y - ((pCurr.y - pPrev.y) / dPrev) * shiftPrev
+        } : pCurr;
+
+        const dNext = Math.sqrt((pNext.x - pCurr.x) ** 2 + (pNext.y - pCurr.y) ** 2);
+        const shiftNext = dNext > 0 ? Math.min(10, dNext / 2) : 0;
+        const newStart2 = dNext > 0 ? {
+          x: pCurr.x + ((pNext.x - pCurr.x) / dNext) * shiftNext,
+          y: pCurr.y + ((pNext.y - pCurr.y) / dNext) * shiftNext
+        } : pCurr;
+
+        const line1Points = [...line.points.slice(0, idx), newEnd1];
+        const line2Points = [newStart2, ...line.points.slice(idx + 1)];
+
+        const line1: LineData = { ...line, points: line1Points };
+        const line2: LineData = { ...line, id: crypto.randomUUID(), points: line2Points };
+
+        const newLines = lines.map(l => l.id === line.id ? line1 : l);
+        newLines.push(line2);
+        onLinesChange(newLines);
+        selectSingleElement(null);
+        toast.success("Corner elbow removed (pipeline split into two runs).");
+      }
+    }
+  }, [lines, onLinesChange, selectSingleElement]);
+
+  selectedFittingRef.current = selectedFitting;
+  handleDeleteAutoFittingRef.current = handleDeleteAutoFitting;
 
   // ---------- component renderer ----------
   const renderComponent = (comp: PlacedComponent) => {
@@ -2627,12 +2843,34 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       if (activeTool === 'delete') { onPlacedComponentsChange(placedComponents.filter(c => c.id !== comp.id)); e.cancelBubble = true; }
     };
 
+    const handleCompContextMenu = (e: any) => {
+      e.cancelBubble = true;
+      if (e.evt) {
+        e.evt.preventDefault();
+        e.evt.stopPropagation();
+      }
+      selectSingleElement(comp.id);
+      setAssetContextMenu({
+        x: e.evt?.clientX || 200,
+        y: e.evt?.clientY || 200,
+        comp,
+      });
+    };
+
     const base = {
       onClick: handleCompClick,
       onTap: handleCompClick,
-      onContextMenu: (e: any) => {
+      onContextMenu: handleCompContextMenu,
+      onDblClick: (e: any) => {
         if (activeTool === 'select') {
-          toggleSelectElement(comp.id, e);
+          setEditingAsset(comp);
+          e.cancelBubble = true;
+        }
+      },
+      onDblTap: (e: any) => {
+        if (activeTool === 'select') {
+          setEditingAsset(comp);
+          e.cancelBubble = true;
         }
       },
       draggable: isDraggable,
@@ -2641,30 +2879,61 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
     };
 
     switch (comp.type) {
-      case 'pump': return (
-        <Group key={comp.id} {...base}>
-          {isLocked && <Text x={comp.x - 5} y={comp.y - 30} text="📌" fontSize={14} listening={false} />}
-          {/* Pump body shadow */}
-          <Rect x={comp.x - 22} y={comp.y - 17} width={44} height={34} fill="rgba(0,0,0,0.1)" cornerRadius={3} listening={false} />
-          {/* Main pump block */}
-          <Rect x={comp.x - 20} y={comp.y - 15} width={40} height={30} fill={del ? '#fca5a5' : '#0ea5e9'} stroke={isSelected ? '#fbbf24' : '#0284c7'} strokeWidth={2} cornerRadius={2} />
-          <Rect x={comp.x - 10} y={comp.y - 8} width={20} height={16} fill="#bae6fd" />
-          
-          {/* Suction port indicator at the left face edge */}
-          <Circle x={comp.x - 20} y={comp.y} radius={5} fill="#fbbf24" stroke="#78350f" strokeWidth={1} />
-          <Circle x={comp.x - 20} y={comp.y} radius={2} fill="#fff" />
-          <Text x={comp.x - 55} y={comp.y - 4} text="Suction" fill="#78350f" fontSize={7} fontStyle="bold" listening={false} />
+      case 'pump': {
+        const flowRate = comp.flowRate ?? 150;
+        const isFlipped = !!comp.flipped;
+        // Normal: Suction on left (-20), Discharge on right (+20)
+        // Flipped: Suction on right (+20), Discharge on left (-20)
+        const suctionX = isFlipped ? 20 : -20;
+        const dischargeX = isFlipped ? -20 : 20;
+        const suctionLabelX = isFlipped ? 26 : -58;
+        const dischargeLabelX = isFlipped ? -62 : 26;
 
-          {/* Discharge port indicator at the right face edge */}
-          <Circle x={comp.x + 20} y={comp.y} radius={5} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={1} />
-          <Circle x={comp.x + 20} y={comp.y} radius={2} fill="#fff" />
-          <Text x={comp.x + 25} y={comp.y - 4} text="Discharge" fill="#1d4ed8" fontSize={7} fontStyle="bold" listening={false} />
+        return (
+          <Group 
+            key={comp.id} 
+            x={comp.x} 
+            y={comp.y} 
+            rotation={comp.rotation || 0}
+            {...base}
+          >
+            {isLocked && <Text x={-5} y={-30} text="📌" fontSize={14} rotation={-(comp.rotation || 0)} listening={false} />}
+            {/* Pump body shadow */}
+            <Rect x={-22} y={-17} width={44} height={34} fill="rgba(0,0,0,0.1)" cornerRadius={3} listening={false} />
+            {/* Main pump block */}
+            <Rect x={-20} y={-15} width={40} height={30} fill={del ? '#fca5a5' : '#0ea5e9'} stroke={isSelected ? '#fbbf24' : '#0284c7'} strokeWidth={isSelected ? 2.5 : 2} cornerRadius={2} />
+            <Rect x={-10} y={-8} width={20} height={16} fill="#bae6fd" />
+            
+            {/* Suction port indicator */}
+            <Circle x={suctionX} y={0} radius={5} fill="#fbbf24" stroke="#78350f" strokeWidth={1} />
+            <Circle x={suctionX} y={0} radius={2} fill="#fff" />
+            <Text x={suctionLabelX} y={-4} text="Suction" fill="#78350f" fontSize={7} fontStyle="bold" listening={false} />
 
-          {/* Labels */}
-          <Text x={comp.x - 35} y={comp.y - 28} text="Dewatering Pump" fill="#0284c7" fontSize={9} fontStyle="bold" listening={false} />
-          <Text x={comp.x - 35} y={comp.y + 19} text="Cap: 150 m³/h" fill="#64748b" fontSize={8} fontStyle="bold" listening={false} />
-        </Group>
-      );
+            {/* Discharge port indicator */}
+            <Circle x={dischargeX} y={0} radius={5} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={1} />
+            <Circle x={dischargeX} y={0} radius={2} fill="#fff" />
+            <Text x={dischargeLabelX} y={-4} text="Discharge" fill="#1d4ed8" fontSize={7} fontStyle="bold" listening={false} />
+
+            {/* Directional Flow Arrow Dash from Suction to Discharge */}
+            <Line
+              points={isFlipped ? [10, 0, -10, 0] : [-10, 0, 10, 0]}
+              stroke="#0369a1"
+              strokeWidth={1.5}
+              dash={[3, 2]}
+              listening={false}
+            />
+
+            {/* Labels */}
+            <Text x={-35} y={-28} text={comp.label || "Dewatering Pump"} fill="#0284c7" fontSize={9} fontStyle="bold" listening={false} />
+            <Text x={-35} y={19} text={`Cap: ${flowRate} m³/h`} fill="#475569" fontSize={8} fontStyle="bold" listening={false} />
+
+            {/* Interactive hint when selected */}
+            {isSelected && (
+              <Text x={-36} y={-38} text="↺ rotate · ⇄ flip · ⚙ flow" fill="#f59e0b" fontSize={7} fontStyle="bold" listening={false} />
+            )}
+          </Group>
+        );
+      }
       case 'tee': {
         const showPorts = ['hose', 'discharge', 'line'].includes(activeTool);
         return (
@@ -2907,28 +3176,32 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
         >
         <Layer>
           {/* Grid Background */}
-          {gridSnap && (() => {
-            const gridLines = [];
-            const step = PIXELS_PER_METER;
-            
-            // Calculate visible bounds in local coordinates
-            const startX = -position.x / scale;
-            const startY = -position.y / scale;
-            const endX = (canvasSize.width - position.x) / scale;
-            const endY = (canvasSize.height - position.y) / scale;
+          {gridSnap && (
+            <Group id="grid-layer" name="hide-on-export canvas-grid">
+              {(() => {
+                const gridLines = [];
+                const step = PIXELS_PER_METER;
+                
+                // Calculate visible bounds in local coordinates
+                const startX = -position.x / scale;
+                const startY = -position.y / scale;
+                const endX = (canvasSize.width - position.x) / scale;
+                const endY = (canvasSize.height - position.y) / scale;
 
-            // Snap start coordinates to the nearest grid step
-            const firstGridX = Math.floor(startX / step) * step;
-            const firstGridY = Math.floor(startY / step) * step;
+                // Snap start coordinates to the nearest grid step
+                const firstGridX = Math.floor(startX / step) * step;
+                const firstGridY = Math.floor(startY / step) * step;
 
-            for (let x = firstGridX; x <= endX; x += step) {
-              gridLines.push(<Line key={`gv-${Math.round(x)}`} points={[Math.round(x), startY, Math.round(x), endY]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
-            }
-            for (let y = firstGridY; y <= endY; y += step) {
-              gridLines.push(<Line key={`gh-${Math.round(y)}`} points={[startX, Math.round(y), endX, Math.round(y)]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
-            }
-            return gridLines;
-          })()}
+                for (let x = firstGridX; x <= endX; x += step) {
+                  gridLines.push(<Line key={`gv-${Math.round(x)}`} points={[Math.round(x), startY, Math.round(x), endY]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
+                }
+                for (let y = firstGridY; y <= endY; y += step) {
+                  gridLines.push(<Line key={`gh-${Math.round(y)}`} points={[startX, Math.round(y), endX, Math.round(y)]} stroke="#cbd5e1" strokeWidth={0.5} opacity={0.5} listening={false} />);
+                }
+                return gridLines;
+              })()}
+            </Group>
+          )}
 
           {bgImage && blueprintSettings.visible && (
             <KonvaImage
@@ -4116,15 +4389,65 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             const componentsVisible = !layers?.find(l => l.id === 'layer-components' && !l.visible);
             if (!componentsVisible) return null;
             const invScale = 1 / scale;
-            return autoFittings.map((fit, i) => {
+            return autoFittings.map((fit) => {
+              const isSelected = selectedId === fit.id;
+              const isHoveredDel = hoveredFittingId === fit.id && activeTool === 'delete';
+
               if (fit.type === 'elbow') {
                 return (
-                  <Group key={`auto-elbow-${i}`} x={fit.x} y={fit.y} listening={false}>
+                  <Group
+                    key={fit.id}
+                    x={fit.x}
+                    y={fit.y}
+                    listening={true}
+                    onMouseEnter={() => {
+                      setHoveredFittingId(fit.id);
+                      if (['select', 'delete'].includes(activeTool)) {
+                        document.body.style.cursor = 'pointer';
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredFittingId(null);
+                      document.body.style.cursor = 'default';
+                    }}
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      if (activeTool === 'delete') {
+                        handleDeleteAutoFitting(fit, 'disconnect');
+                        return;
+                      }
+                      if (['select', 'move', 'rotate'].includes(activeTool)) {
+                        selectSingleElement(fit.id);
+                      }
+                    }}
+                    onTap={(e) => {
+                      e.cancelBubble = true;
+                      if (activeTool === 'delete') {
+                        handleDeleteAutoFitting(fit, 'disconnect');
+                        return;
+                      }
+                      if (['select', 'move', 'rotate'].includes(activeTool)) {
+                        selectSingleElement(fit.id);
+                      }
+                    }}
+                  >
+                    {/* Selected / Delete Hover Ring */}
+                    {(isSelected || isHoveredDel) && (
+                      <Circle
+                        radius={Math.max(8, 13 * invScale)}
+                        stroke={isHoveredDel ? '#ef4444' : '#fbbf24'}
+                        strokeWidth={Math.max(1.5, 2.5 * invScale)}
+                        dash={isHoveredDel ? undefined : [4 * invScale, 3 * invScale]}
+                        fill={isHoveredDel ? 'rgba(239, 68, 68, 0.25)' : 'rgba(251, 191, 36, 0.2)'}
+                        listening={false}
+                      />
+                    )}
+
                     {/* Outer collar ring */}
                     <Circle 
                       radius={Math.max(5, 8 * invScale)} 
-                      fill="#fef3c7" 
-                      stroke="#78350f" 
+                      fill={isHoveredDel ? '#fee2e2' : '#fef3c7'} 
+                      stroke={isHoveredDel ? '#b91c1c' : '#78350f'} 
                       strokeWidth={Math.max(0.75, 1.2 * invScale)} 
                       shadowColor="#000" 
                       shadowBlur={2 * invScale} 
@@ -4133,14 +4456,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                     {/* Core fitting */}
                     <Circle 
                       radius={Math.max(3, 4.5 * invScale)} 
-                      fill="#f59e0b" 
-                      stroke="#b45309"
+                      fill={isHoveredDel ? '#ef4444' : '#f59e0b'} 
+                      stroke={isHoveredDel ? '#991b1b' : '#b45309'}
                       strokeWidth={Math.max(0.5, 0.8 * invScale)}
                     />
                     <Text 
                       x={-2.5 * invScale} 
                       y={-3 * invScale} 
-                      text="E" 
+                      text={isHoveredDel ? '✕' : 'E'} 
                       fill="#ffffff" 
                       fontSize={Math.max(5, 7 * invScale)} 
                       fontStyle="bold" 
@@ -4150,15 +4473,62 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 );
               } else {
                 return (
-                  <Group key={`auto-tee-${i}`} x={fit.x} y={fit.y} rotation={fit.rotation} listening={false}>
+                  <Group
+                    key={fit.id}
+                    x={fit.x}
+                    y={fit.y}
+                    rotation={fit.rotation}
+                    listening={true}
+                    onMouseEnter={() => {
+                      setHoveredFittingId(fit.id);
+                      if (['select', 'delete'].includes(activeTool)) {
+                        document.body.style.cursor = 'pointer';
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredFittingId(null);
+                      document.body.style.cursor = 'default';
+                    }}
+                    onClick={(e) => {
+                      e.cancelBubble = true;
+                      if (activeTool === 'delete') {
+                        handleDeleteAutoFitting(fit, 'disconnect');
+                        return;
+                      }
+                      if (['select', 'move', 'rotate'].includes(activeTool)) {
+                        selectSingleElement(fit.id);
+                      }
+                    }}
+                    onTap={(e) => {
+                      e.cancelBubble = true;
+                      if (activeTool === 'delete') {
+                        handleDeleteAutoFitting(fit, 'disconnect');
+                        return;
+                      }
+                      if (['select', 'move', 'rotate'].includes(activeTool)) {
+                        selectSingleElement(fit.id);
+                      }
+                    }}
+                  >
+                    {/* Selected / Delete Hover Ring */}
+                    {(isSelected || isHoveredDel) && (
+                      <Circle
+                        radius={Math.max(9, 14 * invScale)}
+                        stroke={isHoveredDel ? '#ef4444' : '#10b981'}
+                        strokeWidth={Math.max(1.5, 2.5 * invScale)}
+                        dash={isHoveredDel ? undefined : [4 * invScale, 3 * invScale]}
+                        fill={isHoveredDel ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.2)'}
+                        listening={false}
+                      />
+                    )}
                     {/* High contrast visual Tee joint */}
                     <Rect 
                       x={-4 * invScale} 
                       y={-8 * invScale} 
                       width={8 * invScale} 
                       height={16 * invScale} 
-                      fill="#10b981" 
-                      stroke="#064e3b" 
+                      fill={isHoveredDel ? '#f87171' : '#10b981'} 
+                      stroke={isHoveredDel ? '#991b1b' : '#064e3b'} 
                       strokeWidth={Math.max(0.5, 1.5 * invScale)} 
                       cornerRadius={1 * invScale} 
                     />
@@ -4167,8 +4537,8 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                       y={-4 * invScale} 
                       width={16 * invScale} 
                       height={8 * invScale} 
-                      fill="#10b981" 
-                      stroke="#064e3b" 
+                      fill={isHoveredDel ? '#f87171' : '#10b981'} 
+                      stroke={isHoveredDel ? '#991b1b' : '#064e3b'} 
                       strokeWidth={Math.max(0.5, 1.5 * invScale)} 
                       cornerRadius={1 * invScale} 
                     />
@@ -4538,6 +4908,61 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             Cancel
           </button>
         </div>
+      )}
+
+      {/* Asset Quick Toolbar (Floating directly above selected asset on canvas) */}
+      {selectedComp && ['select', 'move', 'rotate'].includes(activeTool) && !editingAsset && (
+        <AssetQuickToolbar
+          comp={selectedComp}
+          screenX={selectedComp.x * scale + position.x}
+          screenY={selectedComp.y * scale + position.y}
+          canvasWidth={canvasSize.width}
+          canvasHeight={canvasSize.height}
+          onUpdate={(updates) => handleUpdateComponent(selectedComp.id, updates)}
+          onDelete={() => handleDeleteComponent(selectedComp.id)}
+          onDuplicate={() => handleDuplicateComponent(selectedComp.id)}
+          onOpenSettings={() => setEditingAsset(selectedComp)}
+        />
+      )}
+
+      {/* Auto Fitting Quick Toolbar (Floating directly above selected auto elbow/tee) */}
+      {selectedFitting && ['select', 'move', 'rotate'].includes(activeTool) && (
+        <AutoFittingQuickToolbar
+          fitting={selectedFitting}
+          screenX={selectedFitting.x * scale + position.x}
+          screenY={selectedFitting.y * scale + position.y}
+          canvasWidth={canvasSize.width}
+          canvasHeight={canvasSize.height}
+          onDisconnect={() => handleDeleteAutoFitting(selectedFitting, 'disconnect')}
+          onStraighten={() => handleDeleteAutoFitting(selectedFitting, 'straighten')}
+          onDelete={() => handleDeleteAutoFitting(selectedFitting, 'disconnect')}
+          onClose={() => selectSingleElement(null)}
+        />
+      )}
+
+      {/* Asset Properties Modal */}
+      {editingAsset && (
+        <AssetPropertiesModal
+          comp={editingAsset}
+          levels={levels}
+          onClose={() => setEditingAsset(null)}
+          onSave={(updates) => handleUpdateComponent(editingAsset.id, updates)}
+          onDelete={() => handleDeleteComponent(editingAsset.id)}
+        />
+      )}
+
+      {/* Asset Context Menu (Right Click) */}
+      {assetContextMenu && (
+        <AssetContextMenu
+          x={assetContextMenu.x}
+          y={assetContextMenu.y}
+          comp={assetContextMenu.comp}
+          onClose={() => setAssetContextMenu(null)}
+          onUpdate={(updates) => handleUpdateComponent(assetContextMenu.comp.id, updates)}
+          onDelete={() => handleDeleteComponent(assetContextMenu.comp.id)}
+          onDuplicate={() => handleDuplicateComponent(assetContextMenu.comp.id)}
+          onOpenSettings={() => setEditingAsset(assetContextMenu.comp)}
+        />
       )}
       </div>
     </div>

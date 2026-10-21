@@ -661,12 +661,16 @@ export function PaymentFormModal({
           const invNum = invObj
             ? (invObj as any).invoiceNumber || (invObj as any).invoiceNo || invId
             : invId;
+          const allocSite = invObj
+            ? (invObj as any).siteName || (invObj as any).site || (invObj as any).project || form.site
+            : form.site;
           allocations.push({
             invoiceId: invId,
             invoiceNumber: invNum,
             amount: aAmt,
             withholdingTax: aWht > 0 ? aWht : undefined,
             discount: aDisc > 0 ? aDisc : undefined,
+            site: allocSite ? String(allocSite).trim() : undefined,
           });
         }
       });

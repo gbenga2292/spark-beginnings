@@ -121,6 +121,7 @@ export function Variables() {
   const [newBank, setNewBank] = useState('');
   const [newVendorName, setNewVendorName] = useState('');
   const [newVendorTin, setNewVendorTin] = useState('');
+  const [newVendorServices, setNewVendorServices] = useState('');
   const [newBenBankName, setNewBenBankName] = useState('');
 
   // Top-level section switch: 'system' | 'ledger' | 'services' | 'operations'
@@ -1760,17 +1761,19 @@ export function Variables() {
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2">
                 <Input value={newVendorName} onChange={e => setNewVendorName(e.target.value)} placeholder="Vendor Name" className="flex-1" />
+                <Input value={newVendorServices} onChange={e => setNewVendorServices(e.target.value)} placeholder="Services Rendered" className="flex-1" />
                 <Input value={newVendorTin} onChange={e => setNewVendorTin(e.target.value)} placeholder="TIN" className="w-[100px]" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: generateId(), name: newVendorName, tinNumber: newVendorTin}); setNewVendorName(''); setNewVendorTin(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: generateId(), name: newVendorName, tinNumber: newVendorTin || undefined, servicesRendered: newVendorServices || undefined}); setNewVendorName(''); setNewVendorTin(''); setNewVendorServices(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Vendor</TableHead><TableHead>TIN</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Vendor</TableHead><TableHead>Services</TableHead><TableHead>TIN</TableHead><TableHead></TableHead></TableRow></TableHeader>
                   <TableBody>
                     {ledgerVendors.map(v => (
                       <TableRow key={v.id}>
                         <TableCell className="font-medium text-slate-700">{v.name}</TableCell>
+                        <TableCell className="text-sm text-slate-600">{v.servicesRendered || '—'}</TableCell>
                         <TableCell className="text-sm text-slate-500">{v.tinNumber || '—'}</TableCell>
                         <TableCell className="w-[80px]">
                           <div className="flex items-center gap-1">
@@ -1789,7 +1792,7 @@ export function Variables() {
                       </TableRow>
                     ))}
                     {ledgerVendors.length === 0 && (
-                      <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No vendors yet.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-slate-400 text-center text-sm py-6 italic">No vendors yet.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>

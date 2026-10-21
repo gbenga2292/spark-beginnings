@@ -4,6 +4,7 @@ import logoSrc from '../../logo/logo-2.png';
 import { Save, FolderOpen, Loader2, X, Trash2, Clock, Ruler, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
 import { DewateringCanvas } from '../components/canvas/DewateringCanvas';
 import { Dewatering3DView } from '../components/canvas/Dewatering3DView';
+import { DewateringSectionView } from '../components/canvas/DewateringSectionView';
 import { ResultsPanel } from '../components/canvas/ResultsPanel';
 import { ActiveTool } from '../components/canvas/Toolbar';
 import { StatusBar } from '../components/canvas/StatusBar';
@@ -11,7 +12,9 @@ import { DrawingSheetPreview, ExportOptions } from '../components/canvas/Drawing
 import { DewaterCadHeader, ViewMode } from '../components/canvas/DewaterCadHeader';
 import { CadToolDock } from '../components/canvas/CadToolDock';
 import { DesignPanel, LayerItem } from '../components/canvas/DesignPanel';
-import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ArrowData, TextData, ElevationLevel, PIXELS_PER_METER } from '../utils/simulationLogic';
+import { BlueprintControlBar } from '../components/canvas/BlueprintControlBar';
+import { AiDewateringWizard } from '../components/canvas/AiDewateringWizard';
+import { calculateBOM, LineData, PlacedComponent, DimensionData, AreaData, HoseData, ArrowData, TextData, ElevationLevel, PIXELS_PER_METER, Point } from '../utils/simulationLogic';
 import { captureKonvaStage, captureThreeCanvas } from '../utils/drawingExportUtils';
 import { useSetPageTitle } from '../contexts/PageContext';
 import { db } from '../lib/supabaseService';
@@ -21,7 +24,15 @@ import { supabase } from '../integrations/supabase/client';
 import { toast } from 'sonner';
 import { CADLayer, DEFAULT_LAYERS } from '../utils/cadDataModels';
 import { usePriv } from '../hooks/usePriv';
-import { DewateringInput, DewateringLayoutType, DEFAULT_DEWATERING_INPUT } from '../utils/dewateringCalculator';
+import { useTheme } from '../hooks/useTheme';
+import { DewateringInput, DewateringLayoutType, DEFAULT_DEWATERING_INPUT, calculateDewatering } from '../utils/dewateringCalculator';
+import {
+  saveDewaterDraft,
+  loadDewaterDraft,
+  clearDewaterDraft,
+  hasDraftContent,
+  type DewaterDraftData
+} from '../utils/dewaterAutoSave';
 
 interface SavedLayout {
   id: string;
@@ -211,6 +222,7 @@ function CanvasHudOverlay({
 
 export default function Simulator() {
   const priv = usePriv('simulator');
+  const { isDark } = useTheme();
   const { isSimulatorDirty, setSimulatorDirty } = useAppStore();
   const [lines, setLines] = useState<LineData[]>([]);
   const [placedComponents, setPlacedComponents] = useState<PlacedComponent[]>([]);
@@ -266,8 +278,40 @@ export default function Simulator() {
   const [textColor, setTextColor] = useState<string>('#000000');
   const [textSize, setTextSize] = useState<number>(14);
 
-  const [history, setHistory] = useState<{ type: 'line' | 'component' | 'dimension' | 'area' | 'hose' | 'arrow'; id: string }[]>([]);
-  const [redoStack, setRedoStack] = useState<{ type: string; id: string; item: any }[]>([]);
+  interface CanvasSnapshot {
+    lines: LineData[];
+    placedComponents: PlacedComponent[];
+    dimensions: DimensionData[];
+    areas: AreaData[];
+    hoses: HoseData[];
+    arrows: ArrowData[];
+    texts: TextData[];
+  }
+
+  const [undoStack, setUndoStack] = useState<CanvasSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<CanvasSnapshot[]>([]);
+
+  // Refs to read current canvas state synchronously without race conditions
+  const linesRef = useRef(lines);
+  linesRef.current = lines;
+  const placedComponentsRef = useRef(placedComponents);
+  placedComponentsRef.current = placedComponents;
+  const dimensionsRef = useRef(dimensions);
+  dimensionsRef.current = dimensions;
+  const areasRef = useRef(areas);
+  areasRef.current = areas;
+  const hosesRef = useRef(hoses);
+  hosesRef.current = hoses;
+  const arrowsRef = useRef(arrows);
+  arrowsRef.current = arrows;
+  const textsRef = useRef(texts);
+  textsRef.current = texts;
+
+  // Guard flags to coalesce simultaneous mutations and avoid recording during restore
+  const isRestoringRef = useRef(false);
+  const snapshotPendingRef = useRef(false);
+  const snapshotTimerRef = useRef<any>(null);
+
   const [lineLengthMeters, setLineLengthMeters] = useState<number | ''>('');
   
   // Elevation Levels
@@ -441,6 +485,13 @@ export default function Simulator() {
   const [currentLayoutName, setCurrentLayoutName] = useState('');
   const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
 
+  // Offline Auto-Save & Recovery State
+  const [pendingDraft, setPendingDraft] = useState<{ draft: DewaterDraftData; blob: Blob | null } | null>(null);
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<string | null>(null);
+  const autoSaveDebounceTimerRef = useRef<any>(null);
+  const initialDraftCheckedRef = useRef(false);
+
   // Drawing Export State
   const stageRef = useRef<any>(null);
   const canvasApiRef = useRef<any>(null);
@@ -448,8 +499,9 @@ export default function Simulator() {
   const [showDrawingPreview, setShowDrawingPreview] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
-    layoutFormat: 'combined',
+    layoutFormat: 'multi-view',
     includeSitePlan: true,
+    includeSectionView: true,
     include3DView: true,
     includeBOM: true,
     includeLegend: true,
@@ -481,6 +533,248 @@ export default function Simulator() {
   const [scaleRefPt2, setScaleRefPt2] = useState<{ x: number; y: number } | null>(null);
   const [showScaleModal, setShowScaleModal] = useState(false);
   const [scaleInputStr, setScaleInputStr] = useState('');
+
+  // AI Dewatering Assistant State
+  const [showAiWizard, setShowAiWizard] = useState(false);
+  const [isAiTracing, setIsAiTracing] = useState(false);
+  const [aiTracedPoints, setAiTracedPoints] = useState<Point[]>([]);
+  const aiTraceCallbackRef = useRef<((points: Point[]) => void) | null>(null);
+
+  const handleStartAiTracing = useCallback((onComplete: (points: Point[]) => void) => {
+    aiTraceCallbackRef.current = onComplete;
+    setIsAiTracing(true);
+    setShowAiWizard(false);
+    setActiveTool('area');
+    setDrawShapeMode('poly');
+    toast.info('Click consecutive points on blueprint to trace excavation pit. Click first point to finish.');
+  }, []);
+
+  const handleCancelAiTracing = useCallback(() => {
+    setIsAiTracing(false);
+    setShowAiWizard(true);
+    setActiveTool('select');
+    aiTraceCallbackRef.current = null;
+    setAiTracedPoints([]);
+  }, []);
+
+  // Reference Scale & Blueprint Handlers
+  const handleStartReferenceScale = useCallback(() => {
+    if (!backgroundImage) {
+      toast.info('Please import a blueprint underlay first (File -> Import Blueprint)');
+      return;
+    }
+    if (show3D) {
+      setShow3D(false);
+      setViewMode('2d');
+    }
+    setScaleRefMode('selecting-start');
+    setScaleRefPt1(null);
+    setScaleRefPt2(null);
+    toast.info('Reference Scale: Click the START point of a known dimension line on the blueprint.');
+  }, [backgroundImage, show3D]);
+
+  const handleCancelReferenceScale = useCallback(() => {
+    setScaleRefMode('idle');
+    setScaleRefPt1(null);
+    setScaleRefPt2(null);
+    toast.info('Scale calibration cancelled.');
+  }, []);
+
+  const handleResetBlueprint = useCallback(() => {
+    setBlueprintSettings(prev => ({
+      ...prev,
+      x: 0,
+      y: 0,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+    }));
+    setSimulatorDirty(true);
+    toast.info('Blueprint position and scale reset to defaults.');
+  }, [setSimulatorDirty]);
+
+  const handleRemoveBlueprint = useCallback(() => {
+    if (backgroundImage && backgroundImage.startsWith('blob:')) {
+      URL.revokeObjectURL(backgroundImage);
+    }
+    setBackgroundImage(undefined);
+    setBackgroundFile(null);
+    setScaleRefMode('idle');
+    setScaleRefPt1(null);
+    setScaleRefPt2(null);
+    setSimulatorDirty(true);
+    toast.info('Blueprint removed.');
+  }, [backgroundImage, setSimulatorDirty]);
+
+  const handleConfirmScale = useCallback(() => {
+    if (!scaleRefPt1 || !scaleRefPt2) return;
+    const actualLengthMeters = parseFloat(scaleInputStr);
+    if (isNaN(actualLengthMeters) || actualLengthMeters <= 0) {
+      toast.error('Please enter a valid positive length in meters.');
+      return;
+    }
+    const distPx = Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2));
+    if (distPx === 0) return;
+    const factor = (actualLengthMeters * PIXELS_PER_METER) / distPx;
+    const newX = scaleRefPt1.x - (scaleRefPt1.x - blueprintSettings.x) * factor;
+    const newY = scaleRefPt1.y - (scaleRefPt1.y - blueprintSettings.y) * factor;
+    setBlueprintSettings(prev => ({
+      ...prev,
+      scaleX: prev.scaleX * factor,
+      scaleY: prev.scaleY * factor,
+      x: newX,
+      y: newY,
+    }));
+    setShowScaleModal(false);
+    setScaleInputStr('');
+    setScaleRefPt1(null);
+    setScaleRefPt2(null);
+    setSimulatorDirty(true);
+    toast.success(`Blueprint scaled: reference length calibrated to ${actualLengthMeters}m.`);
+  }, [scaleRefPt1, scaleRefPt2, scaleInputStr, blueprintSettings, setSimulatorDirty]);
+
+  // ── Offline Auto-Save & Draft Check on Mount ──────────────────────────────
+  useEffect(() => {
+    // Only check once on mount
+    if (initialDraftCheckedRef.current) return;
+    initialDraftCheckedRef.current = true;
+
+    // If we're importing from calculator, don't interrupt with restore prompt
+    const stateData = (location.state as any)?.layoutData;
+    const sessionStr = sessionStorage.getItem('dewatering_calculator_import');
+    if (stateData || sessionStr) return;
+
+    loadDewaterDraft().then(({ draft, blueprintBlob }) => {
+      if (hasDraftContent(draft)) {
+        setPendingDraft({ draft: draft!, blob: blueprintBlob });
+        setShowRestorePrompt(true);
+        if (draft?.savedAt) {
+          setLastAutoSavedAt(draft.savedAt);
+        }
+      }
+    });
+  }, [location.state]);
+
+  const handleApplyRestoredDraft = useCallback((draftData: DewaterDraftData, blob: Blob | null) => {
+    setLines(draftData.lines || []);
+    setPlacedComponents(draftData.placedComponents || []);
+    setDimensions(draftData.dimensions || []);
+    setAreas(draftData.areas || []);
+    setHoses(draftData.hoses || []);
+    setArrows(draftData.arrows || []);
+    setTexts(draftData.texts || []);
+    if (draftData.levels && draftData.levels.length > 0) {
+      setLevels(draftData.levels);
+      setActiveLevelId(draftData.activeLevelId || draftData.levels[0].id);
+    }
+    if (draftData.layers && draftData.layers.length > 0) {
+      setLayers(draftData.layers);
+      setActiveLayerId(draftData.activeLayerId || draftData.layers[0].id);
+    }
+    if (draftData.blueprintSettings) {
+      setBlueprintSettings(draftData.blueprintSettings);
+    }
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      setBackgroundImage(url);
+      setBackgroundFile(blob as File);
+    } else if (draftData.backgroundImageUrl) {
+      setBackgroundImage(draftData.backgroundImageUrl);
+    }
+    if (draftData.name) {
+      setCurrentLayoutName(draftData.name);
+    }
+    if (draftData.layoutId) {
+      setCurrentLayoutId(draftData.layoutId);
+    }
+    setUndoStack([]);
+    setRedoStack([]);
+    setShowRestorePrompt(false);
+    setPendingDraft(null);
+    setSimulatorDirty(true);
+    toast.success(`Restored previous drawing session (${draftData.itemCount} items).`);
+    setTimeout(() => {
+      canvasApiRef.current?.zoomAll();
+    }, 150);
+  }, [setSimulatorDirty]);
+
+  const handleDiscardDraft = useCallback(() => {
+    clearDewaterDraft();
+    setShowRestorePrompt(false);
+    setPendingDraft(null);
+    setLastAutoSavedAt(null);
+    setSimulatorDirty(false);
+    toast.info('Offline draft discarded. Starting fresh canvas.');
+  }, [setSimulatorDirty]);
+
+  // ── Debounced Auto-Save to IndexedDB whenever canvas state changes ──────────
+  useEffect(() => {
+    // If restore modal is currently open, don't overwrite the draft with empty initial state
+    if (showRestorePrompt) return;
+
+    // Only auto-save to offline draft if the user actually has UNSAVED changes
+    if (!isSimulatorDirty) {
+      if (autoSaveDebounceTimerRef.current) {
+        clearTimeout(autoSaveDebounceTimerRef.current);
+      }
+      return;
+    }
+
+    const hasAnyContent =
+      lines.length > 0 ||
+      placedComponents.length > 0 ||
+      dimensions.length > 0 ||
+      areas.length > 0 ||
+      hoses.length > 0 ||
+      arrows.length > 0 ||
+      texts.length > 0 ||
+      !!backgroundImage;
+
+    if (!hasAnyContent) return;
+
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
+
+    autoSaveDebounceTimerRef.current = setTimeout(async () => {
+      try {
+        await saveDewaterDraft({
+          name: currentLayoutName || 'Untitled Drawing',
+          layoutId: currentLayoutId,
+          lines,
+          placedComponents,
+          dimensions,
+          areas,
+          hoses,
+          arrows,
+          texts,
+          levels,
+          activeLevelId,
+          layers,
+          activeLayerId,
+          blueprintSettings,
+          backgroundImageUrl: backgroundImage && !backgroundImage.startsWith('blob:') ? backgroundImage : null,
+        }, backgroundFile || null);
+
+        const nowIso = new Date().toISOString();
+        setLastAutoSavedAt(nowIso);
+      } catch (err) {
+        console.warn('Auto-save error', err);
+      }
+    }, 800);
+
+    return () => {
+      if (autoSaveDebounceTimerRef.current) {
+        clearTimeout(autoSaveDebounceTimerRef.current);
+      }
+    };
+  }, [
+    isSimulatorDirty,
+    lines, placedComponents, dimensions, areas, hoses, arrows, texts,
+    levels, activeLevelId, layers, activeLayerId,
+    blueprintSettings, backgroundImage, backgroundFile,
+    currentLayoutName, currentLayoutId, showRestorePrompt
+  ]);
 
   const results = useMemo(() => calculateBOM(lines, placedComponents, PIXELS_PER_METER, hoses), [lines, placedComponents, hoses]);
 
@@ -564,6 +858,11 @@ export default function Simulator() {
       setShowSaveDialog(false);
       setSaveName('');
       setSimulatorDirty(false);
+      if (autoSaveDebounceTimerRef.current) {
+        clearTimeout(autoSaveDebounceTimerRef.current);
+      }
+      clearDewaterDraft();
+      setLastAutoSavedAt(null);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save layout.');
     } finally {
@@ -622,6 +921,11 @@ export default function Simulator() {
       });
       toast.success(`Layout "${currentLayoutName}" updated successfully.`);
       setSimulatorDirty(false);
+      if (autoSaveDebounceTimerRef.current) {
+        clearTimeout(autoSaveDebounceTimerRef.current);
+      }
+      clearDewaterDraft();
+      setLastAutoSavedAt(null);
     } catch (err: any) {
       toast.error(err.message || 'Failed to update layout.');
     } finally {
@@ -671,12 +975,18 @@ export default function Simulator() {
     setBackgroundImage(url || undefined);
     setBlueprintSettings(settings);
     setBackgroundFile(null);
-    setHistory([]);
+    setUndoStack([]);
+    setRedoStack([]);
     setShowLoadPanel(false);
     setCurrentLayoutName(layout.name);
     setCurrentLayoutId(layout.id);
     toast.success(`Loaded layout "${layout.name}".`);
     setSimulatorDirty(false);
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
+    clearDewaterDraft();
+    setLastAutoSavedAt(null);
   };
 
   const handleDeleteLayout = async (id: string, name: string) => {
@@ -712,10 +1022,9 @@ export default function Simulator() {
     let sitePlanUrl: string | null = null;
     let perspectiveUrl: string | null = null;
 
-    // ── Pure 2D: capture Konva stage only ──
-    if (fmt === 'pure-2d' || fmt === 'combined') {
-      if (show3D) {
-        // 2D canvas is not mounted when in 3D mode
+    // ── 2D Site Plan Capture ──
+    if (fmt === 'pure-2d' || fmt === 'combined' || fmt === 'multi-view' || fmt === 'plan-section') {
+      if (show3D && fmt === 'pure-2d') {
         toast.error(
           'Please switch back to the 2D canvas view before exporting a 2D Floor Plan.',
           { duration: 4000 }
@@ -724,21 +1033,20 @@ export default function Simulator() {
       }
       
       if (exportWindowMode) {
-        // If window mode, we enter select mode and wait for the user to drag a box.
         setActiveTool('export-window');
         toast.info('Click and drag on the canvas to select the export area.');
         return;
       }
       
       sitePlanUrl = captureKonvaStage(stageRef, undefined, { includeBlueprint: exportOptions.includeBlueprint });
-      if (!sitePlanUrl) {
+      if (!sitePlanUrl && fmt === 'pure-2d') {
         toast.error('Failed to capture the 2D site plan. Make sure the canvas has content.');
         return;
       }
     }
 
-    // ── Pure 3D: capture Three.js canvas only ──
-    if (fmt === 'pure-3d' || fmt === 'combined') {
+    // ── 3D View Capture ──
+    if (fmt === 'pure-3d' || fmt === 'combined' || fmt === 'multi-view') {
       if (!show3D && fmt === 'pure-3d') {
         toast.error(
           'Please switch to the 3D view before exporting a 3D Perspective sheet.',
@@ -753,7 +1061,7 @@ export default function Simulator() {
       }
     }
 
-    if (!sitePlanUrl && !perspectiveUrl) {
+    if (!sitePlanUrl && !perspectiveUrl && fmt !== 'pure-section') {
       toast.error('Nothing to export.');
       return;
     }
@@ -762,7 +1070,8 @@ export default function Simulator() {
   };
 
   const finishExport = async (sitePlanUrl: string | null, perspectiveUrl: string | null) => {
-    if (!sitePlanUrl && !perspectiveUrl) {
+    const fmt = exportOptions.layoutFormat;
+    if (!sitePlanUrl && !perspectiveUrl && fmt !== 'pure-section') {
       toast.error('No drawings captured for export.');
       return;
     }
@@ -812,17 +1121,23 @@ export default function Simulator() {
   };
 
   const handleClear = () => {
+    // Record snapshot so user can undo accidental clear
+    recordSnapshotBeforeChange();
     setLines([]);
     setPlacedComponents([]);
     setDimensions([]);
     setAreas([]);
     setHoses([]);
+    setArrows([]);
     setTexts([]);
-    setHistory([]);
-    setRedoStack([]);
     setCurrentLayoutId(null);
     setCurrentLayoutName('');
     setSimulatorDirty(false);
+    if (autoSaveDebounceTimerRef.current) {
+      clearTimeout(autoSaveDebounceTimerRef.current);
+    }
+    clearDewaterDraft();
+    setLastAutoSavedAt(null);
   };
 
   const handleNewLayout = () => {
@@ -836,6 +1151,64 @@ export default function Simulator() {
 
   useSetPageTitle('Dewatering Layout Simulator', '', null);
 
+  // Helper to compute live effective calculator inputs from canvas geometry
+  const getEffectiveCalculatorInputs = useCallback((): DewateringInput => {
+    const pit = areas.find(a => a.kind === 'excavation') || areas[0];
+    const site = areas.find(a => a.kind === 'site');
+
+    let calcL = calculatorInputs?.excavationLength || 12;
+    let calcW = calculatorInputs?.excavationWidth || 8;
+
+    if (pit && pit.width && pit.height) {
+      calcL = Math.max(1, Math.round((pit.width / PIXELS_PER_METER) * 10) / 10);
+      calcW = Math.max(1, Math.round((pit.height / PIXELS_PER_METER) * 10) / 10);
+    } else if (lines.length > 0) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      lines.forEach(l => l.points.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }));
+      if (minX !== Infinity && maxX > minX && maxY > minY) {
+        calcL = Math.max(1, Math.round(((maxX - minX) / PIXELS_PER_METER) * 10) / 10);
+        calcW = Math.max(1, Math.round(((maxY - minY) / PIXELS_PER_METER) * 10) / 10);
+      }
+    }
+
+    let landL = calculatorInputs?.landLength || Math.max(30, calcL + 12);
+    let landW = calculatorInputs?.landWidth || Math.max(24, calcW + 12);
+    if (site && site.width && site.height) {
+      landL = Math.max(calcL + 4, Math.round((site.width / PIXELS_PER_METER) * 10) / 10);
+      landW = Math.max(calcW + 4, Math.round((site.height / PIXELS_PER_METER) * 10) / 10);
+    }
+
+    const calcDepth = targetDepth || calculatorInputs?.excavationDepth || 4.0;
+
+    let detectedLayout: DewateringLayoutType = calculatorInputs?.layoutType || 'ring';
+    if (lines.length === 1 && lines[0].points.length === 2) {
+      detectedLayout = 'single_line';
+    } else if (lines.length === 1 && lines[0].points.length === 3) {
+      detectedLayout = 'l_shape';
+    } else if (lines.length === 1 && lines[0].points.length === 4) {
+      detectedLayout = 'u_shape';
+    } else if (lines.length > 0) {
+      detectedLayout = 'ring';
+    }
+
+    return {
+      ...(calculatorInputs || DEFAULT_DEWATERING_INPUT),
+      excavationLength: calcL,
+      excavationWidth: calcW,
+      excavationDepth: calcDepth,
+      landLength: Math.max(landL, calcL + 4),
+      landWidth: Math.max(landW, calcW + 4),
+      layoutType: detectedLayout,
+      waterTableDepth: calculatorInputs?.waterTableDepth ?? 1.0,
+      requiredDrawdown: calculatorInputs?.requiredDrawdown ?? 0.5,
+    };
+  }, [calculatorInputs, areas, lines, targetDepth]);
+
   // Handle view mode changes
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
@@ -843,134 +1216,116 @@ export default function Simulator() {
       setShow3D(true);
     } else if (mode === '2d') {
       setShow3D(false);
+    } else if (mode === 'section') {
+      setShow3D(false);
     } else if (mode === 'calc') {
-      // Extract latest layout dimensions and geometry from canvas elements
-      const pit = areas.find(a => a.kind === 'excavation') || areas[0];
-      const site = areas.find(a => a.kind === 'site');
-
-      let calcL = calculatorInputs?.excavationLength || 6;
-      let calcW = calculatorInputs?.excavationWidth || 6;
-
-      if (pit && pit.width && pit.height) {
-        calcL = Math.max(1, Math.round((pit.width / PIXELS_PER_METER) * 10) / 10);
-        calcW = Math.max(1, Math.round((pit.height / PIXELS_PER_METER) * 10) / 10);
-      } else if (lines.length > 0) {
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        lines.forEach(l => l.points.forEach(p => {
-          if (p.x < minX) minX = p.x;
-          if (p.x > maxX) maxX = p.x;
-          if (p.y < minY) minY = p.y;
-          if (p.y > maxY) maxY = p.y;
-        }));
-        if (minX !== Infinity && maxX > minX && maxY > minY) {
-          calcL = Math.max(1, Math.round(((maxX - minX) / PIXELS_PER_METER) * 10) / 10);
-          calcW = Math.max(1, Math.round(((maxY - minY) / PIXELS_PER_METER) * 10) / 10);
-        }
-      }
-
-      let landL = calculatorInputs?.landLength || Math.max(30, calcL + 12);
-      let landW = calculatorInputs?.landWidth || Math.max(24, calcW + 12);
-      if (site && site.width && site.height) {
-        landL = Math.max(calcL + 4, Math.round((site.width / PIXELS_PER_METER) * 10) / 10);
-        landW = Math.max(calcW + 4, Math.round((site.height / PIXELS_PER_METER) * 10) / 10);
-      }
-
-      const calcDepth = targetDepth || calculatorInputs?.excavationDepth || 5;
-
-      let detectedLayout: DewateringLayoutType = calculatorInputs?.layoutType || 'ring';
-      if (lines.length === 1 && lines[0].points.length === 2) {
-        detectedLayout = 'single_line';
-      } else if (lines.length === 1 && lines[0].points.length === 3) {
-        detectedLayout = 'l_shape';
-      } else if (lines.length === 1 && lines[0].points.length === 4) {
-        detectedLayout = 'u_shape';
-      } else if (lines.length > 0) {
-        detectedLayout = 'ring';
-      }
-
-      const exportInputs: DewateringInput = {
-        ...(calculatorInputs || DEFAULT_DEWATERING_INPUT),
-        excavationLength: calcL,
-        excavationWidth: calcW,
-        excavationDepth: calcDepth,
-        landLength: Math.max(landL, calcL + 4),
-        landWidth: Math.max(landW, calcW + 4),
-        layoutType: detectedLayout,
-        waterTableDepth: calculatorInputs?.waterTableDepth ?? 1.5,
-        requiredDrawdown: calculatorInputs?.requiredDrawdown ?? (calcDepth + 0.5),
-      };
-
+      const exportInputs = getEffectiveCalculatorInputs();
       sessionStorage.setItem('dewatering_simulator_export', JSON.stringify(exportInputs));
       navigate('/operations/dewatering-calculator', {
         state: { fromSimulator: true, calculatorInputs: exportInputs }
       });
     }
-  }, [navigate, areas, lines, targetDepth, calculatorInputs]);
+  }, [navigate, getEffectiveCalculatorInputs]);
 
   // Keep viewMode in sync with show3D
   useEffect(() => {
-    setViewMode(show3D ? '3d' : '2d');
-  }, [show3D]);
-
-  const handleUndo = () => {
-    if (history.length === 0) return;
-    const lastAction = history[history.length - 1];
-    let removedItem: any = null;
-
-    if (lastAction.type === 'line') {
-      removedItem = lines.find(l => l.id === lastAction.id);
-      setLines(prev => prev.filter(l => l.id !== lastAction.id));
-    } else if (lastAction.type === 'dimension') {
-      removedItem = dimensions.find(d => d.id === lastAction.id);
-      setDimensions(prev => prev.filter(d => d.id !== lastAction.id));
-    } else if (lastAction.type === 'area') {
-      removedItem = areas.find(a => a.id === lastAction.id);
-      setAreas(prev => prev.filter(a => a.id !== lastAction.id));
-    } else if (lastAction.type === 'hose') {
-      removedItem = hoses.find(h => h.id === lastAction.id);
-      setHoses(prev => prev.filter(h => h.id !== lastAction.id));
-    } else if (lastAction.type === 'arrow') {
-      removedItem = arrows.find(a => a.id === lastAction.id);
-      setArrows(prev => prev.filter(a => a.id !== lastAction.id));
-    } else {
-      removedItem = placedComponents.find(c => c.id === lastAction.id);
-      setPlacedComponents(prev => prev.filter(c => c.id !== lastAction.id));
+    if (show3D && viewMode !== '3d') {
+      setViewMode('3d');
+    } else if (!show3D && viewMode === '3d') {
+      setViewMode('2d');
     }
+  }, [show3D, viewMode]);
 
-    if (removedItem) {
-      setRedoStack(prev => [...prev, { type: lastAction.type, id: lastAction.id, item: removedItem }]);
-    }
-    setHistory(prev => prev.slice(0, -1));
+  const recordSnapshotBeforeChange = useCallback(() => {
+    if (isRestoringRef.current) return;
+    if (snapshotPendingRef.current) return;
+
+    snapshotPendingRef.current = true;
+    if (snapshotTimerRef.current) clearTimeout(snapshotTimerRef.current);
+    snapshotTimerRef.current = setTimeout(() => {
+      snapshotPendingRef.current = false;
+    }, 200);
+
+    const snapshot: CanvasSnapshot = {
+      lines: JSON.parse(JSON.stringify(linesRef.current)),
+      placedComponents: JSON.parse(JSON.stringify(placedComponentsRef.current)),
+      dimensions: JSON.parse(JSON.stringify(dimensionsRef.current)),
+      areas: JSON.parse(JSON.stringify(areasRef.current)),
+      hoses: JSON.parse(JSON.stringify(hosesRef.current)),
+      arrows: JSON.parse(JSON.stringify(arrowsRef.current)),
+      texts: JSON.parse(JSON.stringify(textsRef.current)),
+    };
+
+    setUndoStack(prev => {
+      const next = [...prev, snapshot];
+      return next.length > 50 ? next.slice(next.length - 50) : next;
+    });
+    setRedoStack([]);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+
+    const previousSnapshot = undoStack[undoStack.length - 1];
+    const currentSnapshot: CanvasSnapshot = {
+      lines: JSON.parse(JSON.stringify(linesRef.current)),
+      placedComponents: JSON.parse(JSON.stringify(placedComponentsRef.current)),
+      dimensions: JSON.parse(JSON.stringify(dimensionsRef.current)),
+      areas: JSON.parse(JSON.stringify(areasRef.current)),
+      hoses: JSON.parse(JSON.stringify(hosesRef.current)),
+      arrows: JSON.parse(JSON.stringify(arrowsRef.current)),
+      texts: JSON.parse(JSON.stringify(textsRef.current)),
+    };
+
+    isRestoringRef.current = true;
+    setRedoStack(prev => [...prev, currentSnapshot]);
+    setUndoStack(prev => prev.slice(0, -1));
+
+    setLines(previousSnapshot.lines);
+    setPlacedComponents(previousSnapshot.placedComponents);
+    setDimensions(previousSnapshot.dimensions);
+    setAreas(previousSnapshot.areas);
+    setHoses(previousSnapshot.hoses);
+    setArrows(previousSnapshot.arrows);
+    setTexts(previousSnapshot.texts);
     setSimulatorDirty(true);
-  };
 
-  const handleRedo = () => {
+    setTimeout(() => {
+      isRestoringRef.current = false;
+    }, 50);
+  }, [undoStack, setSimulatorDirty]);
+
+  const handleRedo = useCallback(() => {
     if (redoStack.length === 0) return;
-    const nextAction = redoStack[redoStack.length - 1];
-    const item = nextAction.item;
-    if (!item) {
-      setRedoStack(prev => prev.slice(0, -1));
-      return;
-    }
 
-    if (nextAction.type === 'line') {
-      setLines(prev => [...prev, item]);
-    } else if (nextAction.type === 'dimension') {
-      setDimensions(prev => [...prev, item]);
-    } else if (nextAction.type === 'area') {
-      setAreas(prev => [...prev, item]);
-    } else if (nextAction.type === 'hose') {
-      setHoses(prev => [...prev, item]);
-    } else if (nextAction.type === 'arrow') {
-      setArrows(prev => [...prev, item]);
-    } else {
-      setPlacedComponents(prev => [...prev, item]);
-    }
+    const nextSnapshot = redoStack[redoStack.length - 1];
+    const currentSnapshot: CanvasSnapshot = {
+      lines: JSON.parse(JSON.stringify(linesRef.current)),
+      placedComponents: JSON.parse(JSON.stringify(placedComponentsRef.current)),
+      dimensions: JSON.parse(JSON.stringify(dimensionsRef.current)),
+      areas: JSON.parse(JSON.stringify(areasRef.current)),
+      hoses: JSON.parse(JSON.stringify(hosesRef.current)),
+      arrows: JSON.parse(JSON.stringify(arrowsRef.current)),
+      texts: JSON.parse(JSON.stringify(textsRef.current)),
+    };
 
-    setHistory(prev => [...prev, { type: nextAction.type as any, id: nextAction.id }]);
+    isRestoringRef.current = true;
+    setUndoStack(prev => [...prev, currentSnapshot]);
     setRedoStack(prev => prev.slice(0, -1));
+
+    setLines(nextSnapshot.lines);
+    setPlacedComponents(nextSnapshot.placedComponents);
+    setDimensions(nextSnapshot.dimensions);
+    setAreas(nextSnapshot.areas);
+    setHoses(nextSnapshot.hoses);
+    setArrows(nextSnapshot.arrows);
+    setTexts(nextSnapshot.texts);
     setSimulatorDirty(true);
-  };
+
+    setTimeout(() => {
+      isRestoringRef.current = false;
+    }, 50);
+  }, [redoStack, setSimulatorDirty]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -993,73 +1348,104 @@ export default function Simulator() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [history, redoStack, lines, placedComponents, dimensions, areas, hoses, arrows]);
+  }, [handleUndo, handleRedo]);
 
   const handleLinesChange = (newLines: LineData[]) => {
-    if (newLines.length > lines.length) {
-      const newLine = newLines[newLines.length - 1];
-      if (newLine.id !== 'current') {
-        setHistory([...history, { type: 'line', id: newLine.id }]);
-        setRedoStack([]);
-      }
-    }
+    recordSnapshotBeforeChange();
     setLines(newLines);
     setSimulatorDirty(true);
   };
 
   const handleComponentsChange = (newComps: PlacedComponent[]) => {
-    if (newComps.length > placedComponents.length) {
-      const newComp = newComps[newComps.length - 1];
-      setHistory([...history, { type: 'component', id: newComp.id }]);
-      setRedoStack([]);
-    }
+    recordSnapshotBeforeChange();
     setPlacedComponents(newComps);
     setSimulatorDirty(true);
   };
 
   const handleDimensionsChange = (newDims: DimensionData[]) => {
-    if (newDims.length > dimensions.length) {
-      const newDim = newDims[newDims.length - 1];
-      setHistory([...history, { type: 'dimension', id: newDim.id }]);
-      setRedoStack([]);
-    }
+    recordSnapshotBeforeChange();
     setDimensions(newDims);
     setSimulatorDirty(true);
   };
 
-  const handleAreasChange = (newAreas: AreaData[]) => {
-    if (newAreas.length > areas.length) {
-      const newArea = newAreas[newAreas.length - 1];
-      setHistory([...history, { type: 'area', id: newArea.id }]);
-      setRedoStack([]);
+  const handleApplyAiGeneratedLayout = useCallback((payload: {
+    lines: LineData[];
+    areas: AreaData[];
+    components: PlacedComponent[];
+    hoses: HoseData[];
+    levels: ElevationLevel[];
+    targetDepth: number;
+    calculatorInputs: DewateringInput;
+    name: string;
+  }) => {
+    recordSnapshotBeforeChange();
+    setLines(payload.lines);
+    setAreas(payload.areas);
+    setPlacedComponents(payload.components);
+    setHoses(payload.hoses);
+    if (payload.levels && payload.levels.length > 0) {
+      setLevels(payload.levels);
+      setActiveLevelId(payload.levels[1]?.id || payload.levels[0].id);
     }
+    setTargetDepth(payload.targetDepth);
+    setCalculatorInputs(payload.calculatorInputs);
+    setShowWellpoints(true);
+    setCurrentLayoutName(payload.name);
+    setSimulatorDirty(true);
+    toast.success(`Generated ${payload.name} and placed on CAD canvas!`);
+    setTimeout(() => {
+      canvasApiRef.current?.zoomAll();
+      view3DApiRef.current?.zoomAll();
+    }, 120);
+  }, [recordSnapshotBeforeChange, setSimulatorDirty]);
+
+  const handleAreasChange = (newAreas: AreaData[]) => {
+    recordSnapshotBeforeChange();
     setAreas(newAreas);
     setSimulatorDirty(true);
+
+    if (isAiTracing && aiTraceCallbackRef.current && newAreas.length > areas.length) {
+      const addedArea = newAreas[newAreas.length - 1];
+      const pts: Point[] = addedArea.points && addedArea.points.length >= 3
+        ? addedArea.points
+        : [
+            { x: addedArea.x, y: addedArea.y },
+            { x: addedArea.x + (addedArea.width || 0), y: addedArea.y },
+            { x: addedArea.x + (addedArea.width || 0), y: addedArea.y + (addedArea.height || 0) },
+            { x: addedArea.x, y: addedArea.y + (addedArea.height || 0) }
+          ];
+      setIsAiTracing(false);
+      setShowAiWizard(true);
+      setActiveTool('select');
+      aiTraceCallbackRef.current(pts);
+      aiTraceCallbackRef.current = null;
+      setAiTracedPoints([]);
+    }
   };
 
   const handleHosesChange = (newHoses: HoseData[]) => {
-    if (newHoses.length > hoses.length) {
-      const newHose = newHoses[newHoses.length - 1];
-      if (newHose.id !== 'current') {
-        setHistory([...history, { type: 'hose', id: newHose.id }]);
-        setRedoStack([]);
-      }
-    }
+    recordSnapshotBeforeChange();
     setHoses(newHoses);
     setSimulatorDirty(true);
   };
 
   const handleArrowsChange = (newArrows: ArrowData[]) => {
-    if (newArrows.length > arrows.length) {
-      const newArrow = newArrows[newArrows.length - 1];
-      setHistory([...history, { type: 'arrow', id: newArrow.id }]);
-      setRedoStack([]);
-    }
+    recordSnapshotBeforeChange();
     setArrows(newArrows);
     setSimulatorDirty(true);
   };
 
+  const handleTextsChange = (newTexts: TextData[]) => {
+    recordSnapshotBeforeChange();
+    setTexts(newTexts);
+    setSimulatorDirty(true);
+  };
+
   const handleToolSelect = (tool: ActiveTool) => {
+    if (tool === 'scale-blueprint') {
+      handleStartReferenceScale();
+      return;
+    }
     setActiveTool(tool);
     if (['line', 'hose', 'discharge'].includes(tool)) {
       setOrthoLocked(true);
@@ -1150,9 +1536,11 @@ export default function Simulator() {
         onOpenLoad={handleOpenLoadPanel}
         onExport={handleExportDrawing}
         onUploadBlueprint={() => fileInputRef.current?.click()}
+        hasBlueprint={!!backgroundImage}
+        onStartReferenceScale={handleStartReferenceScale}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        canUndo={history.length > 0}
+        canUndo={undoStack.length > 0}
         canRedo={redoStack.length > 0}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
@@ -1168,6 +1556,8 @@ export default function Simulator() {
         isSaving={isSaving}
         isDirty={isSimulatorDirty}
         hasLayout={!!currentLayoutId}
+        onOpenAiAssistant={() => setShowAiWizard(true)}
+        lastAutoSavedAt={lastAutoSavedAt}
       />
 
       {/* ── Body: Left Dock + Layers Panel + Canvas ── */}
@@ -1240,6 +1630,25 @@ export default function Simulator() {
             showLayers={showLayersPanel}
           />
 
+          {/* Active Reference Scale Calibration Guidance Banner */}
+          {scaleRefMode !== 'idle' && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-2xl flex items-center gap-3 border border-blue-400 select-none animate-in fade-in slide-in-from-top-2">
+              <Ruler className="w-4 h-4 animate-pulse" />
+              <span>
+                {scaleRefMode === 'selecting-start'
+                  ? 'Step 1 of 2: Click the START point of a known dimension line on the blueprint'
+                  : 'Step 2 of 2: Click the END point of the known dimension line'}
+              </span>
+              <button
+                type="button"
+                onClick={handleCancelReferenceScale}
+                className="ml-2 px-2.5 py-0.5 bg-white/20 hover:bg-white/30 rounded-full text-xs font-bold transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {activeTool === 'export-window' && (
             <div className="absolute top-0 inset-x-0 z-50 bg-blue-700/90 backdrop-blur-sm text-white text-center py-1.5 text-xs font-medium shadow-md flex items-center justify-center gap-4">
               <span>Click and drag on the canvas to select the export window area.</span>
@@ -1252,7 +1661,7 @@ export default function Simulator() {
             </div>
           )}
 
-          {show3D ? (
+          {viewMode === '3d' ? (
             <Dewatering3DView 
               lines={lines}
               placedComponents={placedComponents}
@@ -1275,6 +1684,24 @@ export default function Simulator() {
               onToggleNavWheel={() => setShowNavWheel(p => !p)}
               view3DApiRef={view3DApiRef}
             />
+          ) : viewMode === 'section' ? (
+            <div className={`flex-1 h-full w-full ${isDark ? 'bg-slate-900' : 'bg-slate-100'} overflow-hidden flex flex-col`}>
+              <DewateringSectionView
+                inputs={getEffectiveCalculatorInputs()}
+                onUpdateInputs={(updates) => {
+                  setCalculatorInputs(prev => ({
+                    ...(prev || DEFAULT_DEWATERING_INPUT),
+                    ...updates,
+                  }));
+                  if (updates.excavationDepth !== undefined) {
+                    setTargetDepth(updates.excavationDepth);
+                  }
+                  setSimulatorDirty(true);
+                }}
+                theme={isDark ? 'dark' : 'light'}
+                className="h-full w-full"
+              />
+            </div>
           ) : (
             <DewateringCanvas
               stageRef={stageRef}
@@ -1295,7 +1722,7 @@ export default function Simulator() {
               arrows={arrows}
               onArrowsChange={handleArrowsChange}
               texts={texts}
-              onTextsChange={(newTexts) => { setTexts(newTexts); setSimulatorDirty(true); }}
+              onTextsChange={handleTextsChange}
               activeTool={activeTool}
               onToolSelect={setActiveTool}
               backgroundImageUrl={backgroundImage}
@@ -1331,6 +1758,22 @@ export default function Simulator() {
               scaleRefPt2={scaleRefPt2}
               onSetScaleRefPt1={(pt) => { setScaleRefPt1(pt); setScaleRefMode('selecting-end'); }}
               onSetScaleRefPt2={(pt) => { setScaleRefPt2(pt); setScaleRefMode('idle'); setShowScaleModal(true); setScaleInputStr(''); }}
+            />
+          )}
+
+          {/* Blueprint Floating Control Bar */}
+          {backgroundImage && !show3D && (
+            <BlueprintControlBar
+              blueprintSettings={blueprintSettings}
+              onUpdateSettings={(updates) => {
+                setBlueprintSettings(prev => ({ ...prev, ...updates }));
+                setSimulatorDirty(true);
+              }}
+              onStartReferenceScale={handleStartReferenceScale}
+              isCalibrating={scaleRefMode !== 'idle'}
+              onResetBlueprint={handleResetBlueprint}
+              onRemoveBlueprint={handleRemoveBlueprint}
+              onOpenAiAssistant={() => setShowAiWizard(true)}
             />
           )}
 
@@ -1401,93 +1844,73 @@ export default function Simulator() {
       {/* ── Reference Scale Modal ── */}
       {showScaleModal && scaleRefPt1 && scaleRefPt2 && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-sm mx-4 overflow-hidden border border-gray-200" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border-b border-gray-200">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <div className="bg-blue-500 p-1 rounded">
-                  <Ruler className="w-4 h-4 text-white" />
+                <div className="bg-blue-600 p-1.5 rounded-lg text-white">
+                  <Ruler className="w-4 h-4" />
                 </div>
-                <h2 className="text-sm font-semibold text-gray-800">Set scale</h2>
+                <h2 className="text-sm font-bold text-slate-900">Calibrate Blueprint Scale</h2>
               </div>
-              <button onClick={() => { setShowScaleModal(false); setScaleRefPt1(null); setScaleRefPt2(null); }} className="text-gray-500 hover:text-gray-700">
+              <button
+                onClick={() => { setShowScaleModal(false); setScaleRefPt1(null); setScaleRefPt2(null); }}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-4 text-sm">
-              <p className="text-gray-700 mb-4">Enter the actual length to calculate the scale.</p>
+            <div className="p-5 text-xs text-slate-600">
+              <p className="mb-4 text-slate-500 leading-relaxed">
+                Enter the actual real-world length of the line you picked on the blueprint to calibrate accurate measurements.
+              </p>
               
-              <div className="flex items-center gap-2 mb-3">
-                <label className="text-gray-600 w-28">Measured length:</label>
-                <div className="px-2 py-1 bg-gray-50 border border-gray-200 text-gray-600 rounded">
-                  {(Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2)) / PIXELS_PER_METER).toFixed(3)}
+              <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-200 mb-4">
+                <span className="font-medium text-slate-600">Measured on screen:</span>
+                <span className="font-mono font-bold text-slate-900 text-sm">
+                  {(Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2)) / PIXELS_PER_METER).toFixed(3)} m
+                </span>
+              </div>
+              
+              <div className="mb-5">
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  Actual Dimension (Meters):
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.01"
+                    autoFocus
+                    placeholder="e.g. 10.0"
+                    className="w-full pl-3 pr-16 py-2 border border-slate-300 rounded-lg font-mono text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={scaleInputStr}
+                    onChange={e => setScaleInputStr(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleConfirmScale();
+                      if (e.key === 'Escape') { setShowScaleModal(false); setScaleRefPt1(null); setScaleRefPt2(null); }
+                    }}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-slate-400">
+                    meters
+                  </span>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2 mb-6">
-                <label className="text-gray-600 w-28">Actual length:</label>
-                <input
-                  type="number"
-                  autoFocus
-                  className="flex-1 px-2 py-1 border border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
-                  value={scaleInputStr}
-                  onChange={e => setScaleInputStr(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      const actualLengthMeters = parseFloat(scaleInputStr);
-                      if (isNaN(actualLengthMeters) || actualLengthMeters <= 0) return;
-                      const distPx = Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2));
-                      if (distPx === 0) return;
-                      const factor = (actualLengthMeters * PIXELS_PER_METER) / distPx;
-                      const newX = scaleRefPt1.x - (scaleRefPt1.x - blueprintSettings.x) * factor;
-                      const newY = scaleRefPt1.y - (scaleRefPt1.y - blueprintSettings.y) * factor;
-                      setBlueprintSettings(prev => ({
-                        ...prev,
-                        scaleX: prev.scaleX * factor,
-                        scaleY: prev.scaleY * factor,
-                        x: newX,
-                        y: newY,
-                      }));
-                      setShowScaleModal(false);
-                      setScaleInputStr('');
-                      setScaleRefPt1(null);
-                      setScaleRefPt2(null);
-                    }
-                  }}
-                />
-              </div>
 
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
-                  onClick={() => {
-                    const actualLengthMeters = parseFloat(scaleInputStr);
-                    if (isNaN(actualLengthMeters) || actualLengthMeters <= 0) return;
-                    const distPx = Math.sqrt(Math.pow(scaleRefPt2.x - scaleRefPt1.x, 2) + Math.pow(scaleRefPt2.y - scaleRefPt1.y, 2));
-                    if (distPx === 0) return;
-                    const factor = (actualLengthMeters * PIXELS_PER_METER) / distPx;
-                    const newX = scaleRefPt1.x - (scaleRefPt1.x - blueprintSettings.x) * factor;
-                    const newY = scaleRefPt1.y - (scaleRefPt1.y - blueprintSettings.y) * factor;
-                    setBlueprintSettings(prev => ({
-                      ...prev,
-                      scaleX: prev.scaleX * factor,
-                      scaleY: prev.scaleY * factor,
-                      x: newX,
-                      y: newY,
-                    }));
-                    setShowScaleModal(false);
-                    setScaleInputStr('');
-                    setScaleRefPt1(null);
-                    setScaleRefPt2(null);
-                  }}
-                  disabled={!scaleInputStr || parseFloat(scaleInputStr) <= 0}
-                  className="px-4 py-1.5 border border-gray-300 rounded hover:bg-gray-50 text-gray-700 bg-white shadow-sm disabled:opacity-50"
-                >
-                  Ok
-                </button>
-                <button
+                  type="button"
                   onClick={() => { setShowScaleModal(false); setScaleRefPt1(null); setScaleRefPt2(null); }}
-                  className="px-4 py-1.5 border border-gray-300 rounded hover:bg-gray-50 text-gray-700 bg-white shadow-sm"
+                  className="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700 font-semibold transition-colors"
                 >
                   Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmScale}
+                  disabled={!scaleInputStr || parseFloat(scaleInputStr) <= 0}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-semibold shadow-sm disabled:opacity-50 transition-colors"
+                >
+                  Apply Scale
                 </button>
               </div>
             </div>
@@ -1588,20 +2011,40 @@ export default function Simulator() {
                 <select
                   value={exportOptions.layoutFormat}
                   onChange={e => {
-                    const format = e.target.value as 'combined' | 'pure-2d' | 'pure-3d';
+                    const format = e.target.value as ExportOptions['layoutFormat'];
                     setExportOptions(prev => {
                       const next = { ...prev, layoutFormat: format };
-                      // Auto-adjust checkboxes based on selected format for user convenience
-                      if (format === 'pure-2d') {
+                      if (format === 'multi-view') {
                         next.includeSitePlan = true;
+                        next.includeSectionView = true;
+                        next.include3DView = true;
+                        next.includeBOM = true;
+                        next.includeLegend = true;
+                      } else if (format === 'plan-section') {
+                        next.includeSitePlan = true;
+                        next.includeSectionView = true;
+                        next.include3DView = false;
+                        next.includeBOM = true;
+                        next.includeLegend = true;
+                      } else if (format === 'pure-section') {
+                        next.includeSitePlan = false;
+                        next.includeSectionView = true;
+                        next.include3DView = false;
+                        next.includeBOM = true;
+                        next.includeLegend = false;
+                      } else if (format === 'pure-2d') {
+                        next.includeSitePlan = true;
+                        next.includeSectionView = false;
                         next.include3DView = false;
                       } else if (format === 'pure-3d') {
                         next.includeSitePlan = false;
+                        next.includeSectionView = false;
                         next.include3DView = true;
                         next.includeBOM = false;
                         next.includeLegend = false;
                       } else if (format === 'combined') {
                         next.includeSitePlan = true;
+                        next.includeSectionView = false;
                         next.include3DView = show3D;
                         next.includeBOM = true;
                         next.includeLegend = true;
@@ -1611,6 +2054,9 @@ export default function Simulator() {
                   }}
                   className="w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 border"
                 >
+                  <option value="multi-view">Multi-View Master (A-103) — Plan + Section + 3D + BOM</option>
+                  <option value="plan-section">Plan + Section Profile (A-104) — Plan + Section + BOM</option>
+                  <option value="pure-section">Cross-Section Blueprint (A-105) — Pure Section Profile</option>
                   <option value="combined">Combined Sheet (A-100) — 2D + 3D + BOM</option>
                   <option value="pure-2d">Pure 2D Floor Plan (A-101) — Blueprint layout</option>
                   <option value="pure-3d">Pure 3D Perspective (A-102) — Full-bleed 3D render</option>
@@ -1728,9 +2174,93 @@ export default function Simulator() {
             exportOptions={exportOptions}
             onExportOptionsChange={setExportOptions}
             activeLegendItems={activeLegendItems}
+            calculatorInputs={getEffectiveCalculatorInputs()}
+            calculationResult={results ? calculateDewatering(getEffectiveCalculatorInputs()) : null}
           />
         );
       })()}
+
+      {/* ── Offline Draft Auto-Recovery Modal ── */}
+      {showRestorePrompt && pendingDraft && (
+        <div className="fixed inset-0 z-[250] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-6 animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4 border border-blue-100">
+              <RotateCcw className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-base font-bold text-slate-900 mb-1">
+              Resume Unsaved Drawing?
+            </h3>
+            <p className="text-xs text-slate-600 mb-4 leading-relaxed">
+              We detected an unsaved drawing session auto-saved offline on this device. Would you like to restore where you left off or start fresh?
+            </p>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-5 space-y-1.5 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Drawing Name:</span>
+                <span className="font-semibold text-slate-900 truncate max-w-[200px]">
+                  {pendingDraft.draft.name || 'Untitled Drawing'}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Total Placed Items:</span>
+                <span className="font-semibold text-blue-600">
+                  {pendingDraft.draft.itemCount} items
+                </span>
+              </div>
+              {pendingDraft.draft.savedAt && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Last Auto-Saved:</span>
+                  <span className="font-mono text-slate-700">
+                    {new Date(pendingDraft.draft.savedAt).toLocaleDateString()} at{' '}
+                    {new Date(pendingDraft.draft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+              {pendingDraft.draft.hasBlueprintImage && (
+                <div className="flex justify-between text-slate-600">
+                  <span>Blueprint Underlay:</span>
+                  <span className="text-emerald-600 font-semibold">Included</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Discard & Start Fresh
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApplyRestoredDraft(pendingDraft.draft, pendingDraft.blob)}
+                className="px-5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restore Drawing</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AI Dewatering Blueprint Assistant Wizard ── */}
+      <AiDewateringWizard
+        isOpen={showAiWizard || isAiTracing}
+        onClose={() => setShowAiWizard(false)}
+        blueprintUrl={backgroundImage}
+        onUploadBlueprint={() => fileInputRef.current?.click()}
+        onStartScaleCalibration={handleStartReferenceScale}
+        scalePixelsPerMeter={PIXELS_PER_METER * (blueprintSettings.scaleX || 1)}
+        existingAreas={areas}
+        onApplyGeneratedLayout={handleApplyAiGeneratedLayout}
+        onStartTracingBoundary={handleStartAiTracing}
+        isTracingActive={isAiTracing}
+        tracedPoints={aiTracedPoints}
+        onCancelTracing={handleCancelAiTracing}
+      />
     </div>
   );
 };

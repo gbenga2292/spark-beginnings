@@ -4,7 +4,7 @@ import {
   Fuel, Plus, X, ChevronDown, ChevronUp, Pencil, Trash2, Save,
   Building2, Calendar, Droplets, Package, AlertCircle, CheckCircle2,
   Info, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, Gauge, BarChart3, List, Link as LinkIcon,
-  Sparkles, Receipt, ArrowRight, Zap, Search
+  Sparkles, Receipt, ArrowRight, Zap, Search, LayoutGrid, CheckCheck, Loader2
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
@@ -1898,10 +1898,11 @@ function FlatPagination({
 export function DieselRefillManager() {
   const { isDark } = useTheme();
   const currentUser = useUserStore(s => s.getCurrentUser());
-  const { dieselRefills, addDieselRefill, updateDieselRefill, deleteDieselRefill } = useOperations();
+  const { dieselRefills, addDieselRefill, addBatchDieselRefills, updateDieselRefill, deleteDieselRefill, assets } = useOperations();
   const sites = useAppStore(s => s.sites);
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
   const ledgerRemainingAmounts = useDieselLedgerRemaining();
+  const allMachinesOverview = useAllActiveMachines('');
 
   const canAdd = currentUser?.privileges?.opsDiesel?.canAdd ?? false;
   const canEdit = currentUser?.privileges?.opsDiesel?.canEdit ?? false;
@@ -1911,6 +1912,17 @@ export function DieselRefillManager() {
   const [editingRefill, setEditingRefill] = useState<DieselRefill | null>(null);
   const [initialLedgerEntry, setInitialLedgerEntry] = useState<LedgerEntry | null>(null);
   const [showPendingExpenses, setShowPendingExpenses] = useState(true);
+
+  // Simplified view and batch reconcile state
+  const [pendingViewMode, setPendingViewMode] = useState<'simplified' | 'cards'>('simplified');
+  const [pendingFilterStatus, setPendingFilterStatus] = useState<'all' | 'pending' | 'reconciled'>('all');
+  const [pendingSearch, setPendingSearch] = useState('');
+  const [rowDateOverrides, setRowDateOverrides] = useState<Record<string, string>>({});
+  const [rowLitreOverrides, setRowLitreOverrides] = useState<Record<string, string>>({});
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  const [isBatchReconciling, setIsBatchReconciling] = useState(false);
+  const [showBatchConfirmDialog, setShowBatchConfirmDialog] = useState(false);
+  const [reconcilingId, setReconcilingId] = useState<string | null>(null);
 
   const [filterSite, setFilterSite] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
@@ -1945,6 +1957,211 @@ export function DieselRefillManager() {
   const totalPendingAmount = useMemo(() => {
     return pendingDieselExpenses.reduce((s, i) => s + i.remaining, 0);
   }, [pendingDieselExpenses]);
+
+  // Filtered expenses for pending queue banner
+  const displayedPendingExpenses = useMemo(() => {
+    let list = allDieselExpenses;
+    if (pendingFilterStatus === 'pending') {
+      list = pendingDieselExpenses;
+    } else if (pendingFilterStatus === 'reconciled') {
+      list = allDieselExpenses.filter(item => item.remaining <= 0);
+    }
+
+    if (!pendingSearch.trim()) return list;
+    const q = pendingSearch.toLowerCase();
+    return list.filter(({ entry }) =>
+      (entry.description || '').toLowerCase().includes(q) ||
+      (entry.voucherNo || '').toLowerCase().includes(q) ||
+      (entry.site || '').toLowerCase().includes(q)
+    );
+  }, [allDieselExpenses, pendingDieselExpenses, pendingFilterStatus, pendingSearch]);
+
+  // Build a complete refill payload for an unlogged ledger entry
+  const buildRefillPayload = (
+    entry: LedgerEntry,
+    overrideDate?: string,
+    overrideLitres?: number
+  ): Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'> | null => {
+    // 1. Auto-detect date from ledger voucher
+    const refillDate = overrideDate || (entry.date ? entry.date.substring(0, 10) : today());
+    
+    // 2. Auto-parse litres from description (e.g. 60L, 100l, 120 litres)
+    const parsedL = overrideLitres !== undefined ? overrideLitres : parseLitresFromText(entry.description);
+    const totalL = Number(parsedL) || 0;
+    if (totalL <= 0) return null;
+
+    const remainingAmt = ledgerRemainingAmounts.get(entry.id) ?? Number(entry.amount) ?? 0;
+    const totalCost = remainingAmt > 0 ? remainingAmt : (Number(entry.amount) || 0);
+    const pricePerLitre = totalL > 0 && totalCost > 0 ? Number((totalCost / totalL).toFixed(2)) : undefined;
+
+    // 3. Match site: try voucher's site selection first
+    let matchedSite = entry.site
+      ? sites.find(s =>
+          s.name.toLowerCase() === entry.site!.toLowerCase() ||
+          s.name.toLowerCase().includes(entry.site!.toLowerCase()) ||
+          entry.site!.toLowerCase().includes(s.name.toLowerCase())
+        )
+      : undefined;
+
+    // If no site matched or site is generic 'Office', check if description mentions a known site
+    if (!matchedSite || matchedSite.name.toLowerCase() === 'office') {
+      const descLower = (entry.description || '').toLowerCase();
+      const siteFromDesc = sites.find(s => s.name.length > 2 && descLower.includes(s.name.toLowerCase()));
+      if (siteFromDesc) matchedSite = siteFromDesc;
+    }
+
+    // 4. Check if description specifies a machine name (e.g. Hiab, Pump, Deutz, Perkins)
+    const descLower = (entry.description || '').toLowerCase();
+    const specificAsset = assets.find(a =>
+      (a.type === 'equipment' || !!a.requiresLogging) &&
+      a.name.length > 2 &&
+      (descLower.includes(a.name.toLowerCase()) || (a.serialNumber && descLower.includes(a.serialNumber.toLowerCase())))
+    );
+
+    let machineAllocations: DieselRefillAllocation[] = [];
+
+    if (specificAsset) {
+      machineAllocations = [{
+        assetId: specificAsset.id,
+        assetName: specificAsset.name,
+        siteId: matchedSite?.id || '',
+        siteName: matchedSite?.name || 'Assigned Equipment',
+        allocatedLitres: totalL,
+        actualUsed: 0,
+        refillDate: refillDate,
+        notes: `Matched from voucher: ${entry.voucherNo || ''}`
+      }];
+    } else if (matchedSite) {
+      let siteMachines = allMachinesOverview.allMachinesWithSite.filter(m => m.siteId === matchedSite!.id);
+      if (siteMachines.length > 0) {
+        const perMachine = Number((totalL / siteMachines.length).toFixed(1));
+        let distributed = 0;
+        machineAllocations = siteMachines.map((m, idx) => {
+          const amt = idx === siteMachines.length - 1 ? Number((totalL - distributed).toFixed(1)) : perMachine;
+          distributed += amt;
+          return {
+            assetId: m.assetId,
+            assetName: m.assetName,
+            siteId: matchedSite!.id,
+            siteName: matchedSite!.name,
+            allocatedLitres: amt,
+            actualUsed: 0,
+            refillDate: refillDate,
+            notes: `Auto-allocated across site equipment`
+          };
+        });
+      } else {
+        machineAllocations = [{
+          assetId: `site-pool-${matchedSite.id}`,
+          assetName: `${matchedSite.name} Site Drum / Pool`,
+          siteId: matchedSite.id,
+          siteName: matchedSite.name,
+          allocatedLitres: totalL,
+          actualUsed: 0,
+          refillDate: refillDate,
+          notes: 'Site fuel pool allocation'
+        }];
+      }
+    } else {
+      machineAllocations = [{
+        assetId: 'unassigned-fuel-pool',
+        assetName: 'General Fuel Storage',
+        siteId: 'unassigned',
+        siteName: entry.site || 'Site Storage',
+        allocatedLitres: totalL,
+        actualUsed: 0,
+        refillDate: refillDate,
+        notes: 'General fuel pool allocation'
+      }];
+    }
+
+    return {
+      date: refillDate,
+      siteId: matchedSite?.id || 'multiple',
+      siteName: matchedSite?.name || entry.site || 'Site Refill',
+      totalLitres: totalL,
+      pricePerLitre,
+      totalCost,
+      purchasedBy: entry.enteredBy || undefined,
+      supplier: entry.vendor || undefined,
+      notes: `[Auto-Reconciled from ${entry.voucherNo || 'Ledger'}] ${entry.description}`,
+      linkedLedgerIds: [entry.id],
+      machineAllocations
+    };
+  };
+
+  // Quick 1-click single item reconcile
+  const handleQuickReconcile = async (entry: LedgerEntry) => {
+    const customDate = rowDateOverrides[entry.id];
+    const customLitres = rowLitreOverrides[entry.id] ? Number(rowLitreOverrides[entry.id]) : undefined;
+
+    const payload = buildRefillPayload(entry, customDate, customLitres);
+    if (!payload) {
+      toast.error('Cannot reconcile without Litres', {
+        description: 'Please enter litres for this entry or use "Log" for full options.'
+      });
+      return;
+    }
+
+    setReconcilingId(entry.id);
+    try {
+      await addDieselRefill(payload);
+      toast.success(`Reconciled ${payload.totalLitres}L for ${payload.siteName}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reconcile');
+    } finally {
+      setReconcilingId(null);
+    }
+  };
+
+  // Ready items count for batch reconcile
+  const readyPendingItems = useMemo(() => {
+    return pendingDieselExpenses.filter(({ entry }) => {
+      const customLitres = rowLitreOverrides[entry.id] ? Number(rowLitreOverrides[entry.id]) : undefined;
+      const l = customLitres !== undefined ? customLitres : parseLitresFromText(entry.description);
+      return l !== undefined && l > 0;
+    });
+  }, [pendingDieselExpenses, rowLitreOverrides]);
+
+  const readyTotalLitres = useMemo(() => {
+    return readyPendingItems.reduce((acc, { entry }) => {
+      const customLitres = rowLitreOverrides[entry.id] ? Number(rowLitreOverrides[entry.id]) : undefined;
+      const l = customLitres !== undefined ? customLitres : parseLitresFromText(entry.description);
+      return acc + (l || 0);
+    }, 0);
+  }, [readyPendingItems, rowLitreOverrides]);
+
+  const readyTotalCost = useMemo(() => {
+    return readyPendingItems.reduce((acc, { remaining }) => acc + remaining, 0);
+  }, [readyPendingItems]);
+
+  // Batch Auto-Reconcile All Ready Items
+  const handleBatchReconcileAll = async () => {
+    if (readyPendingItems.length === 0) {
+      toast.info('No ready purchases with detectable litres found.');
+      return;
+    }
+
+    setIsBatchReconciling(true);
+    try {
+      const payloads: Array<Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'>> = [];
+      for (const { entry } of readyPendingItems) {
+        const customDate = rowDateOverrides[entry.id];
+        const customLitres = rowLitreOverrides[entry.id] ? Number(rowLitreOverrides[entry.id]) : undefined;
+        const p = buildRefillPayload(entry, customDate, customLitres);
+        if (p) payloads.push(p);
+      }
+
+      if (payloads.length > 0) {
+        await addBatchDieselRefills(payloads);
+        setShowBatchConfirmDialog(false);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Batch reconciliation failed');
+    } finally {
+      setIsBatchReconciling(false);
+    }
+  };
 
   useSetPageTitle(
     showForm ? (editingRefill ? 'Edit Diesel Refill' : 'Log Diesel Refill') : 'Diesel Refill',
@@ -2057,9 +2274,9 @@ export function DieselRefillManager() {
         )}>
           <div 
             onClick={() => setShowPendingExpenses(s => !s)}
-            className="p-3 sm:p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none"
+            className="p-3 sm:p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none flex-wrap sm:flex-nowrap"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className={cn('w-7 h-7 rounded-md flex items-center justify-center shrink-0', 
                 pendingDieselExpenses.length > 0 
                   ? (isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-600 text-white')
@@ -2085,17 +2302,60 @@ export function DieselRefillManager() {
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                   {pendingDieselExpenses.length > 0
-                    ? 'Expenses from the Financial Ledger ready to be assigned to machines'
+                    ? 'Expenses from Financial Ledger ready to be reconciled to sites and equipment'
                     : 'All diesel expenses in the financial ledger have been logged and matched to refills'}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[11px] font-medium text-slate-400 hidden sm:inline">
-                {showPendingExpenses ? 'Collapse' : (pendingDieselExpenses.length > 0 ? 'Expand Queue' : 'View Purchases')}
-              </span>
-              <div className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center" onClick={e => e.stopPropagation()}>
+              {pendingDieselExpenses.length > 0 && canAdd && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowBatchConfirmDialog(true)}
+                  disabled={readyPendingItems.length === 0 || isBatchReconciling}
+                  className="h-7 text-xs px-2.5 bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-none rounded-md"
+                  title="Auto-reconcile all pending vouchers that have detected litres and site"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Auto-Reconcile All ({readyPendingItems.length})</span>
+                </Button>
+              )}
+
+              {/* View Switcher: Simplified List vs Cards */}
+              <div className={cn('flex items-center rounded-md border p-0.5', isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-100')}>
+                <button
+                  type="button"
+                  onClick={() => setPendingViewMode('simplified')}
+                  className={cn(
+                    'p-1 rounded text-xs transition-colors',
+                    pendingViewMode === 'simplified'
+                      ? (isDark ? 'bg-slate-800 text-blue-400 font-semibold' : 'bg-white text-blue-600 shadow-xs font-semibold')
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  )}
+                  title="Simplified Minimalist View"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingViewMode('cards')}
+                  className={cn(
+                    'p-1 rounded text-xs transition-colors',
+                    pendingViewMode === 'cards'
+                      ? (isDark ? 'bg-slate-800 text-blue-400 font-semibold' : 'bg-white text-blue-600 shadow-xs font-semibold')
+                      : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  )}
+                  title="Cards View"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div 
+                onClick={() => setShowPendingExpenses(s => !s)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
                 {showPendingExpenses ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
             </div>
@@ -2110,75 +2370,340 @@ export function DieselRefillManager() {
                 transition={{ duration: 0.15 }}
                 className="overflow-hidden"
               >
-                <div className={cn('border-t p-2.5 sm:p-3 grid grid-cols-1 md:grid-cols-2 gap-2', isDark ? 'border-slate-800 bg-slate-900/70' : 'border-slate-200/80 bg-white/70')}>
-                  {(pendingDieselExpenses.length > 0 ? pendingDieselExpenses : allDieselExpenses).map(({ entry, remaining, total }) => {
-                    const parsedL = parseLitresFromText(entry.description);
-                    const isPartial = remaining < total && remaining > 0;
-                    const isReconciled = remaining <= 0;
-                    return (
-                      <div
-                        key={entry.id}
-                        className={cn(
-                          'p-2.5 rounded-md border flex items-center justify-between gap-3 text-xs transition-all',
-                          isDark ? 'bg-slate-900 border-slate-800 hover:border-blue-800' : 'bg-white border-slate-200 hover:border-blue-200'
-                        )}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={cn('font-semibold truncate text-xs', isDark ? 'text-slate-200' : 'text-slate-800')}>
-                              {entry.description}
-                            </span>
-                            {parsedL && (
-                              <span className="px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px] border border-blue-500/20 font-mono tabular-nums">
-                                {parsedL}L
-                              </span>
-                            )}
-                            {isReconciled && (
-                              <span className="px-1.5 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider">
-                                Fully Reconciled
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400 flex-wrap font-mono tabular-nums">
-                            <span>{entry.voucherNo}</span>
-                            <span>•</span>
-                            <span>{new Date(entry.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                            {entry.site && (
-                              <>
-                                <span>•</span>
-                                <span className="font-medium text-blue-600 dark:text-blue-400 font-sans">{entry.site}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <div className="text-right font-mono tabular-nums">
-                            <p className={cn('font-bold text-xs', isReconciled ? (isDark ? 'text-slate-400' : 'text-slate-600') : (isDark ? 'text-blue-400' : 'text-blue-700'))}>
-                              {isReconciled ? fmtCurrency(total) : fmtCurrency(remaining)}
-                            </p>
-                            {isPartial && (
-                              <p className="text-[9px] text-slate-400">of {fmtCurrency(total)}</p>
-                            )}
-                          </div>
-
-                          {!isReconciled && canAdd && (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setInitialLedgerEntry(entry);
-                                setEditingRefill(null);
-                                setShowForm(true);
-                              }}
-                              className="h-7 text-xs px-2.5 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-none rounded-md shrink-0"
-                            >
-                              <Zap className="w-3 h-3" /> Log
-                            </Button>
+                <div className={cn('border-t p-2.5 sm:p-3 flex flex-col gap-2.5', isDark ? 'border-slate-800 bg-slate-900/70' : 'border-slate-200/80 bg-white/70')}>
+                  
+                  {/* Search, Filter Tabs & Queue summary */}
+                  <div className="flex items-center justify-between gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-2 flex-1 min-w-[280px] flex-wrap sm:flex-nowrap">
+                      <div className="relative flex-1 max-w-sm">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={pendingSearch}
+                          onChange={e => setPendingSearch(e.target.value)}
+                          placeholder="Search voucher, description, site..."
+                          className={cn(
+                            'w-full h-7 pl-8 pr-2.5 text-xs rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500',
+                            isDark ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500' : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'
                           )}
-                        </div>
+                        />
                       </div>
-                    );
-                  })}
+
+                      {/* Status Pills: All vs Pending vs Reconciled */}
+                      <div className={cn('inline-flex items-center rounded-md border p-0.5 shrink-0', isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-100')}>
+                        <button
+                          type="button"
+                          onClick={() => setPendingFilterStatus('all')}
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[11px] font-medium transition-colors',
+                            pendingFilterStatus === 'all'
+                              ? (isDark ? 'bg-slate-800 text-white font-bold' : 'bg-white text-slate-900 font-bold shadow-xs')
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                          )}
+                        >
+                          All ({allDieselExpenses.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingFilterStatus('pending')}
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[11px] font-medium transition-colors',
+                            pendingFilterStatus === 'pending'
+                              ? (isDark ? 'bg-amber-500/20 text-amber-300 font-bold' : 'bg-amber-100 text-amber-900 font-bold shadow-xs')
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                          )}
+                        >
+                          Pending ({pendingDieselExpenses.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingFilterStatus('reconciled')}
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[11px] font-medium transition-colors',
+                            pendingFilterStatus === 'reconciled'
+                              ? (isDark ? 'bg-emerald-500/20 text-emerald-300 font-bold' : 'bg-emerald-100 text-emerald-900 font-bold shadow-xs')
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                          )}
+                        >
+                          Reconciled ({allDieselExpenses.length - pendingDieselExpenses.length})
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                      <span>Showing <strong>{displayedPendingExpenses.length}</strong> of <strong>{allDieselExpenses.length}</strong> purchases</span>
+                    </div>
+                  </div>
+
+                  {displayedPendingExpenses.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 border rounded-md">
+                      No purchases found matching your filter.
+                    </div>
+                  ) : pendingViewMode === 'simplified' ? (
+                    /* Minimalist Simplified Table View */
+                    <div className={cn('rounded-md border overflow-x-auto', isDark ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-white')}>
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className={cn('border-b text-[11px] font-semibold text-slate-400 uppercase tracking-wider', isDark ? 'border-slate-800 bg-slate-900/80' : 'border-slate-200 bg-slate-50')}>
+                            <th className="py-2 px-3">Refill Date (Auto)</th>
+                            <th className="py-2 px-3">Voucher & Description</th>
+                            <th className="py-2 px-3">Matched Target</th>
+                            <th className="py-2 px-3 text-right">Volume</th>
+                            <th className="py-2 px-3 text-right">Amount</th>
+                            <th className="py-2 px-3 text-right">Quick Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                          {displayedPendingExpenses.map(({ entry, remaining, total }) => {
+                            const autoDate = rowDateOverrides[entry.id] || (entry.date ? entry.date.substring(0, 10) : today());
+                            const parsedL = rowLitreOverrides[entry.id] ? Number(rowLitreOverrides[entry.id]) : parseLitresFromText(entry.description);
+                            const isReconciled = remaining <= 0;
+                            const isReconciling = reconcilingId === entry.id;
+
+                              // Detect target
+                              const descLower = (entry.description || '').toLowerCase();
+                              let matchedSite = entry.site
+                                ? sites.find(s =>
+                                    s.name.toLowerCase() === entry.site!.toLowerCase() ||
+                                    s.name.toLowerCase().includes(entry.site!.toLowerCase()) ||
+                                    entry.site!.toLowerCase().includes(s.name.toLowerCase())
+                                  )
+                                : undefined;
+                              if (!matchedSite || matchedSite.name.toLowerCase() === 'office') {
+                                const siteFromDesc = sites.find(s => s.name.length > 2 && descLower.includes(s.name.toLowerCase()));
+                                if (siteFromDesc) matchedSite = siteFromDesc;
+                              }
+                              const specificAsset = assets.find(a =>
+                                (a.type === 'equipment' || !!a.requiresLogging) &&
+                                a.name.length > 2 &&
+                                (descLower.includes(a.name.toLowerCase()) || (a.serialNumber && descLower.includes(a.serialNumber.toLowerCase())))
+                              );
+
+                              return (
+                                <tr key={entry.id} className={cn('hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors', isReconciled && 'opacity-60')}>
+                                  {/* Date Column */}
+                                  <td className="py-2.5 px-3 whitespace-nowrap">
+                                    {editingDateId === entry.id ? (
+                                      <input
+                                        type="date"
+                                        value={autoDate}
+                                        onChange={e => setRowDateOverrides(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                                        onBlur={() => setEditingDateId(null)}
+                                        autoFocus
+                                        className="h-6 px-1.5 text-xs font-mono border rounded bg-white dark:bg-slate-900 border-blue-500"
+                                      />
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingDateId(entry.id)}
+                                        title="Auto-detected from ledger. Click to change."
+                                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors"
+                                      >
+                                        <Calendar className="w-3 h-3 text-blue-500" />
+                                        <span>{new Date(autoDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                        <Pencil className="w-2.5 h-2.5 text-slate-400 opacity-60" />
+                                      </button>
+                                    )}
+                                  </td>
+
+                                  {/* Voucher & Description */}
+                                  <td className="py-2.5 px-3 min-w-[220px]">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-mono text-[10px] px-1 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                                        {entry.voucherNo || 'VOUCHER'}
+                                      </span>
+                                      <span className={cn('font-medium text-xs', isDark ? 'text-slate-200' : 'text-slate-800')}>
+                                        {entry.description}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Matched Target */}
+                                  <td className="py-2.5 px-3 whitespace-nowrap">
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="font-semibold text-blue-600 dark:text-blue-400 text-xs">
+                                        {matchedSite ? matchedSite.name : (entry.site || 'Unassigned Site')}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                                        {specificAsset ? (
+                                          <span>Machine: {specificAsset.name}</span>
+                                        ) : (
+                                          <span>Site Equipment Pool</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  </td>
+
+                                  {/* Litres */}
+                                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                    {parsedL && parsedL > 0 ? (
+                                      <div className="inline-flex items-center gap-1">
+                                        <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                          {parsedL}L
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div className="inline-flex items-center gap-1">
+                                        <input
+                                          type="number"
+                                          placeholder="Litres"
+                                          value={rowLitreOverrides[entry.id] || ''}
+                                          onChange={e => setRowLitreOverrides(prev => ({ ...prev, [entry.id]: e.target.value }))}
+                                          className="w-16 h-6 px-1.5 text-xs text-right font-mono border rounded bg-white dark:bg-slate-900 border-amber-300"
+                                        />
+                                        <span className="text-[10px] text-slate-400 font-mono">L</span>
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  {/* Amount */}
+                                  <td className="py-2.5 px-3 text-right whitespace-nowrap font-mono tabular-nums">
+                                    <p className={cn('font-bold text-xs', isReconciled ? 'text-slate-400' : 'text-slate-800 dark:text-slate-200')}>
+                                      {fmtCurrency(remaining)}
+                                    </p>
+                                    {parsedL && parsedL > 0 && remaining > 0 && (
+                                      <p className="text-[9px] text-slate-400">
+                                        ₦{(remaining / parsedL).toFixed(0)}/L
+                                      </p>
+                                    )}
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {!isReconciled && canAdd && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleQuickReconcile(entry)}
+                                          disabled={isReconciling || isBatchReconciling || !parsedL || parsedL <= 0}
+                                          className="h-6 text-[11px] px-2 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-none rounded shrink-0"
+                                          title="1-Click Auto-Reconcile"
+                                        >
+                                          {isReconciling ? (
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                          ) : (
+                                            <Zap className="w-3 h-3" />
+                                          )}
+                                          Reconcile
+                                        </Button>
+                                      )}
+                                      {!isReconciled && canAdd && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setInitialLedgerEntry(entry);
+                                            setEditingRefill(null);
+                                            setShowForm(true);
+                                          }}
+                                          title="Open full form for manual adjustments"
+                                          className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                        >
+                                          <ArrowRight className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                      {isReconciled && (
+                                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase">
+                                          ✓ Reconciled
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    /* Original Cards View (Enhanced with Quick Reconcile) */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {displayedPendingExpenses.map(({ entry, remaining, total }) => {
+                          const autoDate = rowDateOverrides[entry.id] || (entry.date ? entry.date.substring(0, 10) : today());
+                          const parsedL = rowLitreOverrides[entry.id] ? Number(rowLitreOverrides[entry.id]) : parseLitresFromText(entry.description);
+                          const isPartial = remaining < total && remaining > 0;
+                          const isReconciled = remaining <= 0;
+                          const isReconciling = reconcilingId === entry.id;
+
+                          return (
+                            <div
+                              key={entry.id}
+                              className={cn(
+                                'p-2.5 rounded-md border flex items-center justify-between gap-3 text-xs transition-all',
+                                isDark ? 'bg-slate-900 border-slate-800 hover:border-blue-800' : 'bg-white border-slate-200 hover:border-blue-200'
+                              )}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={cn('font-semibold truncate text-xs', isDark ? 'text-slate-200' : 'text-slate-800')}>
+                                    {entry.description}
+                                  </span>
+                                  {parsedL && (
+                                    <span className="px-1.5 py-0.5 rounded-sm bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px] border border-blue-500/20 font-mono tabular-nums">
+                                      {parsedL}L
+                                    </span>
+                                  )}
+                                  {isReconciled && (
+                                    <span className="px-1.5 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider">
+                                      Fully Reconciled
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-400 flex-wrap font-mono tabular-nums">
+                                  <span>{entry.voucherNo}</span>
+                                  <span>•</span>
+                                  <span>{new Date(autoDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                                  {entry.site && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="font-medium text-blue-600 dark:text-blue-400 font-sans">{entry.site}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right font-mono tabular-nums">
+                                  <p className={cn('font-bold text-xs', isReconciled ? (isDark ? 'text-slate-400' : 'text-slate-600') : (isDark ? 'text-blue-400' : 'text-blue-700'))}>
+                                    {isReconciled ? fmtCurrency(total) : fmtCurrency(remaining)}
+                                  </p>
+                                  {isPartial && (
+                                    <p className="text-[9px] text-slate-400">of {fmtCurrency(total)}</p>
+                                  )}
+                                </div>
+
+                                {!isReconciled && canAdd && (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleQuickReconcile(entry)}
+                                      disabled={isReconciling || isBatchReconciling || !parsedL || parsedL <= 0}
+                                      className="h-7 text-xs px-2 bg-blue-600 hover:bg-blue-700 text-white gap-1 shadow-none rounded-md shrink-0"
+                                      title="1-Click Auto-Reconcile"
+                                    >
+                                      {isReconciling ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                                      Reconcile
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setInitialLedgerEntry(entry);
+                                        setEditingRefill(null);
+                                        setShowForm(true);
+                                      }}
+                                      className="h-7 text-xs px-2 shadow-none rounded-md shrink-0"
+                                      title="Open Full Form"
+                                    >
+                                      Log
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -2293,6 +2818,77 @@ export function DieselRefillManager() {
       ) : (
         <MachineAnalyticsView refills={filtered} />
       )}
+
+      {/* Batch Auto-Reconcile Confirmation Dialog */}
+      <Dialog open={showBatchConfirmDialog} onOpenChange={setShowBatchConfirmDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Zap className="w-4 h-4 text-blue-600" />
+              Auto-Reconcile {readyPendingItems.length} Purchases?
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <p className="text-slate-600 dark:text-slate-300">
+              The system will automatically create refill records and reconcile the vouchers in your Financial Ledger for all purchases where litres and site could be detected.
+            </p>
+
+            <div className={cn('p-3 rounded-md border space-y-2 font-mono text-xs', isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200')}>
+              <div className="flex justify-between items-center">
+                <span className="font-sans text-slate-500">Purchases to Reconcile:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{readyPendingItems.length} vouchers</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-sans text-slate-500">Total Volume:</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">{fmt(readyTotalLitres)} Litres</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-sans text-slate-500">Total Spend:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">{fmtCurrency(readyTotalCost)}</span>
+              </div>
+              <div className="border-t pt-1.5 flex justify-between items-center text-[11px] text-slate-500">
+                <span className="font-sans">Refill Dates:</span>
+                <span>Auto-detected from Ledger dates</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              💡 <strong>Zero double-entry:</strong> Machine fuel consumption entered by your operations team in daily logs remains completely intact.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBatchConfirmDialog(false)}
+              disabled={isBatchReconciling}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleBatchReconcileAll}
+              disabled={isBatchReconciling || readyPendingItems.length === 0}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1.5"
+            >
+              {isBatchReconciling ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Reconciling All ({readyPendingItems.length})...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  Confirm & Reconcile All ({readyPendingItems.length})
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

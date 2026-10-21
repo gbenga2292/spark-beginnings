@@ -105,13 +105,13 @@ export const navigation: NavCategory[] = [
         name: 'Phonebook',
         href: '/clients/phonebook',
         icon: Contact,
-        privKey: 'sites',
+        privKey: 'phonebook',
         privField: 'canView',
         visible: (user: any) =>
           Boolean(
             user?.privileges?.users?.canManage ||
-            user?.privileges?.sites?.canView ||
-            user?.privileges?.clients?.canView
+            user?.privileges?.phonebook?.canView ||
+            (!user?.privileges?.phonebook && (user?.privileges?.sites?.canView || user?.privileges?.clients?.canView))
           ),
       },
       { name: 'Machine Recon', href: '/operations/machine-reconciliation', icon: ArrowRightLeft, privKey: 'opsMachineRecon', privField: 'canView' },
@@ -214,7 +214,19 @@ export const navigation: NavCategory[] = [
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
       { name: 'Bank AI Import', href: '/bank-import', icon: Sparkles, privKey: 'bankImport', privField: 'canView' },
-      { name: 'Vendor Invoices', href: '/company-expenses', icon: ReceiptText, privKey: 'ledger', privField: 'canView' },
+      {
+        name: 'Vendor Invoices',
+        href: '/vendor-invoices',
+        icon: ReceiptText,
+        privKey: 'vendorInvoices',
+        privField: 'canView',
+        visible: (user: any) =>
+          Boolean(
+            user?.privileges?.users?.canManage ||
+            user?.privileges?.vendorInvoices?.canView ||
+            (!user?.privileges?.vendorInvoices && user?.privileges?.ledger?.canView)
+          ),
+      },
       { name: 'Budget', href: '/budget', icon: PiggyBank, privKey: 'budget', privField: 'canView' },
     ],
   },
@@ -257,9 +269,9 @@ export function getVisibleNavItems(items: NavItem[], currentUser: any): NavItem[
     if (IS_LIMITED_WEB_WEB) {
       const isTaskPath = item.href.startsWith('/tasks') || item.href === '/comm-log';
       const isDashboardPath = item.href === '/';
-      const isCompanyExpenses = item.href === '/company-expenses' || item.href === '/vendor-invoices';
+      const isVendorInvoices = item.href === '/vendor-invoices';
       const isDailyJournal = item.href === '/daily-journal';
-      if (!isTaskPath && !isDashboardPath && !isCompanyExpenses && !isDailyJournal) return false;
+      if (!isTaskPath && !isDashboardPath && !isVendorInvoices && !isDailyJournal) return false;
     }
 
     if (!currentUser) return false;

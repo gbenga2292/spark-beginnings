@@ -17,7 +17,8 @@ import {
   BookOpen, ExternalLink, Filter, Wallet, FileText, Check, Sparkles,
   Link2, Unlink, Edit2, Users, Paperclip, Upload, Eye, Loader2,
   Phone, MapPin, Landmark, ShieldCheck, History, Send, ThumbsUp,
-  ThumbsDown, MessageSquare, TrendingDown, Tag, RotateCcw, UserCheck, Lock
+  ThumbsDown, MessageSquare, TrendingDown, Tag, RotateCcw, UserCheck, Lock,
+  Copy, Info, Briefcase
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -340,7 +341,7 @@ const parseAmountInput = (val: string | number): number => {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function VendorInvoices() {
   const navigate = useNavigate();
-  const priv = usePriv('ledger');
+  const priv = usePriv('vendorInvoices');
   const currentUser = useUserStore((s) => s.getCurrentUser());
   const ws = currentUser?.workspaceId || 'dcel-team';
 
@@ -349,6 +350,7 @@ export function VendorInvoices() {
   const vendorInvoicePayments = useAppStore((s) => s.vendorInvoicePayments);
   const ledgerVendors = useAppStore((s) => s.ledgerVendors);
   const ledgerBanks = useAppStore((s) => s.ledgerBanks);
+  const ledgerBeneficiaryBanks = useAppStore((s) => s.ledgerBeneficiaryBanks);
   const ledgerEntries = useAppStore((s) => s.ledgerEntries);
 
   // Store actions
@@ -377,7 +379,9 @@ export function VendorInvoices() {
   const [activeTab, setActiveTab] = useState<'all' | 'outstanding' | 'awaiting_approval' | 'overdue' | 'paid'>('outstanding');
   const [searchTerm, setSearchTerm] = useState('');
   const [vendorFilter, setVendorFilter] = useState('all');
-  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'balance-desc' | 'due-soon'>('date-desc');
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'balance-desc' | 'balance-asc' | 'due-soon' | 'vendor-asc' | 'vendor-desc'>('date-desc');
+  const [isVendorBalancesOpen, setIsVendorBalancesOpen] = useState(false);
+  const [vendorBalancesSearch, setVendorBalancesSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -404,6 +408,7 @@ export function VendorInvoices() {
 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [detailInvoice, setDetailInvoice] = useState<ComputedVendorInvoice | null>(null);
+  const [showVendorBankInfo, setShowVendorBankInfo] = useState(false);
 
   // ─── State: Vendor Directory Modal ──────────────────────────────────────────
   const [isVendorDirectoryOpen, setIsVendorDirectoryOpen] = useState(false);
@@ -414,6 +419,7 @@ export function VendorInvoices() {
   const [vendorFormTin, setVendorFormTin] = useState('');
   const [vendorFormAddress, setVendorFormAddress] = useState('');
   const [vendorFormPhone, setVendorFormPhone] = useState('');
+  const [vendorFormServicesRendered, setVendorFormServicesRendered] = useState('');
   const [vendorFormBankName, setVendorFormBankName] = useState('');
   const [vendorFormAccountNumber, setVendorFormAccountNumber] = useState('');
   const [vendorFormNotes, setVendorFormNotes] = useState('');
@@ -597,6 +603,11 @@ export function VendorInvoices() {
   const [linkedLedgerId, setLinkedLedgerId] = useState('');
   const [isBrowsingLedger, setIsBrowsingLedger] = useState(false);
   const [ledgerSearchQuery, setLedgerSearchQuery] = useState('');
+  // Vendor bank details in payment modal
+  const [payToBankName, setPayToBankName] = useState('');
+  const [payToAccountNo, setPayToAccountNo] = useState('');
+  const [isEditingVendorBank, setIsEditingVendorBank] = useState(false);
+  const [hasCopiedAccount, setHasCopiedAccount] = useState(false);
   // Detail-modal voucher picker state
   const [linkingPaymentId, setLinkingPaymentId] = useState<string | null>(null);
   const [linkingPaymentDate, setLinkingPaymentDate] = useState<string>('');
@@ -694,6 +705,53 @@ export function VendorInvoices() {
     };
   }, [invoicesWithBalance]);
 
+  // ─── Vendor Balance Summaries (Total Owed per Vendor) ────────────────────────
+  const vendorBalances = useMemo(() => {
+    const map = new Map<string, { totalInvoiced: number; totalPaid: number; totalOwed: number; overdueCount: number; overdueAmount: number; invoiceCount: number }>();
+    invoicesWithBalance.forEach((inv) => {
+      const isApproved = (inv.approvalStatus || 'approved') === 'approved';
+      if (!isApproved) return;
+      const key = (inv.vendorName || '').trim() || 'Unknown Vendor';
+      const cur = map.get(key) || { totalInvoiced: 0, totalPaid: 0, totalOwed: 0, overdueCount: 0, overdueAmount: 0, invoiceCount: 0 };
+      cur.totalInvoiced += Number(inv.totalAmount || 0);
+      cur.totalPaid += inv.paidAmount;
+      cur.totalOwed += inv.balanceRemaining;
+      cur.invoiceCount += 1;
+      if (inv.isOverdue) {
+        cur.overdueCount += 1;
+        cur.overdueAmount += inv.balanceRemaining;
+      }
+      map.set(key, cur);
+    });
+
+    return Array.from(map.entries())
+      .map(([name, stats]) => {
+        const vendorObj = ledgerVendors.find(v => v.name.toLowerCase() === name.toLowerCase());
+        return {
+          name,
+          servicesRendered: vendorObj?.servicesRendered,
+          tinNumber: vendorObj?.tinNumber,
+          phone: vendorObj?.phone,
+          ...stats,
+        };
+      })
+      .sort((a, b) => b.totalOwed - a.totalOwed); // Highest owed first by default
+  }, [invoicesWithBalance, ledgerVendors]);
+
+  const activeVendorStats = useMemo(() => {
+    if (vendorFilter === 'all') return null;
+    return vendorBalances.find(v => v.name.toLowerCase() === vendorFilter.toLowerCase()) || null;
+  }, [vendorFilter, vendorBalances]);
+
+  const filteredVendorBalances = useMemo(() => {
+    if (!vendorBalancesSearch.trim()) return vendorBalances;
+    const q = vendorBalancesSearch.toLowerCase();
+    return vendorBalances.filter(v =>
+      v.name.toLowerCase().includes(q) ||
+      (v.servicesRendered && v.servicesRendered.toLowerCase().includes(q))
+    );
+  }, [vendorBalances, vendorBalancesSearch]);
+
   // ─── Filtered & Sorted Invoices ──────────────────────────────────────────────
   const filteredInvoices = useMemo(() => {
     let list = invoicesWithBalance;
@@ -727,11 +785,14 @@ export function VendorInvoices() {
 
     // 4. Sorting
     const sorted = [...list].sort((a, b) => {
+      if (sortBy === 'vendor-asc') return (a.vendorName || '').localeCompare(b.vendorName || '');
+      if (sortBy === 'vendor-desc') return (b.vendorName || '').localeCompare(a.vendorName || '');
       if (sortBy === 'date-desc') return new Date(b.dateReceived).getTime() - new Date(a.dateReceived).getTime();
       if (sortBy === 'date-asc') return new Date(a.dateReceived).getTime() - new Date(b.dateReceived).getTime();
       if (sortBy === 'amount-desc') return b.totalAmount - a.totalAmount;
       if (sortBy === 'amount-asc') return a.totalAmount - b.totalAmount;
       if (sortBy === 'balance-desc') return b.balanceRemaining - a.balanceRemaining;
+      if (sortBy === 'balance-asc') return a.balanceRemaining - b.balanceRemaining;
       if (sortBy === 'due-soon') {
         const dA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
         const dB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
@@ -795,6 +856,7 @@ export function VendorInvoices() {
     setVendorFormTin('');
     setVendorFormAddress('');
     setVendorFormPhone('');
+    setVendorFormServicesRendered('');
     setVendorFormBankName('');
     setVendorFormAccountNumber('');
     setVendorFormNotes('');
@@ -807,6 +869,7 @@ export function VendorInvoices() {
     setVendorFormTin(v.tinNumber || '');
     setVendorFormAddress(v.address || '');
     setVendorFormPhone(v.phone || '');
+    setVendorFormServicesRendered(v.servicesRendered || '');
     setVendorFormBankName(v.bankName || '');
     setVendorFormAccountNumber(v.accountNumber || '');
     setVendorFormNotes(v.notes || '');
@@ -832,6 +895,7 @@ export function VendorInvoices() {
         tinNumber: vendorFormTin.trim() || undefined,
         address: vendorFormAddress.trim() || undefined,
         phone: vendorFormPhone.trim() || undefined,
+        servicesRendered: vendorFormServicesRendered.trim() || undefined,
         bankName: vendorFormBankName.trim() || undefined,
         accountNumber: vendorFormAccountNumber.trim() || undefined,
         notes: vendorFormNotes.trim() || undefined,
@@ -843,6 +907,7 @@ export function VendorInvoices() {
         tinNumber: vendorFormTin.trim() || undefined,
         address: vendorFormAddress.trim() || undefined,
         phone: vendorFormPhone.trim() || undefined,
+        servicesRendered: vendorFormServicesRendered.trim() || undefined,
         bankName: vendorFormBankName.trim() || undefined,
         accountNumber: vendorFormAccountNumber.trim() || undefined,
         notes: vendorFormNotes.trim() || undefined,
@@ -898,6 +963,22 @@ export function VendorInvoices() {
 
   const headerButtons = (
     <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        onClick={() => setIsVendorBalancesOpen(true)}
+        className="h-8 sm:h-9 px-2.5 sm:px-3 gap-1.5 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700/80 font-semibold text-xs shadow-xs transition-all"
+        title="View Total Owed Breakdown by Vendor"
+      >
+        <Wallet className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+        <span className="hidden sm:inline">Totals Owed by Vendor</span>
+        <span className="sm:hidden">Totals Owed</span>
+        {vendorBalances.filter(v => v.totalOwed > 0).length > 0 && (
+          <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/50 text-[10px] font-bold text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-700">
+            {vendorBalances.filter(v => v.totalOwed > 0).length}
+          </span>
+        )}
+      </Button>
+
       <Button
         variant="outline"
         onClick={() => setIsVendorDirectoryOpen(true)}
@@ -1417,6 +1498,16 @@ export function VendorInvoices() {
     setIsBrowsingLedger(false);
     setLedgerSearchQuery('');
 
+    // Pre-populate vendor's destination bank account details
+    const matchedVendor = ledgerVendors.find(
+      (v) => (inv.vendorId && v.id === inv.vendorId) ||
+             (v.name && v.name.trim().toLowerCase() === inv.vendorName.trim().toLowerCase())
+    );
+    setPayToBankName(matchedVendor?.bankName || '');
+    setPayToAccountNo(matchedVendor?.accountNumber || '');
+    setIsEditingVendorBank(!matchedVendor?.accountNumber && !matchedVendor?.bankName);
+    setHasCopiedAccount(false);
+
     // If a preselected ledger entry was explicitly provided
     if (preselectedLedger) {
       setPayAmount(String(preselectedLedger.amount));
@@ -1439,6 +1530,39 @@ export function VendorInvoices() {
     setPayNotes(`Payment for ${inv.vendorName} (Inv #${inv.invoiceNumber})`);
     setLinkedLedgerId('');
     setIsPaymentModalOpen(true);
+  };
+
+  const payingVendor = useMemo(() => {
+    if (!payingInvoice) return null;
+    return (
+      ledgerVendors.find(
+        (v) => (payingInvoice.vendorId && v.id === payingInvoice.vendorId) ||
+               (v.name && v.name.trim().toLowerCase() === payingInvoice.vendorName.trim().toLowerCase())
+      ) || null
+    );
+  }, [payingInvoice, ledgerVendors]);
+
+  const handleSaveVendorBank = () => {
+    if (!payingInvoice) return;
+    const cleanBank = payToBankName.trim();
+    const cleanAcc = payToAccountNo.trim();
+    if (payingVendor) {
+      updateLedgerVendor(payingVendor.id, {
+        bankName: cleanBank,
+        accountNumber: cleanAcc,
+      });
+      toast.success(`Updated bank details for ${payingVendor.name}`);
+    } else {
+      const newVId = crypto.randomUUID();
+      addLedgerVendor({
+        id: newVId,
+        name: payingInvoice.vendorName,
+        bankName: cleanBank,
+        accountNumber: cleanAcc,
+      });
+      toast.success(`Saved bank details for ${payingInvoice.vendorName}`);
+    }
+    setIsEditingVendorBank(false);
   };
 
   const handleApplyLedgerEntry = (entry: LedgerEntry) => {
@@ -1498,11 +1622,34 @@ export function VendorInvoices() {
       paymentDate: payDate,
       amountPaid: amt,
       paidFromBank: payFromBank.trim(),
+      paidToBankName: payToBankName.trim() || undefined,
+      paidToAccountNo: payToAccountNo.trim() || undefined,
       notes: payNotes.trim() || undefined,
       ledgerEntryId: linkedLedgerId ? String(linkedLedgerId) : undefined,
       enteredBy: currentUser?.name || 'User',
       createdAt: new Date().toISOString(),
     };
+
+    // Auto-update vendor profile if bank details were entered/updated
+    const cleanBank = payToBankName.trim();
+    const cleanAcc = payToAccountNo.trim();
+    if (cleanBank || cleanAcc) {
+      if (payingVendor) {
+        if (payingVendor.bankName !== cleanBank || payingVendor.accountNumber !== cleanAcc) {
+          updateLedgerVendor(payingVendor.id, {
+            bankName: cleanBank,
+            accountNumber: cleanAcc,
+          });
+        }
+      } else {
+        addLedgerVendor({
+          id: crypto.randomUUID(),
+          name: payingInvoice.vendorName,
+          bankName: cleanBank,
+          accountNumber: cleanAcc,
+        });
+      }
+    }
 
     // 1. Record payment in store and Supabase
     addVendorInvoicePayment(newPayment);
@@ -1600,6 +1747,16 @@ export function VendorInvoices() {
     if (!detailInvoice) return null;
     return invoicesWithBalance.find((i) => i.id === detailInvoice.id) || detailInvoice;
   }, [detailInvoice, invoicesWithBalance]);
+
+  const detailVendor = useMemo(() => {
+    if (!detailInvoiceComputed) return null;
+    return (
+      ledgerVendors.find(
+        (v) => (detailInvoiceComputed.vendorId && v.id === detailInvoiceComputed.vendorId) ||
+               (v.name && v.name.trim().toLowerCase() === detailInvoiceComputed.vendorName.trim().toLowerCase())
+      ) || null
+    );
+  }, [detailInvoiceComputed, ledgerVendors]);
 
   // ── Ledger entries available for linking in the detail modal ─────────────────
   // Sorted by proximity to the payment's own date, so the most likely match
@@ -1924,14 +2081,66 @@ export function VendorInvoices() {
               onChange={(e) => setSortBy(e.target.value as any)}
               className="w-full h-8 px-2.5 text-xs bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-md text-slate-700 dark:text-slate-200 focus:bg-white"
             >
+              <option value="vendor-asc">Vendor Name (A to Z)</option>
+              <option value="vendor-desc">Vendor Name (Z to A)</option>
+              <option value="balance-desc">Balance Due (Highest first)</option>
+              <option value="balance-asc">Balance Due (Lowest first)</option>
               <option value="date-desc">Date (Newest first)</option>
               <option value="date-asc">Date (Oldest first)</option>
-              <option value="balance-desc">Balance Due (High to Low)</option>
-              <option value="amount-desc">Amount (High to Low)</option>
+              <option value="amount-desc">Amount (Highest first)</option>
+              <option value="amount-asc">Amount (Lowest first)</option>
               <option value="due-soon">Due Date (Soonest)</option>
             </select>
           </div>
         </div>
+
+        {/* Active Vendor Owed Summary Banner */}
+        {activeVendorStats && (
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 rounded-xl p-3 text-xs animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-amber-100 dark:bg-amber-900/60 rounded-lg text-amber-700 dark:text-amber-300">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">{activeVendorStats.name}</span>
+                  {activeVendorStats.servicesRendered && (
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">({activeVendorStats.servicesRendered})</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {activeVendorStats.invoiceCount} invoices recorded
+                  {activeVendorStats.overdueCount > 0 && (
+                    <span className="text-rose-600 font-semibold ml-1.5">• {activeVendorStats.overdueCount} overdue</span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+              <div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Total Invoiced</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200">₦{fmt(activeVendorStats.totalInvoiced)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-semibold">Total Paid</p>
+                <p className="font-bold text-emerald-600 dark:text-emerald-400">₦{fmt(activeVendorStats.totalPaid)}</p>
+              </div>
+              <div className="bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800/80 shadow-xs">
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 uppercase font-bold">Total Owed</p>
+                <p className="text-sm font-black text-amber-700 dark:text-amber-300">₦{fmt(activeVendorStats.totalOwed)}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setVendorFilter('all')}
+                className="h-7 text-xs text-slate-500 hover:text-slate-800 dark:text-slate-400"
+              >
+                Clear Filter
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── 4. Main Data Table ────────────────────────────────────────────── */}
@@ -1940,11 +2149,29 @@ export function VendorInvoices() {
           <Table>
             <TableHeader className="bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-700/80">
               <TableRow className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
-                <TableHead className="py-2 px-3 w-[260px]">Vendor & Invoice</TableHead>
+                <TableHead 
+                  onClick={() => setSortBy(sortBy === 'vendor-asc' ? 'vendor-desc' : 'vendor-asc')}
+                  className="py-2 px-3 w-[260px] cursor-pointer hover:text-blue-600 transition-colors select-none group"
+                  title="Click to sort by Vendor"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Vendor & Invoice</span>
+                    <ArrowUpDown className={`w-3 h-3 ${sortBy.startsWith('vendor') ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                  </div>
+                </TableHead>
                 <TableHead className="py-2 px-3">Date / Due</TableHead>
                 <TableHead className="py-2 px-3 text-right">Total (₦)</TableHead>
                 <TableHead className="py-2 px-3 text-right">Paid (₦)</TableHead>
-                <TableHead className="py-2 px-3 text-right">Balance Due (₦)</TableHead>
+                <TableHead 
+                  onClick={() => setSortBy(sortBy === 'balance-desc' ? 'balance-asc' : 'balance-desc')}
+                  className="py-2 px-3 text-right cursor-pointer hover:text-blue-600 transition-colors select-none group"
+                  title="Click to sort by Balance Due"
+                >
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>Balance Due (₦)</span>
+                    <ArrowUpDown className={`w-3 h-3 ${sortBy.startsWith('balance') ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                  </div>
+                </TableHead>
                 <TableHead className="py-2 px-3 text-center">Status</TableHead>
                 <TableHead className="py-2 px-3 text-right">Actions</TableHead>
               </TableRow>
@@ -2820,6 +3047,151 @@ export function VendorInvoices() {
                 </div>
               )}
 
+              {/* Vendor Bank Account Banner (Simplified & Copyable) */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                      Vendor Bank Account
+                    </span>
+                  </div>
+                  {!isEditingVendorBank && (
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingVendorBank(true)}
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      {payToAccountNo || payToBankName ? 'Edit Details' : '+ Add Bank'}
+                    </button>
+                  )}
+                </div>
+
+                {isEditingVendorBank ? (
+                  <div className="space-y-2 mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-0.5">
+                          Bank Name
+                        </label>
+                        <Input
+                          placeholder="e.g. GTBank, Zenith"
+                          list="payment-vendor-bank-suggestions"
+                          value={payToBankName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPayToBankName(val);
+                            const matched = ledgerBeneficiaryBanks.find(b => b.name.toLowerCase() === val.toLowerCase());
+                            if (matched && matched.accountNo && !payToAccountNo) {
+                              setPayToAccountNo(matched.accountNo);
+                            }
+                          }}
+                          className="h-7.5 text-xs bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        />
+                        <datalist id="payment-vendor-bank-suggestions">
+                          {ledgerBeneficiaryBanks.map((b) => (
+                            <option key={b.id} value={b.name}>
+                              {b.accountNo ? `${b.name} (${b.accountNo})` : b.name}
+                            </option>
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 block mb-0.5">
+                          Account Number
+                        </label>
+                        <Input
+                          placeholder="10-digit account no."
+                          value={payToAccountNo}
+                          onChange={(e) => setPayToAccountNo(e.target.value)}
+                          className="h-7.5 text-xs font-mono bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPayToBankName(payingVendor?.bankName || '');
+                          setPayToAccountNo(payingVendor?.accountNumber || '');
+                          setIsEditingVendorBank(false);
+                        }}
+                        className="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium px-2 py-0.5"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveVendorBank}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer"
+                      >
+                        <Check className="w-3 h-3" />
+                        Save to Vendor
+                      </button>
+                    </div>
+                  </div>
+                ) : (payToAccountNo || payToBankName) ? (
+                  <div className="flex items-center justify-between bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200/70 dark:border-slate-800">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div>
+                        <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold leading-none mb-0.5">Bank</span>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                          {payToBankName || '—'}
+                        </span>
+                      </div>
+                      <div className="h-6 w-px bg-slate-200 dark:bg-slate-800" />
+                      <div>
+                        <span className="text-[9px] text-slate-400 uppercase tracking-wider block font-semibold leading-none mb-0.5">Account No.</span>
+                        <span className="text-xs font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wider">
+                          {payToAccountNo || '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {payToAccountNo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(payToAccountNo);
+                          setHasCopiedAccount(true);
+                          toast.success('Account number copied to clipboard!');
+                          setTimeout(() => setHasCopiedAccount(false), 2000);
+                        }}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer border shadow-xs shrink-0 ${
+                          hasCopiedAccount
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700'
+                        }`}
+                        title="Copy account number for mobile/online banking transfer"
+                      >
+                        {hasCopiedAccount ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 py-1">
+                    <span>No bank details registered for this vendor yet.</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingVendorBank(true)}
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      + Add Bank Now
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Payment Amount */}
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -3022,7 +3394,7 @@ export function VendorInvoices() {
       </Dialog>
 
       {/* ── 8. Dialog: Invoice Detail & Payment History ────────────────────── */}
-      <Dialog open={isDetailModalOpen} onOpenChange={(open) => { setIsDetailModalOpen(open); if (!open) { setLinkingPaymentId(null); setLinkingPaymentDate(''); setLinkingPaymentAmt(0); setLinkVoucherSearch(''); } }}>
+      <Dialog open={isDetailModalOpen} onOpenChange={(open) => { setIsDetailModalOpen(open); if (!open) { setShowVendorBankInfo(false); setLinkingPaymentId(null); setLinkingPaymentDate(''); setLinkingPaymentAmt(0); setLinkVoucherSearch(''); } }}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           {detailInvoiceComputed && (
             <>
@@ -3038,9 +3410,80 @@ export function VendorInvoices() {
                         isOverdue={detailInvoiceComputed.isOverdue}
                       />
                     </div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                      {detailInvoiceComputed.vendorName}
-                    </h2>
+                    <div className="flex items-center gap-2 mt-1">
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                        {detailInvoiceComputed.vendorName}
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => setShowVendorBankInfo(prev => !prev)}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-full transition-all cursor-pointer border shrink-0 ${
+                          showVendorBankInfo
+                            ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-700 shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700'
+                        }`}
+                        title="View Vendor Bank Account Details"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {showVendorBankInfo && (
+                      <div className="mt-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
+                        {detailVendor?.bankName || detailVendor?.accountNumber ? (
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div>
+                                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block leading-none mb-0.5">Bank</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                                  {detailVendor.bankName || '—'}
+                                </span>
+                              </div>
+                              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
+                              <div>
+                                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block leading-none mb-0.5">Account Number</span>
+                                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-xs tracking-wider">
+                                  {detailVendor.accountNumber || '—'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {detailVendor.accountNumber && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(detailVendor.accountNumber!);
+                                  toast.success('Account number copied to clipboard!');
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold transition-all shadow-xs cursor-pointer shrink-0"
+                                title="Copy account number"
+                              >
+                                <Copy className="w-3 h-3 text-slate-500" />
+                                <span>Copy</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs">
+                            <span>No bank details registered for this vendor yet.</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsDetailModalOpen(false);
+                                setEditingVendorId(detailVendor?.id || null);
+                                setVendorFormName(detailInvoiceComputed.vendorName);
+                                setVendorFormBankName('');
+                                setVendorFormAccountNumber('');
+                                setIsVendorModalOpen(true);
+                              }}
+                              className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                            >
+                              + Add in Directory
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {(() => {
                       const items = loadLineItems(detailInvoiceComputed.lineItems, detailInvoiceComputed.description);
                       const hasItems = items.some(i => i.desc.trim());
@@ -3846,6 +4289,12 @@ export function VendorInvoices() {
                                   <span className="truncate max-w-[220px]">{v.address}</span>
                                 </div>
                               )}
+                              {v.servicesRendered && (
+                                <div className="text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5 ml-5">
+                                  <Briefcase className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                                  <span className="truncate max-w-[220px]">{v.servicesRendered}</span>
+                                </div>
+                              )}
                               {v.notes && (
                                 <div className="text-[11px] text-slate-400 dark:text-slate-500 italic mt-0.5 ml-5 truncate max-w-[220px]">
                                   {v.notes}
@@ -4017,6 +4466,17 @@ export function VendorInvoices() {
               />
             </div>
 
+            {/* Services Rendered */}
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Services</span>
+              <input
+                value={vendorFormServicesRendered}
+                onChange={(e) => setVendorFormServicesRendered(e.target.value)}
+                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Services rendered (e.g. Haulage, Generator repair)"
+              />
+            </div>
+
             {/* Divider */}
             <div className="flex items-center gap-2 pt-0.5">
               <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
@@ -4030,12 +4490,23 @@ export function VendorInvoices() {
               <input
                 list="vendor-bank-suggestions"
                 value={vendorFormBankName}
-                onChange={(e) => setVendorFormBankName(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setVendorFormBankName(val);
+                  const matched = ledgerBeneficiaryBanks.find(b => b.name.toLowerCase() === val.toLowerCase());
+                  if (matched && matched.accountNo && !vendorFormAccountNumber) {
+                    setVendorFormAccountNumber(matched.accountNo);
+                  }
+                }}
                 className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
                 placeholder="Bank name"
               />
               <datalist id="vendor-bank-suggestions">
-                {ledgerBanks.map((b) => <option key={b.id} value={b.name} />)}
+                {ledgerBeneficiaryBanks.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.accountNo ? `${b.name} (${b.accountNo})` : b.name}
+                  </option>
+                ))}
               </datalist>
             </div>
 
@@ -4364,6 +4835,175 @@ export function VendorInvoices() {
           onClose={() => setPreviewDoc(null)}
         />
       )}
+
+      {/* ── 11. Dialog: Totals Owed by Vendor Summary ───────────────────────── */}
+      <Dialog open={isVendorBalancesOpen} onOpenChange={setIsVendorBalancesOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] p-0 overflow-hidden flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+          {/* Header */}
+          <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/50 rounded-xl text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Vendor Balances & Totals Owed
+                  </DialogTitle>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Breakdown of total invoiced, paid, and outstanding balances across all vendors
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Overall Owed Badge */}
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Total Outstanding Owed</p>
+                <p className="text-base font-black text-amber-600 dark:text-amber-400">
+                  ₦{fmt(summary.totalOutstanding)}
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {/* Search & Stats Bar */}
+          <div className="px-6 py-3 bg-slate-50/60 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 shrink-0 flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Search vendor or services..."
+                value={vendorBalancesSearch}
+                onChange={(e) => setVendorBalancesSearch(e.target.value)}
+                className="pl-8 h-8 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+              />
+              {vendorBalancesSearch && (
+                <button
+                  onClick={() => setVendorBalancesSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span>{filteredVendorBalances.length} vendors</span>
+              <span>•</span>
+              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                {vendorBalances.filter(v => v.totalOwed > 0).length} with unpaid balances
+              </span>
+            </div>
+          </div>
+
+          {/* Table Body */}
+          <div className="p-6 overflow-y-auto flex-1">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+              <Table>
+                <TableHeader className="bg-slate-50 dark:bg-slate-800/60">
+                  <TableRow className="border-slate-100 dark:border-slate-800">
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 h-9 px-4">
+                      Vendor
+                    </TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 h-9 px-4 text-center">
+                      Invoices
+                    </TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 h-9 px-4 text-right">
+                      Total Invoiced (₦)
+                    </TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 h-9 px-4 text-right">
+                      Total Paid (₦)
+                    </TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 h-9 px-4 text-right">
+                      Balance Owed (₦)
+                    </TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 h-9 px-4 text-right">
+                      Action
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredVendorBalances.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-28 text-center text-slate-400 dark:text-slate-500 text-xs italic">
+                        {vendorBalancesSearch ? `No vendors matching "${vendorBalancesSearch}"` : 'No vendor invoices found.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredVendorBalances.map((v) => (
+                      <TableRow key={v.name} className="border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                        <TableCell className="py-2.5 px-4">
+                          <div>
+                            <div className="font-semibold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
+                              <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              <span>{v.name}</span>
+                            </div>
+                            {v.servicesRendered && (
+                              <div className="text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1 mt-0.5 ml-5">
+                                <Briefcase className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                                <span className="truncate max-w-[220px]">{v.servicesRendered}</span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2.5 px-4 text-center">
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                            {v.invoiceCount}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-2.5 px-4 text-right font-medium text-slate-700 dark:text-slate-300 text-xs">
+                          ₦{fmt(v.totalInvoiced)}
+                        </TableCell>
+                        <TableCell className="py-2.5 px-4 text-right font-medium text-emerald-600 dark:text-emerald-400 text-xs">
+                          ₦{fmt(v.totalPaid)}
+                        </TableCell>
+                        <TableCell className="py-2.5 px-4 text-right font-bold text-xs">
+                          {v.totalOwed > 0 ? (
+                            <span className="inline-block px-2.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/70 text-amber-700 dark:text-amber-300 font-bold font-mono">
+                              ₦{fmt(v.totalOwed)}
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold">
+                              ₦0.00 (Settled)
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5 px-4 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setVendorFilter(v.name);
+                              setIsVendorBalancesOpen(false);
+                            }}
+                            className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 font-semibold"
+                          >
+                            View Invoices
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <DialogFooter className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/20 shrink-0 flex items-center justify-between">
+            <span className="text-xs text-slate-400">
+              Click &quot;View Invoices&quot; on any row to filter the main table directly to that vendor.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsVendorBalancesOpen(false)}
+              className="text-xs h-8 px-4 border-slate-200 dark:border-slate-700"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

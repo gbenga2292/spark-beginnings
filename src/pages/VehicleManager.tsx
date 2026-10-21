@@ -2019,6 +2019,17 @@ export function VehicleManager() {
   });
 
   // 2. Trip Log Form State (Simplified Daily Mileage & Active Sites)
+  const emptyTRow = () => ({
+    id: crypto.randomUUID(),
+    vehicle_id: '',
+    driver_name: '',
+    distance_km: '' as string | number,
+    site: '',
+    purpose: '',
+  });
+  const [tBulkDate, setTBulkDate] = useState(new Date().toISOString().split('T')[0]);
+  const [tRows, setTRows] = useState<ReturnType<typeof emptyTRow>[]>([emptyTRow()]);
+  // keep legacy tForm for edit-single flow
   const [tForm, setTForm] = useState({
     vehicle_id: '',
     date: new Date().toISOString().split('T')[0],
@@ -2028,6 +2039,9 @@ export function VehicleManager() {
     purpose: '',
     remark: ''
   });
+  const updateTRow = (id: string, patch: Partial<ReturnType<typeof emptyTRow>>) =>
+    setTRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  const removeTRow = (id: string) => setTRows(prev => prev.filter(r => r.id !== id));
 
   const activeSites = useMemo(() => [
     ...sites.filter(s => !s.status || s.status.toLowerCase() === 'active').map(s => ({ id: s.id, name: s.name, type: 'active' })),
@@ -2253,16 +2267,15 @@ export function VehicleManager() {
   };
 
   const handleSaveTrip = () => {
-    const selectedVehicle = vehicles.find(v => v.id === tForm.vehicle_id);
-    if (!selectedVehicle || !tForm.driver_name) {
-      toast.error('Please select a vehicle and enter the driver name');
-      return;
-    }
-
-    const siteNames = tForm.selected_sites.length > 0 ? tForm.selected_sites.join(', ') : 'General Route';
-    const distNum = tForm.distance_km !== '' && !isNaN(Number(tForm.distance_km)) ? Number(tForm.distance_km) : undefined;
-
     if (editingTrip) {
+      // single-edit mode
+      const selectedVehicle = vehicles.find(v => v.id === tForm.vehicle_id);
+      if (!selectedVehicle || !tForm.driver_name) {
+        toast.error('Please select a vehicle and enter the driver name');
+        return;
+      }
+      const siteNames = tForm.selected_sites.length > 0 ? tForm.selected_sites.join(', ') : 'General Route';
+      const distNum = tForm.distance_km !== '' && !isNaN(Number(tForm.distance_km)) ? Number(tForm.distance_km) : undefined;
       const updatedLog: VehicleTripLeg = {
         ...editingTrip,
         vehicle_id: selectedVehicle.id,
@@ -2276,32 +2289,35 @@ export function VehicleManager() {
       };
       updateVehicleTripRecord(editingTrip.id, updatedLog);
       toast.success('Movement record updated');
-    } else {
-      const newLog: VehicleTripLeg = {
-        vehicle_id: selectedVehicle.id,
-        vehicle_reg: selectedVehicle.registration_number,
-        driver_name: tForm.driver_name,
-        site_name: siteNames,
-        purpose: tForm.purpose,
-        remark: tForm.remark,
-        distance_km: distNum,
-        departure_time: `${tForm.date}T00:00:00Z`,
-      };
-      addVehicleTripRecords([newLog]);
-      toast.success('Movement record saved');
+      setShowTripForm(false);
+      setEditingTrip(null);
+      return;
     }
 
-    setShowTripForm(false);
-    setEditingTrip(null);
-    setTForm({
-      vehicle_id: '',
-      date: new Date().toISOString().split('T')[0],
-      driver_name: '',
-      distance_km: '',
-      selected_sites: [],
-      purpose: '',
-      remark: ''
+    // bulk mode
+    const validRows = tRows.filter(r => r.vehicle_id && r.driver_name);
+    if (validRows.length === 0) {
+      toast.error('Add at least one complete vehicle entry (vehicle + driver required)');
+      return;
+    }
+    const newLogs: VehicleTripLeg[] = validRows.map(r => {
+      const v = vehicles.find(vv => vv.id === r.vehicle_id)!;
+      return {
+        vehicle_id: v.id,
+        vehicle_reg: v.registration_number,
+        driver_name: r.driver_name,
+        site_name: r.site || 'General Route',
+        purpose: r.purpose || '',
+        remark: '',
+        distance_km: r.distance_km !== '' && !isNaN(Number(r.distance_km)) ? Number(r.distance_km) : undefined,
+        departure_time: `${tBulkDate}T00:00:00Z`,
+      };
     });
+    addVehicleTripRecords(newLogs);
+    toast.success(`${newLogs.length} movement record${newLogs.length > 1 ? 's' : ''} saved`);
+    setShowTripForm(false);
+    setTRows([emptyTRow()]);
+    setTBulkDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleExport = () => {
@@ -2316,10 +2332,7 @@ export function VehicleManager() {
         'Driver': t.driver_name,
         'Site': t.site_name,
         'Purpose': t.purpose,
-        'Departure': new Date(t.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        'Arrival': t.arrival_time ? new Date(t.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-        'Odometer Start': t.odometer_start || '',
-        'Odometer End': t.odometer_end || '',
+        'Distance (km)': t.distance_km ?? (t.odometer_start && t.odometer_end ? t.odometer_end - t.odometer_start : ''),
         'Remark': t.remark || ''
       }));
 
@@ -2543,187 +2556,183 @@ export function VehicleManager() {
         </div>
       )}
 
-      {/* Trip Log Modal */}
+      {/* Trip Log Modal — Bulk Multi-Vehicle */}
       {showTripForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl shadow-2xl my-8 rounded-md border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-4 duration-300">
-            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                    <ClipboardList className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-bold">{editingTrip ? 'Edit Trip Record' : 'Daily Trip Movement Log'}</CardTitle>
-                    <p className="text-xs text-slate-500">{editingTrip ? 'Modify the details of this site visit' : 'Record vehicle visits and mileage for today'}</p>
-                  </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 overflow-y-auto">
+          <div className="w-full max-w-3xl bg-white dark:bg-slate-950 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200 flex flex-col my-6">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                  <ClipboardList className="h-4.5 w-4.5 text-blue-600" />
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}><X className="h-4 w-4" /></Button>
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {editingTrip ? 'Edit Trip Record' : 'Daily Trip Movement Log'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {editingTrip ? 'Update this trip entry' : 'Log one or more vehicles in one go'}
+                  </p>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* Header Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Vehicle</Label>
-                  <select className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950"
+              <button onClick={() => { setShowTripForm(false); setEditingTrip(null); setTRows([emptyTRow()]); }}
+                className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <X className="h-4 w-4 text-slate-500" />
+              </button>
+            </div>
+
+            {/* Date — shared for all rows */}
+            {!editingTrip && (
+              <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
+                <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide shrink-0">Date</span>
+                <input
+                  type="date"
+                  value={tBulkDate}
+                  onChange={e => setTBulkDate(e.target.value)}
+                  className="h-8 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-sm font-mono text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <span className="text-[11px] text-slate-400 ml-1">Applied to all vehicles below</span>
+              </div>
+            )}
+
+            {/* Edit-single mode */}
+            {editingTrip ? (
+              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Vehicle</label>
+                  <select className="h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm"
                     value={tForm.vehicle_id} onChange={e => setTForm({...tForm, vehicle_id: e.target.value})}>
-                    <option value="">Select Vehicle</option>
+                    <option value="">Select vehicle...</option>
                     {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} ({v.registration_number})</option>)}
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Date</Label>
-                  <Input type="date" className="font-mono tabular-nums h-10" value={tForm.date} onChange={e => setTForm({...tForm, date: e.target.value})} />
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Date</label>
+                  <Input type="date" className="h-9 font-mono" value={tForm.date} onChange={e => setTForm({...tForm, date: e.target.value})} />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Driver Name</Label>
-                  <Input list="driver-list" className="h-10" placeholder="Select or type driver" value={tForm.driver_name} onChange={e => setTForm({...tForm, driver_name: e.target.value})} />
-                  <datalist id="driver-list">
-                    {employees.map(emp => <option key={emp.id} value={`${emp.firstname} ${emp.surname}`} />)}
-                  </datalist>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Driver</label>
+                  <Input list="driver-list-edit" className="h-9" placeholder="Driver name" value={tForm.driver_name} onChange={e => setTForm({...tForm, driver_name: e.target.value})} />
+                  <datalist id="driver-list-edit">{employees.map(emp => <option key={emp.id} value={`${emp.firstname} ${emp.surname}`} />)}</datalist>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold flex items-center justify-between">
-                    <span>Daily Mileage</span>
-                    <span className="text-[10px] text-blue-600 font-mono font-bold uppercase">km</span>
-                  </Label>
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    step="0.1" 
-                    placeholder="e.g. 15" 
-                    className="font-mono tabular-nums h-10" 
-                    value={tForm.distance_km} 
-                    onChange={e => setTForm({...tForm, distance_km: e.target.value})} 
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Mileage (km)</label>
+                  <Input type="number" min="0" step="0.1" className="h-9 font-mono" placeholder="0" value={tForm.distance_km} onChange={e => setTForm({...tForm, distance_km: e.target.value})} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Site / Destination</label>
+                  <Input className="h-9" placeholder="Site name or location" value={tForm.selected_sites.join(', ')} onChange={e => setTForm({...tForm, selected_sites: e.target.value ? [e.target.value] : []})} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Purpose</label>
+                  <Input className="h-9" placeholder="e.g. Site Visit, Delivery" value={tForm.purpose} onChange={e => setTForm({...tForm, purpose: e.target.value})} />
                 </div>
               </div>
-
-              <DropdownMenuSeparator className="my-4" />
-
-              {/* Visited Active Sites Multi-Select */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-blue-600" /> Visited Sites / Destinations
-                  </Label>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    {tForm.selected_sites.length} site{tForm.selected_sites.length === 1 ? '' : 's'} selected
-                  </span>
+            ) : (
+              /* Bulk row table */
+              <div className="overflow-x-auto">
+                {/* Column headers */}
+                <div className="grid grid-cols-[2fr_1.5fr_0.8fr_1.5fr_1.5fr_32px] gap-1.5 px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span>Vehicle</span>
+                  <span>Driver</span>
+                  <span>km</span>
+                  <span>Site / Destination</span>
+                  <span>Purpose</span>
+                  <span></span>
                 </div>
 
-                {/* Selected Site Badges / Pills */}
-                <div className="flex flex-wrap items-center gap-1.5 p-2.5 min-h-12 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
-                  {tForm.selected_sites.length === 0 ? (
-                    <span className="text-xs text-slate-400 italic px-1">
-                      No sites selected yet. Pick active sites from the dropdown below or enter a custom location.
-                    </span>
-                  ) : (
-                    tForm.selected_sites.map(siteName => (
-                      <Badge 
-                        key={siteName} 
-                        variant="secondary" 
-                        className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 gap-1.5 text-xs py-1 px-2.5 rounded-md font-medium"
+                <div className="px-4 pb-3 space-y-2 max-h-[44vh] overflow-y-auto">
+                  {tRows.map((row, idx) => (
+                    <div key={row.id} className="grid grid-cols-[2fr_1.5fr_0.8fr_1.5fr_1.5fr_32px] gap-1.5 items-center">
+                      {/* Vehicle */}
+                      <select
+                        className="h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={row.vehicle_id}
+                        onChange={e => updateTRow(row.id, { vehicle_id: e.target.value })}
                       >
-                        <MapPin className="h-3 w-3 text-blue-500" />
-                        <span>{siteName}</span>
-                        <button
-                          type="button"
-                          onClick={() => setTForm({ ...tForm, selected_sites: tForm.selected_sites.filter(s => s !== siteName) })}
-                          className="hover:text-rose-500 ml-0.5 rounded-full p-0.5"
-                          title="Remove site"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))
-                  )}
+                        <option value="">Select...</option>
+                        {vehicles.map(v => <option key={v.id} value={v.id}>{v.name} · {v.registration_number}</option>)}
+                      </select>
+
+                      {/* Driver */}
+                      <input
+                        list={`dlist-${row.id}`}
+                        className="h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Driver..."
+                        value={row.driver_name}
+                        onChange={e => updateTRow(row.id, { driver_name: e.target.value })}
+                      />
+                      <datalist id={`dlist-${row.id}`}>{employees.map(emp => <option key={emp.id} value={`${emp.firstname} ${emp.surname}`} />)}</datalist>
+
+                      {/* km */}
+                      <input
+                        type="number" min="0" step="0.1"
+                        className="h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="0"
+                        value={row.distance_km}
+                        onChange={e => updateTRow(row.id, { distance_km: e.target.value })}
+                      />
+
+                      {/* Site */}
+                      <input
+                        list={`slist-${row.id}`}
+                        className="h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Site or location..."
+                        value={row.site}
+                        onChange={e => updateTRow(row.id, { site: e.target.value })}
+                      />
+                      <datalist id={`slist-${row.id}`}>
+                        {activeSites.map(s => <option key={s.id} value={s.name} />)}
+                      </datalist>
+
+                      {/* Purpose */}
+                      <input
+                        className="h-9 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="e.g. Site Visit"
+                        value={row.purpose}
+                        onChange={e => updateTRow(row.id, { purpose: e.target.value })}
+                      />
+
+                      {/* Remove row */}
+                      <button
+                        type="button"
+                        disabled={tRows.length === 1}
+                        onClick={() => removeTRow(row.id)}
+                        className="h-8 w-8 flex items-center justify-center rounded-md text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-20 disabled:pointer-events-none"
+                        title="Remove row"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Dropdown to add active sites & custom location input */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950 cursor-pointer"
-                      value=""
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (val && !tForm.selected_sites.includes(val)) {
-                          setTForm({ ...tForm, selected_sites: [...tForm.selected_sites, val] });
-                        }
-                      }}
-                    >
-                      <option value="" disabled>+ Select an Active Site...</option>
-                      {activeSites.map(s => {
-                        const isSelected = tForm.selected_sites.includes(s.name);
-                        return (
-                          <option key={s.id} value={s.name} disabled={isSelected}>
-                            {s.name} {isSelected ? '(Already added)' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      id="manual-site-input"
-                      placeholder="Or enter custom site / stop..."
-                      className="h-10 text-sm"
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const val = (e.target as HTMLInputElement).value.trim();
-                          if (val && !tForm.selected_sites.includes(val)) {
-                            setTForm({ ...tForm, selected_sites: [...tForm.selected_sites, val] });
-                            (e.target as HTMLInputElement).value = '';
-                          }
-                        }
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="shrink-0 h-10 px-3 text-xs font-semibold"
-                      onClick={() => {
-                        const el = document.getElementById('manual-site-input') as HTMLInputElement;
-                        if (el && el.value.trim() && !tForm.selected_sites.includes(el.value.trim())) {
-                          setTForm({ ...tForm, selected_sites: [...tForm.selected_sites, el.value.trim()] });
-                          el.value = '';
-                        }
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
+                {/* Add row */}
+                <div className="px-4 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => setTRows(prev => [...prev, emptyTRow()])}
+                    className="flex items-center gap-1.5 text-[12px] font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors py-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add another vehicle
+                  </button>
                 </div>
               </div>
+            )}
 
-              {/* Movement Purpose & Remarks */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Purpose of Movement</Label>
-                  <Input 
-                    placeholder="e.g. Delivery, Site Visit, Pickup, Staff Transit" 
-                    value={tForm.purpose} 
-                    onChange={e => setTForm({...tForm, purpose: e.target.value})} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Remark / Specific Notes</Label>
-                  <Input 
-                    placeholder="Any additional info or driver comments..." 
-                    value={tForm.remark} 
-                    onChange={e => setTForm({...tForm, remark: e.target.value})} 
-                  />
-                </div>
-              </div>
-            </CardContent>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 flex flex-row gap-3 pt-4">
-              <Button className="flex-1 bg-blue-600 hover:bg-blue-700 rounded-md" onClick={handleSaveTrip}>{editingTrip ? 'Update Entry' : 'Submit Entry'}</Button>
-              <Button variant="outline" className="flex-1 rounded-md" onClick={() => { setShowTripForm(false); setEditingTrip(null); }}>Discard</Button>
-            </CardHeader>
-          </Card>
+            {/* Footer */}
+            <div className="flex items-center gap-3 px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
+              <Button className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm" onClick={handleSaveTrip}>
+                {editingTrip ? 'Update Entry' : `Save ${!editingTrip && tRows.filter(r => r.vehicle_id && r.driver_name).length > 1 ? tRows.filter(r => r.vehicle_id && r.driver_name).length + ' Entries' : 'Entry'}`}
+              </Button>
+              <Button variant="outline" className="h-10 px-5 rounded-lg font-semibold" onClick={() => { setShowTripForm(false); setEditingTrip(null); setTRows([emptyTRow()]); }}>
+                Discard
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 

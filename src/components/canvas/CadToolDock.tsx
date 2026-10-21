@@ -5,7 +5,7 @@ import {
   Ruler, Type, ArrowRight,
   RotateCw, SlidersHorizontal, Scissors, AlignLeft, FlipHorizontal, Pin, Eraser,
   ChevronsRight, ChevronsLeft, Check,
-  Layers, Spline, Compass, Hand
+  Layers, Spline, Compass, Hand, Scaling
 } from 'lucide-react';
 import type { ActiveTool } from './Toolbar';
 
@@ -135,7 +135,7 @@ const TOOL_SLOTS: ToolSlot[] = [
     category: 'Components',
     defaultTool: 'pump',
     tools: [
-      { id: 'pump', label: 'Dewatering Pump', icon: <PumpIcon size={16} />, shortcut: 'P', description: 'Vacuum-assisted centrifugal pump (150 m³/h)' },
+      { id: 'pump', label: 'Dewatering Pump', icon: <PumpIcon size={16} />, shortcut: 'P', description: 'Vacuum dewatering pump (editable flow rate & flip ports)' },
       { id: 'ingress', label: 'Water Ingress', icon: <IngressIcon size={16} />, shortcut: 'I', description: 'Water inflow / sump pit intake point' },
       { id: 'tee', label: 'Tee Connector', icon: <TeeIcon size={16} />, shortcut: 'Te', description: '3-way DN150 Bauer branch tee joint' },
       { id: 'elbow', label: 'Elbow Fitting', icon: <ElbowIcon size={16} />, shortcut: 'El', description: '90° Bauer directional pipe bend' },
@@ -157,6 +157,7 @@ const TOOL_SLOTS: ToolSlot[] = [
     defaultTool: 'dimension',
     tools: [
       { id: 'dimension', label: 'Dimension', icon: <Ruler size={16} />, shortcut: 'Di', description: 'Measure distances and draw linear dims' },
+      { id: 'scale-blueprint', label: 'Scale Blueprint', icon: <Scaling size={16} />, shortcut: 'Sc', description: 'Calibrate blueprint scale with 2 reference points' },
       { id: 'text', label: 'Text Annotation', icon: <Type size={16} />, shortcut: 'T', description: 'Place labels, specifications, and notes' },
       { id: 'arrow', label: 'Direction Arrow', icon: <ArrowRight size={16} />, shortcut: 'Ar', description: 'Indicate water flow or site access' },
     ],

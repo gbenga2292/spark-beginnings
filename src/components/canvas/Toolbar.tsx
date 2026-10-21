@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MousePointer2, Pencil, Droplet, GitMerge, CornerDownRight, Square, Undo2, Redo2, Eraser, Eye, EyeOff, Crosshair, Maximize, Minimize, Grid, Ruler, Spline, Frame, ChevronUp, ChevronDown, Printer, Move, Copy, RotateCw, Type, Pin, PinOff, Scissors, AlignLeft, SlidersHorizontal, FlipHorizontal, Image, ArrowRight, ZoomIn, ZoomOut, Maximize2, Scan, Target, RotateCcw } from 'lucide-react';
 import { ComponentType } from '../../utils/simulationLogic';
 
-export type ActiveTool = 'select' | 'pan' | 'line' | 'dimension' | 'arrow' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | 'export-window' | 'zoom-window' | ComponentType;
+export type ActiveTool = 'select' | 'pan' | 'line' | 'dimension' | 'arrow' | 'delete' | 'area' | 'hose' | 'discharge' | 'discharge-area' | 'site-area' | 'move' | 'copy' | 'rotate' | 'align' | 'offset' | 'mirror-pick' | 'mirror-draw' | 'split' | 'trim' | 'pin' | 'unpin' | 'text' | 'modify-blueprint' | 'scale-blueprint' | 'export-window' | 'zoom-window' | ComponentType;
 
 interface ToolbarProps {
   activeTool: ActiveTool;

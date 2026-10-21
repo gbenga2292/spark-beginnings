@@ -51,6 +51,8 @@ export function dbToSite(r: any): Site {
     currentDewateringStage: (r.end_date && r.end_date.trim() !== '') ? 'demobilisation' : (r.current_dewatering_stage ?? undefined),
     // Explicitly map false → false, null/undefined/true → true (null means default enabled)
     trackDiesel: r.track_diesel === false ? false : true,
+    createdAt: r.created_at || undefined,
+    created_at: r.created_at || undefined,
   };
 }
 
@@ -329,6 +331,7 @@ export function dbToLedgerVendor(r: any): LedgerVendor {
     tinNumber: r.tin_number || undefined,
     address: r.address || undefined,
     phone: r.phone || undefined,
+    servicesRendered: r.services_rendered || undefined,
     accountNumber: r.account_number || undefined,
     bankName: r.bank_name || undefined,
     notes: r.notes || undefined,
@@ -631,6 +634,7 @@ export function dbToVehicleMovement(r: any): VehicleTripLeg {
     remark: r.notes || undefined,   // DB column is 'notes'
     odometer_start: r.odometer_start || undefined,
     odometer_end: r.odometer_end || undefined,
+    distance_km: r.distance_km ?? (r.odometer_start !== null && r.odometer_end !== null && Number(r.odometer_end) >= Number(r.odometer_start) ? Number(r.odometer_end) - Number(r.odometer_start) : undefined),
   };
 }
 
@@ -1194,8 +1198,8 @@ function vehicleMovementToDb(v: any) {
     purpose: v.purpose,
     departure_time: v.departure_time,
     arrival_time: v.arrival_time || null,
-    odometer_start: v.odometer_start || null,
-    odometer_end: v.odometer_end || null,
+    odometer_start: v.odometer_start !== undefined ? v.odometer_start : (v.distance_km !== undefined ? 0 : null),
+    odometer_end: v.odometer_end !== undefined ? v.odometer_end : (v.distance_km !== undefined ? v.distance_km : null),
     notes: v.remark || null,
     created_by_id: v.created_by_id || null,
     created_by_name: v.created_by_name || null,
@@ -1301,7 +1305,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('ledger_vendors').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_banks').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
     canView('ledger') ? supabase.from('ledger_beneficiary_banks').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
-    canView('ledger') ? supabase.from('ledger_entries').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? fetchLedgerByYearRaw(new Date().getFullYear()) : Promise.resolve({ entries: [], count: 0 }),
     canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
     supabase.from('vehicles').select('*').order('name').limit(50000),
     supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(50000),
@@ -1370,7 +1374,9 @@ export async function fetchAllAppData(privs?: any) {
     ledgerVendors: (ledgerVendorsRes.data || []).map(dbToLedgerVendor),
     ledgerBanks: (ledgerBanksRes.data || []).map(dbToLedgerBank),
     ledgerBeneficiaryBanks: (ledgerBeneficiaryBanksRes.data || []).map(dbToLedgerBeneficiaryBank),
-    ledgerEntries: (ledgerEntriesRes.data || []).map(dbToLedgerEntry),
+    ledgerEntries: ((ledgerEntriesRes as any).entries ? (ledgerEntriesRes as any).entries : ((ledgerEntriesRes as any).data || [])).map(dbToLedgerEntry),
+    loadedLedgerYears: [new Date().getFullYear()],
+    dbLedgerCount: (ledgerEntriesRes as any).count ?? ((ledgerEntriesRes as any).data ? (ledgerEntriesRes as any).data.length : null),
     companyExpenses: (companyExpensesRes.data || []).map(dbToCompanyExpense),
     vehicles: (vehiclesRes.data || []).map(dbToVehicle),
     vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
@@ -1392,23 +1398,82 @@ export async function fetchAttendanceData() {
   return (attendanceRes || []).map(dbToAttendance);
 }
 
-export async function fetchLedgerData() {
-  const [lCatRes, lVenRes, lBankRes, lBenBankRes, lEntRes, compExpRes, settingsRes] = await Promise.all([
+export async function fetchLedgerByYearRaw(year: number): Promise<{ entries: any[]; count: number }> {
+  const startOfYear = `${year}-01-01`;
+  const endOfYear = `${year}-12-31`;
+
+  // 1. Exact total count query from database
+  const countRes = await supabase
+    .from('ledger_entries')
+    .select('*', { count: 'exact', head: true })
+    .gte('date', startOfYear)
+    .lte('date', endOfYear);
+
+  if (countRes.error) {
+    console.error(`[fetchLedgerByYearRaw] Count query error for year ${year}:`, countRes.error);
+    throw countRes.error;
+  }
+  const totalCount = countRes.count ?? 0;
+
+  // 2. Fetch all paginated chunks (PostgREST caps single queries at 1,000 rows max)
+  let allData: any[] = [];
+  let page = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data, error } = await supabase
+      .from('ledger_entries')
+      .select('*')
+      .gte('date', startOfYear)
+      .lte('date', endOfYear)
+      .order('date', { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (error) {
+      console.error(`[fetchLedgerByYearRaw] Range fetch error for year ${year} page ${page}:`, error);
+      throw error;
+    }
+    if (!data || data.length === 0) break;
+    allData = [...allData, ...data];
+    if (data.length < pageSize || (totalCount > 0 && allData.length >= totalCount)) break;
+    page++;
+  }
+
+  return { entries: allData, count: totalCount };
+}
+
+export async function fetchLedgerByYear(year: number): Promise<{ ledgerEntries: LedgerEntry[]; dbCount: number }> {
+  const { entries, count } = await fetchLedgerByYearRaw(year);
+  return {
+    ledgerEntries: entries.map(dbToLedgerEntry),
+    dbCount: count,
+  };
+}
+
+export async function fetchLedgerData(year = new Date().getFullYear()) {
+  const [lCatRes, lVenRes, lBankRes, lBenBankRes, ledgerYearResult, compExpRes, settingsRes] = await Promise.all([
     supabase.from('ledger_categories').select('*').order('name').limit(50000),
     supabase.from('ledger_vendors').select('*').order('name').limit(50000),
     supabase.from('ledger_banks').select('*').order('name').limit(50000),
     supabase.from('ledger_beneficiary_banks').select('*').order('name').limit(50000),
-    supabase.from('ledger_entries').select('*').order('date', { ascending: false }).limit(50000),
+    fetchLedgerByYear(year),
     supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000),
     supabase.from('app_settings').select('expense_vat_remittances, payroll_variables').limit(1).maybeSingle(),
   ]);
+
+  if (lCatRes.error) throw lCatRes.error;
+  if (lVenRes.error) throw lVenRes.error;
+  if (lBankRes.error) throw lBankRes.error;
+  if (lBenBankRes.error) throw lBenBankRes.error;
+  if (compExpRes.error) throw compExpRes.error;
   
   return {
     ledgerCategories: (lCatRes.data || []).map(dbToLedgerCategory),
     ledgerVendors: (lVenRes.data || []).map(dbToLedgerVendor),
     ledgerBanks: (lBankRes.data || []).map(dbToLedgerBank),
     ledgerBeneficiaryBanks: (lBenBankRes.data || []).map(dbToLedgerBeneficiaryBank),
-    ledgerEntries: (lEntRes.data || []).map(dbToLedgerEntry),
+    ledgerEntries: ledgerYearResult.ledgerEntries,
+    loadedLedgerYears: [year],
+    dbLedgerCount: ledgerYearResult.dbCount,
     companyExpenses: (compExpRes.data || []).map(dbToCompanyExpense),
     expenseVatRemittances: settingsRes?.data?.expense_vat_remittances || [],
     payrollVariables: settingsRes?.data?.payroll_variables || undefined,
@@ -2448,6 +2513,7 @@ export const db = {
       tin_number: v.tinNumber,
       address: v.address,
       phone: v.phone,
+      services_rendered: v.servicesRendered,
       account_number: v.accountNumber,
       bank_name: v.bankName,
       notes: v.notes,
@@ -2460,6 +2526,7 @@ export const db = {
     if (v.tinNumber !== undefined) update.tin_number = v.tinNumber;
     if (v.address !== undefined) update.address = v.address;
     if (v.phone !== undefined) update.phone = v.phone;
+    if (v.servicesRendered !== undefined) update.services_rendered = v.servicesRendered;
     if (v.accountNumber !== undefined) update.account_number = v.accountNumber;
     if (v.bankName !== undefined) update.bank_name = v.bankName;
     if (v.notes !== undefined) update.notes = v.notes;
@@ -2807,6 +2874,7 @@ export const db = {
         tin_number: v.tinNumber,
         address: v.address,
         phone: v.phone,
+        services_rendered: v.servicesRendered,
         account_number: v.accountNumber,
         bank_name: v.bankName,
         notes: v.notes,

@@ -40,6 +40,8 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 import { SiteGanttStoryboard } from '@/src/components/sites/SiteGanttStoryboard';
 import { SiteMilestonesCard } from '@/src/components/sites/SiteMilestonesCard';
+import { SiteLifecycleStepper } from '@/src/components/sites/SiteLifecycleStepper';
+import { useSiteRequests } from '@/src/hooks/useSiteRequests';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
 import { ClientSiteRequestsPanel } from '@/src/components/site-requests/ClientSiteRequestsPanel';
 
@@ -133,6 +135,10 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const { createMainTask, users, addSubtask, updateSubtask } = useAppData();
   const { user: authUser } = useAuth();
   const currentUser = useUserStore(s => s.users.find(u => u.id === s.currentUserId));
+  const { requests: allSiteRequests } = useSiteRequests();
+  const siteRequests = useMemo(() => {
+    return (allSiteRequests || []).filter(r => r.siteId === site.id || (r.siteName && r.siteName.toLowerCase() === site.name.toLowerCase()));
+  }, [allSiteRequests, site.id, site.name]);
 
   const s360Priv = currentUser?.privileges?.site360;
   const canViewFinancialStats = s360Priv ? s360Priv.canViewFinancialStats : (currentUser?.privileges?.billing?.canViewAmounts ?? true);
@@ -492,7 +498,85 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       (i.siteId === site.id || i.siteName?.trim() === site.name.trim()) && isWithinFilter(i.date)
     );
     const totalBilled = siteInvoices.reduce((a, i) => a + (i.totalCharge || i.amount || 0), 0);
-    const sitePayments = payments.filter(p => (p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()) && isWithinFilter(p.date));
+    // Resolve payments allocated to this site (including split multi-invoice payments)
+    const resolveSitePayments = (dateFilterFn: (d?: string | null) => boolean) => {
+      return payments.flatMap(p => {
+        if (!dateFilterFn(p.date)) return [];
+
+        const isHeaderSite = p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim();
+
+        if (p.allocations && p.allocations.length > 0) {
+          let allocatedToThisSiteCash = 0;
+          let allocatedToThisSiteWht = 0;
+          let allocatedToThisSiteDisc = 0;
+          let totalAllocatedCash = 0;
+          let totalAllocatedWht = 0;
+          let totalAllocatedDisc = 0;
+
+          p.allocations.forEach(alloc => {
+            const invObj = invoices.find(inv => inv.id === alloc.invoiceId);
+            const allocSite = (
+              alloc.site ||
+              invObj?.siteName ||
+              (invObj as any)?.site ||
+              (invObj as any)?.project ||
+              p.site ||
+              ''
+            ).trim().toLowerCase();
+
+            const isThisSite = allocSite === site.name.trim().toLowerCase();
+            const aCash = Number(alloc.amount || 0);
+            const aWht = Number(alloc.withholdingTax || 0);
+            const aDisc = Number(alloc.discount || 0);
+
+            totalAllocatedCash += aCash;
+            totalAllocatedWht += aWht;
+            totalAllocatedDisc += aDisc;
+
+            if (isThisSite) {
+              allocatedToThisSiteCash += aCash;
+              allocatedToThisSiteWht += aWht;
+              allocatedToThisSiteDisc += aDisc;
+            }
+          });
+
+          const results: any[] = [];
+          if (allocatedToThisSiteCash > 0 || allocatedToThisSiteWht > 0 || allocatedToThisSiteDisc > 0) {
+            results.push({
+              ...p,
+              id: `${p.id}-site-${site.id || site.name}`,
+              amount: allocatedToThisSiteCash,
+              withholdingTax: allocatedToThisSiteWht,
+              discount: allocatedToThisSiteDisc,
+            });
+          }
+
+          if (isHeaderSite) {
+            const remCash = Math.max(0, (p.amount || 0) - totalAllocatedCash);
+            const remWht = Math.max(0, (p.withholdingTax || 0) - totalAllocatedWht);
+            const remDisc = Math.max(0, (p.discount || 0) - totalAllocatedDisc);
+            if (remCash > 0.001 || remWht > 0.001 || remDisc > 0.001) {
+              results.push({
+                ...p,
+                id: `${p.id}-unapplied`,
+                amount: remCash,
+                withholdingTax: remWht,
+                discount: remDisc,
+              });
+            }
+          }
+
+          return results;
+        }
+
+        if (isHeaderSite) {
+          return [p];
+        }
+        return [];
+      });
+    };
+
+    const sitePayments = resolveSitePayments(isWithinFilter);
     const totalReceived = sitePayments.reduce((a, p) => a + (p.amount || 0), 0);
     const totalDiscounts = sitePayments.reduce((a, p) => a + (p.discount || 0), 0);
     const totalWht = sitePayments.reduce((a, p) => a + (p.withholdingTax || 0), 0);
@@ -527,7 +611,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
     const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const clientVatPayments = vatPayments.filter(vp => vp.client?.trim() === site.client?.trim());
 
-    const prevPayments = payments.filter(p => (p.site?.trim() === site.name.trim() || p.client?.trim() === site.name.trim()) && isBeforeFilter(p.date));
+    const prevPayments = resolveSitePayments(isBeforeFilter);
     const prevVatCollected = prevPayments.reduce((sum, p) => sum + getPaymentVatAmount(p), 0);
 
     const prevVatRemitted = clientVatPayments.filter(vp => {
@@ -1450,6 +1534,30 @@ Answer site-specific questions and field progress accurately using this context.
               ))}
             </div>
           )}
+
+          {/* ── Operational Lifecycle SOP Pipeline (P100 – P330) ── */}
+          <SiteLifecycleStepper
+            site={site}
+            siteWaybills={data.siteWaybills}
+            siteRequests={siteRequests}
+            machineLogs={data.machineLogs}
+            pumpsOnSite={data.pumpsOnSite}
+            materialsOnSite={data.materialsOnSite}
+            siteMaintAssets={data.siteMaintAssets}
+            siteTasks={data.siteTasks}
+            pendingTasksCount={data.pendingSiteTasks.length}
+            activeHold={activeHold}
+            totalDiesel={data.totalDiesel}
+            totalBilled={data.totalBilled}
+            outstanding={data.outstanding}
+            onNavigateTab={(tab, subTab) => {
+              setActiveTab(tab);
+              if (subTab === 'waybills') setOperationsSubTab('waybills');
+              else if (subTab === 'logs') setOperationsSubTab('logs');
+            }}
+            onOpenHoldModal={() => setShowHoldModal(true)}
+            onQuickTask={() => setShowQuickTaskDialog(true)}
+          />
 
           {/* ── Flat Main Navigation Tabs (Sticky Header Strip) ── */}
           <div className="sticky top-0 z-20 bg-slate-50/90 dark:bg-slate-950/90 backdrop-blur-xl flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x scroll-smooth py-2 border-b border-slate-200/80 dark:border-slate-800">
