@@ -1153,11 +1153,23 @@ export function AssetManager() {
                           </div>
                         </td>
 
-                        {/* Category | Type */}
+                        {/* Category | Type | Classification */}
                         <td className="px-2 py-3">
                           <div className="flex flex-col gap-1 w-fit">
                             <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-sm capitalize text-center">{asset.category}</span>
                             <span className="inline-block px-1.5 py-0.5 text-[10px] font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-sm capitalize text-center">{asset.type}</span>
+                            {asset.assetClassification && (
+                              <span className={cn(
+                                "inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-sm border uppercase text-center",
+                                asset.assetClassification === 'RENTAL_FLEET'
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                  : asset.assetClassification === 'EQUIPMENT_FOR_SALE'
+                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+                                  : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                              )}>
+                                {asset.assetClassification.replace('_', ' ')}
+                              </span>
+                            )}
                           </div>
                         </td>
 

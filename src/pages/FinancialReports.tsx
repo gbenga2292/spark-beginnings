@@ -8,7 +8,7 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Download, Upload, ReceiptText, Wallet, TrendingUp, Landmark, Activity, AlertCircle,
   PieChart as PieChartIcon, BarChart3, Filter, X, CheckCircle2, FileSpreadsheet, FileText, Backpack, CreditCard,
-  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin, Receipt, Clock
+  Eye, Save, Trash2, XCircle, Maximize2, Minimize2, MapPin, Receipt, Clock, Scale, BookOpen
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { Checkbox } from '@/src/components/ui/checkbox';
@@ -31,6 +31,10 @@ import { SiteSummary } from './SiteSummary';
 import { AccountsReportBuilder } from '@/src/components/financial/AccountsReportBuilder';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
 import { OwedServicesReport } from '@/src/components/financial/OwedServicesReport';
+import { RevenueByStreamReport } from '@/src/components/financial/RevenueByStreamReport';
+import { BalanceSheetReport } from '@/src/components/financial/BalanceSheetReport';
+import { TrialBalanceReport } from '@/src/components/financial/TrialBalanceReport';
+import { CompanyAccountStatement } from '@/src/components/financial/CompanyAccountStatement';
 import { cn } from '@/src/lib/utils';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#0284c7', '#0d9488'];
@@ -321,7 +325,7 @@ export function FinancialReports() {
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('all');
-  const [mainTab, setMainTab] = useState<'client-account' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat' | 'owed-services'>('client-account');
+  const [mainTab, setMainTab] = useState<'client-account' | 'balance-sheet' | 'trial-balance' | 'account-statement' | 'revenue-streams' | 'owed-services' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat'>('client-account');
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
@@ -400,6 +404,22 @@ export function FinancialReports() {
     'owed-services': {
       title: 'Owed Services & Machinery Credit',
       subtitle: 'Real-time reconciliation of billed machine duration vs. actual logged operational days and credit balances.'
+    },
+    'revenue-streams': {
+      title: 'Revenue by Business Stream & Service Line',
+      subtitle: 'Analysis of billing, collections, and gross margin across Dewatering, Waterproofing, Allied, Maintenance, and Equipment Sales.'
+    },
+    'balance-sheet': {
+      title: 'Statement of Financial Position',
+      subtitle: 'Corporate balance sheet: assets, liabilities, and shareholders’ equity.'
+    },
+    'trial-balance': {
+      title: 'General Ledger Trial Balance',
+      subtitle: '4-digit Chart of Accounts debit and credit balancing report.'
+    },
+    'account-statement': {
+      title: 'Company Account Statement',
+      subtitle: 'Bank-style chronological ledger of collections, disbursements, and running balance.'
     }
   };
 
@@ -418,8 +438,8 @@ export function FinancialReports() {
   );
 
   useSetPageTitle(
-    tabInfo[mainTab].title,
-    tabInfo[mainTab].subtitle,
+    tabInfo[mainTab]?.title || 'Financial Reports',
+    tabInfo[mainTab]?.subtitle || 'Comprehensive financial analytics and accounting statements.',
     headerActions
   );
 
@@ -2394,6 +2414,10 @@ export function FinancialReports() {
           <div className="flex gap-1">
             {[
               { id: 'client-account', label: 'Client Account', icon: Landmark },
+              { id: 'balance-sheet', label: 'Balance Sheet', icon: Scale },
+              { id: 'trial-balance', label: 'Trial Balance', icon: FileSpreadsheet },
+              { id: 'account-statement', label: 'Account Statement', icon: BookOpen },
+              { id: 'revenue-streams', label: 'Revenue by Stream', icon: TrendingUp },
               { id: 'owed-services', label: 'Owed Services', icon: Clock },
               { id: 'payroll-summary', label: 'Payroll Summary', icon: Wallet },
               { id: 'site-summary', label: 'Site Summary', icon: Activity, priv: sitesPriv.canViewClientSummary },
@@ -3032,6 +3056,31 @@ export function FinancialReports() {
         })()
       ) : mainTab === 'owed-services' ? (
         <OwedServicesReport />
+      ) : mainTab === 'revenue-streams' ? (
+        <RevenueByStreamReport 
+          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
+          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
+          filterClient={filterClient} 
+          onNavigateToLedgerSummary={() => startTransition(() => setMainTab('ledger-summary'))}
+        />
+      ) : mainTab === 'balance-sheet' ? (
+        <BalanceSheetReport 
+          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
+          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
+          filterClient={filterClient} 
+        />
+      ) : mainTab === 'trial-balance' ? (
+        <TrialBalanceReport 
+          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
+          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
+          filterClient={filterClient} 
+        />
+      ) : mainTab === 'account-statement' ? (
+        <CompanyAccountStatement 
+          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
+          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
+          filterClient={filterClient} 
+        />
       ) : mainTab === 'client-account' ? (
         <>
       {/* Top Metrics */}
@@ -4349,7 +4398,7 @@ export function FinancialReports() {
                   </div>
 
                   <div className={`rounded-md border border-slate-200 dark:border-slate-800 overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`}>
-                    <div className="min-w-[1100px]">
+                    <div className="min-w-[1240px]">
                       {/* column legend bar */}
                       <div className="grid grid-cols-9 text-[10px] font-bold tracking-widest uppercase px-0 bg-slate-900 border-b border-slate-800">
                         {[
@@ -4365,7 +4414,7 @@ export function FinancialReports() {
                         ].map(col => (
                           <div
                             key={col.label}
-                            className={`py-3.5 px-4 text-${col.align} ${
+                            className={`py-3.5 px-3 text-${col.align} ${
                               col.accent
                                 ? 'text-amber-300 bg-[#0d3344]/40 border-l border-r border-[#0d3344]/60'
                                 : 'text-[#9ecfe8]'
@@ -4377,7 +4426,7 @@ export function FinancialReports() {
                       </div>
 
                       {/* rows */}
-                      <div className="divide-y divide-slate-100">
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
                         {payrollSummaryData.map((row, idx) => {
                           const maxPayout = Math.max(...payrollSummaryData.map(r => r.totalPayout), 1);
                           const pct = Math.round((row.totalPayout / maxPayout) * 100);
@@ -4385,51 +4434,51 @@ export function FinancialReports() {
                           return (
                             <div
                               key={row.monthLabel}
-                              className={`grid grid-cols-9 items-center group transition-all duration-150  hover:z-10 relative ${
-                                isEven ? 'bg-white' : 'bg-slate-50/70'
-                              } hover:bg-teal-50/60`}
+                              className={`grid grid-cols-9 items-center group transition-all duration-150 hover:z-10 relative ${
+                                isEven ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/70 dark:bg-slate-800/40'
+                              } hover:bg-teal-50/60 dark:hover:bg-teal-950/20`}
                             >
-                              <div className="py-3 px-4 flex items-center gap-2.5">
-                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[10px] font-black bg-slate-800 text-white border border-slate-700 shrink-0">
+                              <div className="py-2.5 px-3 flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[9px] font-black bg-slate-800 text-white border border-slate-700 shrink-0">
                                   {row.monthLabel.slice(0, 3).toUpperCase()}
                                 </span>
-                                <span className="text-sm font-semibold text-slate-800">{row.monthLabel}</span>
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{row.monthLabel}</span>
                               </div>
-                              <div className="py-3 px-4 text-right">
-                                <span className="text-sm font-mono text-slate-700">₦{fm(row.salary)}</span>
+                              <div className="py-2.5 px-3 text-right">
+                                <span className="text-xs xl:text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap tabular-nums">₦{fm(row.salary)}</span>
                               </div>
-                              <div className="py-3 px-4 text-right">
+                              <div className="py-2.5 px-3 text-right">
                                 {row.overtime > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-sm font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5">
+                                  <span className="inline-flex items-center gap-1 text-xs font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 whitespace-nowrap tabular-nums">
                                     ₦{fm(row.overtime)}
                                   </span>
                                 ) : (
-                                  <span className="text-sm font-mono text-slate-400">—</span>
+                                  <span className="text-xs font-mono text-slate-400">—</span>
                                 )}
                               </div>
-                              <div className="py-3 px-4 text-right bg-teal-50/50 border-l border-r border-teal-100 group-hover:bg-teal-100/40">
-                                <span className="text-sm font-mono font-bold text-teal-800">₦{fm(row.grossPay)}</span>
+                              <div className="py-2.5 px-3 text-right bg-teal-50/50 dark:bg-teal-950/20 border-l border-r border-teal-100 dark:border-teal-900/40 group-hover:bg-teal-100/40">
+                                <span className="text-xs xl:text-sm font-mono font-bold text-teal-800 dark:text-teal-300 whitespace-nowrap tabular-nums">₦{fm(row.grossPay)}</span>
                               </div>
-                              <div className="py-3 px-4 text-right">
-                                <span className="text-sm font-mono text-slate-600">₦{fm(row.employeePension)}</span>
+                              <div className="py-2.5 px-3 text-right">
+                                <span className="text-xs xl:text-sm font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">₦{fm(row.employeePension)}</span>
                               </div>
-                              <div className="py-3 px-4 text-right">
-                                <span className="text-sm font-mono text-slate-600">₦{fm(row.loans)}</span>
+                              <div className="py-2.5 px-3 text-right">
+                                <span className="text-xs xl:text-sm font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">₦{fm(row.loans)}</span>
                               </div>
-                              <div className="py-3 px-4 text-right">
-                                <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
+                              <div className="py-2.5 px-3 text-right">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 whitespace-nowrap tabular-nums">
                                   ₦{fm(row.paye)}
                                 </span>
                               </div>
-                              <div className="py-3 px-4 text-right">
-                                <span className="inline-flex items-center gap-1 text-xs font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2.5 py-0.5">
+                              <div className="py-2.5 px-3 text-right">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 whitespace-nowrap tabular-nums">
                                   ₦{fm(row.wht)}
                                 </span>
                               </div>
-                              <div className="py-3 px-4 bg-slate-800/[0.03] border-l border-slate-200 group-hover:bg-slate-800/[0.06]">
+                              <div className="py-2.5 px-3 bg-slate-800/[0.03] dark:bg-slate-700/[0.1] border-l border-slate-200 dark:border-slate-800 group-hover:bg-slate-800/[0.06]">
                                 <div className="flex flex-col items-end gap-1">
-                                  <span className="text-sm font-mono font-extrabold text-slate-900">₦{fm(row.totalPayout)}</span>
-                                  <div className="w-full max-w-[80px] h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <span className="text-xs xl:text-sm font-mono font-extrabold text-slate-900 dark:text-white whitespace-nowrap tabular-nums">₦{fm(row.totalPayout)}</span>
+                                  <div className="w-full max-w-[70px] h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                     <div
                                       className="h-full rounded-full bg-blue-600"
                                       style={{ width: `${pct}%` }}
@@ -4443,30 +4492,35 @@ export function FinancialReports() {
                       </div>
 
                       {/* Grand Total footer */}
-                      <div className="grid grid-cols-8 items-center bg-slate-900 border-t-2 border-slate-800">
-                        <div className="py-4 px-4 flex items-center gap-2">
-                          <span className="text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-lg px-2.5 py-1">
+                      <div className="grid grid-cols-9 items-center bg-slate-900 border-t-2 border-slate-800">
+                        <div className="py-3 px-3 flex items-center gap-2">
+                          <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-md px-2 py-1 whitespace-nowrap">
                             GRAND TOTAL
                           </span>
                         </div>
-                        {[gSalary, gOvertime, gGrossPay, gEmployeePension, gLoans, gPaye, gWht, gTotalPayout].map((val, i) => {
-                          const isAccent = i === 2 || i === 6;
-                          const isPaye   = i === 5;
-                          return (
-                            <div
-                              key={i}
-                              className={`py-4 px-4 text-right ${
-                                isAccent ? 'bg-white/10' : ''
-                              } ${isPaye ? '' : ''}`}
-                            >
-                              <span className={`text-sm font-mono font-extrabold tracking-wide ${
-                                isAccent ? 'text-amber-300' : isPaye ? 'text-rose-300' : 'text-white'
-                              }`}>
-                                ₦{fmT(val)}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {[
+                          { val: gSalary, isAccent: false, isTax: false, border: '' },
+                          { val: gOvertime, isAccent: false, isTax: false, border: '' },
+                          { val: gGrossPay, isAccent: true, isTax: false, border: 'border-l border-r border-white/10' },
+                          { val: gEmployeePension, isAccent: false, isTax: false, border: '' },
+                          { val: gLoans, isAccent: false, isTax: false, border: '' },
+                          { val: gPaye, isAccent: false, isTax: true, border: '' },
+                          { val: gWht, isAccent: false, isTax: true, border: '' },
+                          { val: gTotalPayout, isAccent: true, isTax: false, border: 'border-l border-white/10' },
+                        ].map((col, i) => (
+                          <div
+                            key={i}
+                            className={`py-3 px-3 text-right ${
+                              col.isAccent ? 'bg-white/10' : ''
+                            } ${col.border}`}
+                          >
+                            <span className={`text-xs xl:text-sm font-mono font-extrabold tracking-tight whitespace-nowrap tabular-nums ${
+                              col.isAccent ? 'text-amber-300' : col.isTax ? 'text-rose-300' : 'text-white'
+                            }`}>
+                              ₦{fmT(col.val)}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>

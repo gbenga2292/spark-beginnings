@@ -42,6 +42,9 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
   const [hasExpiry, setHasExpiry]           = useState(assetToEdit?.hasExpiry || false);
   const [tankCapacity, setTankCapacity]     = useState<string | number>(assetToEdit?.tankCapacityLitres ?? '');
   const [expectedDailyBurn, setExpectedDailyBurn] = useState<string | number>(assetToEdit?.expectedDailyBurnRate ?? '');
+  const [assetClassification, setAssetClassification] = useState<string>(assetToEdit?.assetClassification || (assetToEdit?.type === 'consumable' ? 'CONSUMABLE' : 'RENTAL_FLEET'));
+  const [salvageValue, setSalvageValue] = useState<number>(assetToEdit?.salvageValue || 0);
+  const [usefulLifeMonths, setUsefulLifeMonths] = useState<number>(assetToEdit?.usefulLifeMonths || 60);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -61,6 +64,9 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
       serviceIntervalMonths: assetType === 'equipment' ? serviceInterval : undefined,
       status: assetToEdit?.status || 'active',
       condition: assetToEdit?.condition || 'good',
+      assetClassification: assetClassification as any,
+      salvageValue: Number(salvageValue) || 0,
+      usefulLifeMonths: Number(usefulLifeMonths) || 60,
     };
     if (assetToEdit) updateAsset(assetToEdit.id, assetData);
     else addAsset(assetData as any);
@@ -304,6 +310,57 @@ export function AssetForm({ onClose, assetToEdit }: AssetFormProps) {
               </label>
             </div>
           )}
+
+          {/* Asset Classification & Accounting (Fixed Assets vs Inventory) */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-md bg-muted/20 p-4 space-y-3">
+            <div>
+              <p className="text-xs font-bold text-foreground">Asset Accounting Classification</p>
+              <p className="text-[11px] text-muted-foreground">Classify asset for Balance Sheet capitalization, depreciation, or direct job costing</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelCls}>Classification</label>
+                <div className="relative">
+                  <select
+                    value={assetClassification}
+                    onChange={e => setAssetClassification(e.target.value)}
+                    className={selectCls}
+                  >
+                    <option value="RENTAL_FLEET">Rental Fleet (Capitalized Fixed Asset)</option>
+                    <option value="SPARE_PART">Spare Part (Inventory Asset)</option>
+                    <option value="CONSUMABLE">Consumable (Direct Site Expense)</option>
+                    <option value="EQUIPMENT_FOR_SALE">Equipment For Sale (Trading Stock)</option>
+                  </select>
+                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              {assetClassification === 'RENTAL_FLEET' && (
+                <>
+                  <div>
+                    <label className={labelCls}>Useful Life (Months)</label>
+                    <input
+                      type="number"
+                      value={usefulLifeMonths}
+                      onChange={e => setUsefulLifeMonths(Number(e.target.value))}
+                      placeholder="e.g. 60 (5 years)"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Salvage Value (₦)</label>
+                    <input
+                      type="number"
+                      value={salvageValue}
+                      onChange={e => setSalvageValue(Number(e.target.value))}
+                      placeholder="e.g. 500000"
+                      className={inputCls}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
 
           {/* Location */}
           <div>

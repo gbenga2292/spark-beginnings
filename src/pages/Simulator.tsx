@@ -776,7 +776,7 @@ export default function Simulator() {
     currentLayoutName, currentLayoutId, showRestorePrompt
   ]);
 
-  const results = useMemo(() => calculateBOM(lines, placedComponents, PIXELS_PER_METER, hoses), [lines, placedComponents, hoses]);
+  const results = useMemo(() => calculateBOM(lines, placedComponents, PIXELS_PER_METER, hoses, calculatorInputs?.filterPipeLength), [lines, placedComponents, hoses, calculatorInputs?.filterPipeLength]);
 
   useEffect(() => {
     return () => {
@@ -1023,7 +1023,7 @@ export default function Simulator() {
     let perspectiveUrl: string | null = null;
 
     // ── 2D Site Plan Capture ──
-    if (fmt === 'pure-2d' || fmt === 'combined' || fmt === 'multi-view' || fmt === 'plan-section') {
+    if (fmt === 'pure-2d' || fmt === 'combined' || fmt === 'multi-view' || fmt === 'tri-view-a1' || fmt === 'plan-section') {
       if (show3D && fmt === 'pure-2d') {
         toast.error(
           'Please switch back to the 2D canvas view before exporting a 2D Floor Plan.',
@@ -1046,13 +1046,18 @@ export default function Simulator() {
     }
 
     // ── 3D View Capture ──
-    if (fmt === 'pure-3d' || fmt === 'combined' || fmt === 'multi-view') {
+    if (fmt === 'pure-3d' || fmt === 'combined' || fmt === 'multi-view' || fmt === 'tri-view-a1') {
       if (!show3D && fmt === 'pure-3d') {
         toast.error(
           'Please switch to the 3D view before exporting a 3D Perspective sheet.',
           { duration: 4000 }
         );
         return;
+      }
+      if (viewMode !== '3d') {
+        view3DApiRef.current?.fitImmediate?.();
+        // Allow brief tick for Three.js WebGL buffer to commit immediate isometric frame
+        await new Promise(r => setTimeout(r, 60));
       }
       perspectiveUrl = captureThreeCanvas();
       if (!perspectiveUrl && fmt === 'pure-3d') {
@@ -1107,17 +1112,21 @@ export default function Simulator() {
     setShowDrawingPreview(true);
   };
 
-  const handleExportWindowSelected = (rect: {x: number, y: number, width: number, height: number}) => {
+  const handleExportWindowSelected = async (rect: {x: number, y: number, width: number, height: number}) => {
     setActiveTool('select');
     const fmt = exportOptions.layoutFormat;
     
     let sitePlanUrl: string | null = captureKonvaStage(stageRef, rect, { includeBlueprint: exportOptions.includeBlueprint });
     let perspectiveUrl: string | null = null;
-    if (fmt === 'combined') {
+    if (fmt === 'combined' || fmt === 'multi-view' || fmt === 'tri-view-a1') {
+      if (viewMode !== '3d') {
+        view3DApiRef.current?.fitImmediate?.();
+        await new Promise(r => setTimeout(r, 60));
+      }
       perspectiveUrl = captureThreeCanvas();
     }
     
-    finishExport(sitePlanUrl, perspectiveUrl);
+    await finishExport(sitePlanUrl, perspectiveUrl);
   };
 
   const handleClear = () => {
@@ -1206,6 +1215,7 @@ export default function Simulator() {
       layoutType: detectedLayout,
       waterTableDepth: calculatorInputs?.waterTableDepth ?? 1.0,
       requiredDrawdown: calculatorInputs?.requiredDrawdown ?? 0.5,
+      filterPipeLength: calculatorInputs?.filterPipeLength ?? DEFAULT_DEWATERING_INPUT.filterPipeLength ?? 6.0,
     };
   }, [calculatorInputs, areas, lines, targetDepth]);
 
@@ -1661,7 +1671,11 @@ export default function Simulator() {
             </div>
           )}
 
-          {viewMode === '3d' ? (
+          {/* 3D Model View Container */}
+          <div
+            className={viewMode === '3d' ? "absolute inset-0 z-0 overflow-hidden" : "fixed -left-[9999px] top-0 w-[1280px] h-[720px] pointer-events-none opacity-0 -z-50"}
+            aria-hidden={viewMode !== '3d'}
+          >
             <Dewatering3DView 
               lines={lines}
               placedComponents={placedComponents}
@@ -1684,8 +1698,11 @@ export default function Simulator() {
               onToggleNavWheel={() => setShowNavWheel(p => !p)}
               view3DApiRef={view3DApiRef}
             />
-          ) : viewMode === 'section' ? (
-            <div className={`flex-1 h-full w-full ${isDark ? 'bg-slate-900' : 'bg-slate-100'} overflow-hidden flex flex-col`}>
+          </div>
+
+          {/* Section Profile View Container */}
+          {viewMode === 'section' && (
+            <div className={`absolute inset-0 z-10 ${isDark ? 'bg-slate-900' : 'bg-slate-100'} overflow-hidden flex flex-col`}>
               <DewateringSectionView
                 inputs={getEffectiveCalculatorInputs()}
                 onUpdateInputs={(updates) => {
@@ -1702,7 +1719,13 @@ export default function Simulator() {
                 className="h-full w-full"
               />
             </div>
-          ) : (
+          )}
+
+          {/* 2D CAD Canvas Container */}
+          <div
+            className={viewMode === '2d' ? "absolute inset-0 z-0 overflow-hidden" : "fixed -left-[9999px] top-0 w-[1280px] h-[720px] pointer-events-none opacity-0 -z-50"}
+            aria-hidden={viewMode !== '2d'}
+          >
             <DewateringCanvas
               stageRef={stageRef}
               canvasApiRef={canvasApiRef}
@@ -1759,7 +1782,7 @@ export default function Simulator() {
               onSetScaleRefPt1={(pt) => { setScaleRefPt1(pt); setScaleRefMode('selecting-end'); }}
               onSetScaleRefPt2={(pt) => { setScaleRefPt2(pt); setScaleRefMode('idle'); setShowScaleModal(true); setScaleInputStr(''); }}
             />
-          )}
+          </div>
 
           {/* Blueprint Floating Control Bar */}
           {backgroundImage && !show3D && (
@@ -2014,7 +2037,7 @@ export default function Simulator() {
                     const format = e.target.value as ExportOptions['layoutFormat'];
                     setExportOptions(prev => {
                       const next = { ...prev, layoutFormat: format };
-                      if (format === 'multi-view') {
+                      if (format === 'tri-view-a1' || format === 'multi-view') {
                         next.includeSitePlan = true;
                         next.includeSectionView = true;
                         next.include3DView = true;
@@ -2054,6 +2077,7 @@ export default function Simulator() {
                   }}
                   className="w-full text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 p-2 border"
                 >
+                  <option value="tri-view-a1">Civil Engineering Tri-View (A1) — 2D + 3D + Full Section + Tech Data</option>
                   <option value="multi-view">Multi-View Master (A-103) — Plan + Section + 3D + BOM</option>
                   <option value="plan-section">Plan + Section Profile (A-104) — Plan + Section + BOM</option>
                   <option value="pure-section">Cross-Section Blueprint (A-105) — Pure Section Profile</option>
@@ -2117,15 +2141,27 @@ export default function Simulator() {
                   </span>
                 </div>
               )}
-              {exportOptions.layoutFormat === 'combined' && (
-                <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${
-                  show3D ? 'bg-amber-50 border border-amber-300 text-amber-800' : 'bg-blue-50 border border-blue-300 text-blue-800'
-                }`}>
-                  <span className="mt-0.5">{show3D ? '⚠️' : 'ℹ️'}</span>
+              {exportOptions.layoutFormat === 'tri-view-a1' && (
+                <div className="rounded-md px-3 py-2 text-xs flex items-start gap-2 bg-blue-50 border border-blue-300 text-blue-800">
+                  <span className="mt-0.5">✅</span>
                   <span>
-                    {show3D
-                      ? 'Switch back to 2D canvas view to capture the site plan. The 3D panel will be omitted from this sheet if not captured.'
-                      : 'Combined sheet will include the 2D floor plan, BOM, and legend. Enable 3D view first if you also want a perspective thumbnail.'}
+                    Ready — Sheet A1 will generate with the Civil Engineering arrangement: 2D Plan View, 3D Isometric View, full-width Ground Profile Section A-A, Legend, Technical Data bar, and Title Block.
+                  </span>
+                </div>
+              )}
+              {exportOptions.layoutFormat === 'multi-view' && (
+                <div className="rounded-md px-3 py-2 text-xs flex items-start gap-2 bg-blue-50 border border-blue-300 text-blue-800">
+                  <span className="mt-0.5">✅</span>
+                  <span>
+                    Ready — Sheet A-103 will generate with all views: 2D Plan Grid, Hydraulic Section Profile, 3D Isometric View, and Bill of Materials.
+                  </span>
+                </div>
+              )}
+              {exportOptions.layoutFormat === 'combined' && (
+                <div className="rounded-md px-3 py-2 text-xs flex items-start gap-2 bg-blue-50 border border-blue-300 text-blue-800">
+                  <span className="mt-0.5">✅</span>
+                  <span>
+                    Ready — Combined Sheet (A-100) will include the 2D floor plan, 3D perspective thumbnail, BOM, and legend.
                   </span>
                 </div>
               )}

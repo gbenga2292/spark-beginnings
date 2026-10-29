@@ -34,6 +34,7 @@ interface Dewatering3DViewProps {
     zoomIn: () => void;
     zoomOut: () => void;
     zoomAll: () => void;
+    fitImmediate?: () => void;
     zoomWindow: () => void;
     resetView: () => void;
   } | null>;
@@ -93,7 +94,7 @@ const CameraController: React.FC<{
 // Detailed 3D GEHO ZD 900 Double-Acting Dewatering Piston Pump
 const GehoPump3D: React.FC<{ position: [number, number, number]; rotationY?: number; flipped?: boolean }> = ({ position, rotationY = 0, flipped = false }) => {
   return (
-    <group position={position} rotation={[0, rotationY, 0]} scale={[flipped ? -1 : 1, 1, 1]}>
+    <group position={position} rotation={[0, rotationY, 0]} scale={[flipped ? -0.425 : 0.425, 0.67, 0.818]}>
       {/* 1. Heavy Black Steel Skid Frame Chassis */}
       <mesh position={[0, -0.4, 0]}>
         <boxGeometry args={[2.2, 0.15, 1.1]} />
@@ -678,7 +679,7 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
   }, [cameraInstance, controlsInstance]);
 
   // Zoom to Fit (Extents) - frames entire layout perfectly in viewport
-  const handleZoomToFit = useCallback(() => {
+  const handleZoomToFit = useCallback((immediate = false) => {
     // Camera not ready yet — queue the zoom; it fires in handleControlsReady
     if (!cameraInstance || !controlsInstance) {
       pendingZoomToFitRef.current = true;
@@ -690,6 +691,14 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
     const dist = (maxDim / 2) / Math.tan((fov * Math.PI) / 360) * 1.5;
 
     const targetPos = new THREE.Vector3(center.x + dist * 0.7, center.y + dist * 0.55, center.z + dist * 0.7);
+
+    if (immediate) {
+      cameraInstance.position.copy(targetPos);
+      controlsInstance.target.copy(center);
+      cameraInstance.lookAt(controlsInstance.target);
+      controlsInstance.update();
+      return;
+    }
 
     const startPos = cameraInstance.position.clone();
     const startTarget = controlsInstance.target.clone();
@@ -719,7 +728,8 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
       view3DApiRef.current = {
         zoomIn: handleZoomIn,
         zoomOut: handleZoomOut,
-        zoomAll: handleZoomToFit,
+        zoomAll: () => handleZoomToFit(false),
+        fitImmediate: () => handleZoomToFit(true),
         zoomWindow: handleStartZoomWindow,
         resetView: handleReset3DView,
       };
@@ -1014,14 +1024,18 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
       const compHeaderY = groundElevation - levelDepth + 0.5;
 
       if (comp.type === 'pump') {
-        const portY = groundElevation - levelDepth + 0.35;
-        const distSuction = Math.sqrt((pt2D.x - (comp.x - 20)) ** 2 + (pt2D.y - comp.y) ** 2);
-        const distDischarge = Math.sqrt((pt2D.x - (comp.x + 20)) ** 2 + (pt2D.y - comp.y) ** 2);
+        const portY = groundElevation - levelDepth + 0.30;
+        const sOff = comp.flipped ? 8.5 : -8.5;
+        const dOff = comp.flipped ? -8.5 : 8.5;
+        const sP = rotPt(sOff, 0, comp.rotation || 0);
+        const dP = rotPt(dOff, 0, comp.rotation || 0);
+        const distSuction = Math.sqrt((pt2D.x - (comp.x + sP.x)) ** 2 + (pt2D.y - (comp.y + sP.y)) ** 2);
+        const distDischarge = Math.sqrt((pt2D.x - (comp.x + dP.x)) ** 2 + (pt2D.y - (comp.y + dP.y)) ** 2);
 
-        if (distSuction < 30 && distSuction <= distDischarge) {
+        if (distSuction < 20 && distSuction <= distDischarge) {
           targetY = portY;
-        } else if (distDischarge < 30 && distDischarge < distSuction) {
-          targetY = groundElevation - levelDepth + 1.42;
+        } else if (distDischarge < 20 && distDischarge < distSuction) {
+          targetY = groundElevation - levelDepth + 0.95;
         }
       }
 
@@ -1562,14 +1576,20 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
                 };
 
                 if (comp.type === 'pump') {
-                  const portY = groundElevation - levelDepth + 0.35;
-                  const distSuction = Math.sqrt((p.x - (comp.x - 20)) ** 2 + (p.y - comp.y) ** 2);
-                  const distDischarge = Math.sqrt((p.x - (comp.x + 20)) ** 2 + (p.y - comp.y) ** 2);
+                  const portY = groundElevation - levelDepth + 0.30;
+                  const sOff = comp.flipped ? 8.5 : -8.5;
+                  const dOff = comp.flipped ? -8.5 : 8.5;
+                  const sP = rotPt(sOff, 0, comp.rotation || 0);
+                  const dP = rotPt(dOff, 0, comp.rotation || 0);
+                  const distSuction = Math.sqrt((p.x - (comp.x + sP.x)) ** 2 + (p.y - (comp.y + sP.y)) ** 2);
+                  const distDischarge = Math.sqrt((p.x - (comp.x + dP.x)) ** 2 + (p.y - (comp.y + dP.y)) ** 2);
 
-                  if (distSuction < 30 && distSuction <= distDischarge) {
-                    p3D = new THREE.Vector3(pos.x - 2.0, portY, pos.z);
-                  } else if (distDischarge < 30 && distDischarge < distSuction) {
-                    p3D = new THREE.Vector3(pos.x + 2.0, groundElevation - levelDepth + 1.42, pos.z);
+                  if (distSuction < 20 && distSuction <= distDischarge) {
+                    const v = new THREE.Vector3(sOff / 10, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -rotationRad);
+                    p3D = new THREE.Vector3(pos.x + v.x, portY, pos.z + v.z);
+                  } else if (distDischarge < 20 && distDischarge < distSuction) {
+                    const v = new THREE.Vector3(dOff / 10, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -rotationRad);
+                    p3D = new THREE.Vector3(pos.x + v.x, groundElevation - levelDepth + 0.95, pos.z + v.z);
                   }
                 }
 
@@ -1804,7 +1824,7 @@ export const Dewatering3DView: React.FC<Dewatering3DViewProps> = ({
             return compGroup(
               <GehoPump3D
                 key={comp.id}
-                position={[pos.x, groundElevation + 0.45, pos.z]}
+                position={[pos.x, groundElevation + 0.30, pos.z]}
                 rotationY={-rotationRad}
                 flipped={comp.flipped}
               />

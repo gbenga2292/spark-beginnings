@@ -42,8 +42,13 @@ export const DewateringSectionView: React.FC<DewateringSectionViewProps> = ({
   const target = result?.targetDepth || (depth + 0.5);
   const offset = result?.designOffset || 1.0;
 
-  const tipDepth = Math.max(depth + 2.0, 6.0);
-  const maxScaleDepth = Math.max(tipDepth + 1.5, 8.0);
+  const filterPipeLength = inputs.filterPipeLength && inputs.filterPipeLength > 0
+    ? inputs.filterPipeLength
+    : (result?.filterPipeLength || 6.0);
+  const slottedLength = 1.0; // hardcoded 1.0m from tip up
+  const tipDepth = filterPipeLength;
+  const slottedTopDepth = Math.max(0, tipDepth - slottedLength);
+  const maxScaleDepth = Math.max(tipDepth + 1.5, depth + 2.5, 8.0);
 
   // SVG Dimension Constants
   const W = 880;
@@ -58,6 +63,7 @@ export const DewateringSectionView: React.FC<DewateringSectionViewProps> = ({
   const yWT = getY(wt);
   const yTarget = getY(target);
   const yTip = getY(tipDepth);
+  const ySlottedTop = getY(slottedTopDepth);
 
   const cx = W / 2;
   const pitHalfW = 160;
@@ -163,6 +169,25 @@ export const DewateringSectionView: React.FC<DewateringSectionViewProps> = ({
                     isLight 
                       ? 'bg-white border border-slate-300 text-emerald-700 focus:border-blue-500' 
                       : 'bg-slate-950 border border-slate-700 text-emerald-400 focus:border-blue-500'
+                  }`}
+                />
+                <span className={`ml-1 text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>m</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[11px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Filter Length:</span>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  step="0.5"
+                  min="1"
+                  value={filterPipeLength}
+                  onChange={e => onUpdateInputs({ filterPipeLength: parseFloat(e.target.value) || 1 })}
+                  className={`w-16 px-2 py-0.5 font-mono text-xs font-bold rounded text-right outline-none ${
+                    isLight 
+                      ? 'bg-white border border-slate-300 text-teal-700 focus:border-blue-500' 
+                      : 'bg-slate-950 border border-slate-700 text-teal-400 focus:border-blue-500'
                   }`}
                 />
                 <span className={`ml-1 text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>m</span>
@@ -310,14 +335,37 @@ export const DewateringSectionView: React.FC<DewateringSectionViewProps> = ({
               HEADER
             </text>
 
-            {/* Riser Pipe */}
-            <line x1={wpLeft} y1={yGL} x2={wpLeft} y2={yTip} stroke={isLight ? "#64748b" : "#94a3b8"} strokeWidth="2.5" />
+            {/* Solid Riser Pipe from surface down to top of slotted screen */}
+            <line x1={wpLeft} y1={yGL} x2={wpLeft} y2={ySlottedTop} stroke={isLight ? "#64748b" : "#94a3b8"} strokeWidth="2.5" />
 
-            {/* Filter Screen Screen Length (2.0m standard) */}
-            <line x1={wpLeft} y1={yTip - 36} x2={wpLeft} y2={yTip} stroke="#10b981" strokeWidth="4.5" strokeLinecap="round" />
-            <text x={wpLeft - 8} y={yTip - 10} textAnchor="end" fontSize="9" fill={isLight ? "#047857" : "#34d399"} fontWeight="bold">
-              FILTER TIP -{tipDepth.toFixed(2)}m
-            </text>
+            {/* 1.0m Slotted Filter Screen from tip up */}
+            <line x1={wpLeft} y1={ySlottedTop} x2={wpLeft} y2={yTip} stroke="#10b981" strokeWidth="4.5" strokeLinecap="round" />
+            {/* Perforation slot marks */}
+            {[0.2, 0.4, 0.6, 0.8].map(ratio => {
+              const ySlot = ySlottedTop + (yTip - ySlottedTop) * ratio;
+              return (
+                <line
+                  key={ratio}
+                  x1={wpLeft - 4}
+                  y1={ySlot}
+                  x2={wpLeft + 4}
+                  y2={ySlot}
+                  stroke={isLight ? "#047857" : "#064e3b"}
+                  strokeWidth="1.2"
+                />
+              );
+            })}
+            {/* Conical jetting tip shoe */}
+            <polygon points={`${wpLeft - 3},${yTip} ${wpLeft + 3},${yTip} ${wpLeft},${yTip + 5}`} fill="#10b981" />
+
+            <g transform={`translate(${wpLeft - 8}, ${yTip})`}>
+              <text x="0" y="-8" textAnchor="end" fontSize="9" fill={isLight ? "#047857" : "#34d399"} fontWeight="bold">
+                FILTER TIP -{tipDepth.toFixed(2)}m
+              </text>
+              <text x="0" y="3" textAnchor="end" fontSize="7.5" fill={isLight ? "#059669" : "#10b981"} fontWeight="600">
+                (1.0m SLOTTED SCREEN)
+              </text>
+            </g>
 
             {/* Surface Vacuum Pump Unit */}
             <g transform={`translate(${wpLeft - 36}, ${yGL - 28})`}>
@@ -344,28 +392,53 @@ export const DewateringSectionView: React.FC<DewateringSectionViewProps> = ({
                 HEADER
               </text>
 
-              {/* Riser Pipe */}
-              <line x1={wpRight} y1={yGL} x2={wpRight} y2={yTip} stroke={isLight ? "#64748b" : "#94a3b8"} strokeWidth="2.5" />
+              {/* Solid Riser Pipe */}
+              <line x1={wpRight} y1={yGL} x2={wpRight} y2={ySlottedTop} stroke={isLight ? "#64748b" : "#94a3b8"} strokeWidth="2.5" />
 
-              {/* Filter Screen */}
-              <line x1={wpRight} y1={yTip - 36} x2={wpRight} y2={yTip} stroke="#10b981" strokeWidth="4.5" strokeLinecap="round" />
-              <text x={wpRight + 8} y={yTip - 10} textAnchor="start" fontSize="9" fill={isLight ? "#047857" : "#34d399"} fontWeight="bold">
-                FILTER TIP -{tipDepth.toFixed(2)}m
-              </text>
+              {/* 1.0m Slotted Filter Screen */}
+              <line x1={wpRight} y1={ySlottedTop} x2={wpRight} y2={yTip} stroke="#10b981" strokeWidth="4.5" strokeLinecap="round" />
+              {/* Perforation slot marks */}
+              {[0.2, 0.4, 0.6, 0.8].map(ratio => {
+                const ySlot = ySlottedTop + (yTip - ySlottedTop) * ratio;
+                return (
+                  <line
+                    key={ratio}
+                    x1={wpRight - 4}
+                    y1={ySlot}
+                    x2={wpRight + 4}
+                    y2={ySlot}
+                    stroke={isLight ? "#047857" : "#064e3b"}
+                    strokeWidth="1.2"
+                  />
+                );
+              })}
+              {/* Conical jetting tip shoe */}
+              <polygon points={`${wpRight - 3},${yTip} ${wpRight + 3},${yTip} ${wpRight},${yTip + 5}`} fill="#10b981" />
+
+              <g transform={`translate(${wpRight + 8}, ${yTip})`}>
+                <text x="0" y="-8" textAnchor="start" fontSize="9" fill={isLight ? "#047857" : "#34d399"} fontWeight="bold">
+                  FILTER TIP -{tipDepth.toFixed(2)}m
+                </text>
+                <text x="0" y="3" textAnchor="start" fontSize="7.5" fill={isLight ? "#059669" : "#10b981"} fontWeight="600">
+                  (1.0m SLOTTED SCREEN)
+                </text>
+              </g>
             </g>
           )}
 
           {/* Depth Elevation Datum Axis (Right Margin) */}
           <g transform={`translate(${W - 35}, ${yGL})`}>
             <line x1="0" y1="0" x2="0" y2={yTip - yGL + 20} stroke={isLight ? "#94a3b8" : "#475569"} strokeWidth="1.2" />
-            {[0, 1, 2, 3, 4, 5, 6, 7].filter(m => getY(m) <= H - 20).map(m => (
-              <g key={m} transform={`translate(0, ${m * scaleY})`}>
-                <line x1="-4" y1="0" x2="4" y2="0" stroke={isLight ? "#64748b" : "#64748b"} strokeWidth="1" />
-                <text x="8" y="3.5" fontSize="8" fill={isLight ? "#475569" : "#94a3b8"} fontWeight="bold">
-                  -{m}m
-                </text>
-              </g>
-            ))}
+            {Array.from({ length: Math.ceil(maxScaleDepth) + 1 }, (_, i) => i)
+              .filter(m => getY(m) <= H - 20)
+              .map(m => (
+                <g key={m} transform={`translate(0, ${m * scaleY})`}>
+                  <line x1="-4" y1="0" x2="4" y2="0" stroke={isLight ? "#64748b" : "#64748b"} strokeWidth="1" />
+                  <text x="8" y="3.5" fontSize="8" fill={isLight ? "#475569" : "#94a3b8"} fontWeight="bold">
+                    -{m}m
+                  </text>
+                </g>
+              ))}
           </g>
         </svg>
       </div>
@@ -396,13 +469,13 @@ export const DewateringSectionView: React.FC<DewateringSectionViewProps> = ({
           <div className="space-y-0.5">
             <span className={`text-[10px] uppercase font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Wellpoint Screen</span>
             <p className={`font-mono text-sm font-bold ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>-{tipDepth.toFixed(2)} m</p>
-            <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>2.0m Active Screen</span>
+            <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filterPipeLength.toFixed(1)}m Filter (1.0m Slotted)</span>
           </div>
 
           <div className="space-y-0.5">
             <span className={`text-[10px] uppercase font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Total Filters</span>
             <p className={`font-mono text-sm font-bold ${isLight ? 'text-blue-700' : 'text-blue-400'}`}>{result?.filters || 0} pts</p>
-            <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>1.0m c/c Spacing</span>
+            <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filterPipeLength.toFixed(0)}m Pipes @ 1.0m c/c</span>
           </div>
 
           <div className="space-y-0.5">

@@ -363,6 +363,7 @@ export const AiDewateringWizard: React.FC<AiDewateringWizardProps> = ({
         suctionPoints = [
           { x: teeX, y: teeY },
           { x: teeX, y: pumpY },
+          { x: pumpX - 8.5, y: pumpY },
         ];
       } else if (side === 'south') {
         teeX = Math.round(ringX + ringW * t);
@@ -373,6 +374,7 @@ export const AiDewateringWizard: React.FC<AiDewateringWizardProps> = ({
         suctionPoints = [
           { x: teeX, y: teeY },
           { x: teeX, y: pumpY },
+          { x: pumpX - 8.5, y: pumpY },
         ];
       } else if (side === 'east') {
         teeX = ringX + ringW;
@@ -382,7 +384,7 @@ export const AiDewateringWizard: React.FC<AiDewateringWizardProps> = ({
         teeRot = 270;
         suctionPoints = [
           { x: teeX, y: teeY },
-          { x: pumpX - 20, y: pumpY },
+          { x: pumpX - 8.5, y: pumpY },
         ];
       } else {
         // west
@@ -393,11 +395,11 @@ export const AiDewateringWizard: React.FC<AiDewateringWizardProps> = ({
         teeRot = 90;
         suctionPoints = [
           { x: teeX, y: teeY },
-          { x: pumpX - 20, y: pumpY },
+          { x: pumpX - 8.5, y: pumpY },
         ];
       }
 
-      const pumpPortX = pumpX + 20;
+      const pumpPortX = pumpX + 8.5;
       const pumpPortY = pumpY;
       let dischargePoints: Point[] = [];
 

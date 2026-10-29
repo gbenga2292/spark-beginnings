@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.9] - 2026-10-28
+
+### Financial Module & Reconciliation Overhaul
+
+- **Real Database Grounding & Zero-Mock Architecture:**
+  - Eliminated all arbitrary percentage multipliers and mock figures from `TrialBalanceReport.tsx`, `BalanceSheetReport.tsx`, and `CompanyAccountStatement.tsx`.
+  - 100% of reported figures are now derived directly from live database tables: `invoices`, `payments`, `ledger_entries`, `vendor_invoices`, and `vendor_invoice_payments`.
+  - Added an **"Audit Source & Ledger Justification"** column and Excel export notes linking every general ledger line to its exact voucher count, line item source, and calculation basis.
+
+- **Client Collections Date Normalization & Inflow Recovery:**
+  - Resolved the critical date parsing defect in `CompanyAccountStatement.tsx` and `RevenueByStreamReport.tsx` where `DD/MM/YYYY` payment timestamps returned truncated year strings (e.g. `"29/0"`), erroneously zeroing out client collections (`DEPOSITS / CREDITS: ₦0.00`).
+  - Integrated universal `normalizeDate()` to guarantee seamless parsing across ISO (`YYYY-MM-DD`), standard Nigerian banking format (`DD/MM/YYYY`), and Excel serial numbers.
+  - Reconciled all 68 client payment receipts (+₦288,550,867.75) for the 2026 operating period.
+
+- **Prior Year (2025) Carry Forward (B/F) Integration:**
+  - Implemented accurate Prior Period Brought Forward accounting across financial statements:
+    - **Opening Cash Balance (B/F):** Carries forward ₦277,013,270.01 in historical client collections.
+    - **Trade Debtors B/F:** Accounts for ₦93,124,383.22 in uncollected prior year billings into Trade Receivables (Code 1100).
+    - **Retained Earnings B/F:** Accurately reflects accumulated prior operating surplus (Code 3100) to balance the equity equation.
+
+- **Corporate Bank Account Realignment:**
+  - Replaced legacy GTBank/Zenith Bank assumptions with the company's real corporate operational accounts (Stanbic IBTC Main, Construction, Salary, Import, Sterling, FCMB, and First Bank).
+
+- **UI & Accessibility Enhancements:**
+  - Standardized negative amount display to `-₦40,000` syntax across all financial tables and cards.
+  - Expanded company account statement cards into a 5-pillar overview: Opening Balance B/F, Inflows (Collections), Outflows (Vouchers), Net Period Movement, and Closing Bank Position.
+
+### Database Migrations
+
+- `20261028143000_add_job_costing_and_chart_of_accounts.sql` — Adds Chart of Accounts categorization and job costing enhancements to ledger and financial reporting.
+
+---
+
 ## [2.1.6] - 2026-10-05
 
 ### Operations & Telemetry Enhancements

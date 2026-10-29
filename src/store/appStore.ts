@@ -245,6 +245,8 @@ export interface VendorInvoice {
   documentId?: string;
   lineItems?: string; // JSON: Array<{desc:string;qty:number;rate:number}>
   enteredBy: string;
+  siteId?: string;
+  siteName?: string;
   createdAt: string;
 }
 
@@ -289,6 +291,10 @@ export interface Site {
   currentProgressPercentage?: number;
   currentDewateringStage?: DewateringStage;
   trackDiesel?: boolean;
+  projectType?: 'DEWATERING' | 'WATERPROOFING' | 'ALLIED' | 'MAINTENANCE' | 'SALES' | string;
+  contractValue?: number;
+  billedAmount?: number;
+  retentionPercentage?: number;
   createdAt?: string;
   created_at?: string;
 }

@@ -51,6 +51,10 @@ export function dbToSite(r: any): Site {
     currentDewateringStage: (r.end_date && r.end_date.trim() !== '') ? 'demobilisation' : (r.current_dewatering_stage ?? undefined),
     // Explicitly map false → false, null/undefined/true → true (null means default enabled)
     trackDiesel: r.track_diesel === false ? false : true,
+    projectType: r.project_type || 'DEWATERING',
+    contractValue: r.contract_value ? Number(r.contract_value) : 0,
+    billedAmount: r.billed_amount ? Number(r.billed_amount) : 0,
+    retentionPercentage: r.retention_percentage ? Number(r.retention_percentage) : 5.0,
     createdAt: r.created_at || undefined,
     created_at: r.created_at || undefined,
   };
@@ -795,6 +799,10 @@ function siteToDb(s: Site) {
   if (s.trackDiesel !== undefined) {
     dbObj.track_diesel = s.trackDiesel === false ? false : true;
   }
+  if (s.projectType !== undefined) dbObj.project_type = s.projectType;
+  if (s.contractValue !== undefined) dbObj.contract_value = s.contractValue;
+  if (s.billedAmount !== undefined) dbObj.billed_amount = s.billedAmount;
+  if (s.retentionPercentage !== undefined) dbObj.retention_percentage = s.retentionPercentage;
   return dbObj;
 }
 

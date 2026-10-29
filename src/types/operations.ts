@@ -87,6 +87,10 @@ export interface Asset {
   hasExpiry?: boolean;
   batches?: AssetBatch[];
   cost?: number;
+  salvageValue?: number;
+  usefulLifeMonths?: number;
+  accumulatedDepreciation?: number;
+  assetClassification?: 'RENTAL_FLEET' | 'SPARE_PART' | 'CONSUMABLE' | 'EQUIPMENT_FOR_SALE' | string;
   lowStockLevel?: number;
   criticalStockLevel?: number;
   status: AssetStatus;

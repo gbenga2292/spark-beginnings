@@ -51,8 +51,10 @@ export const ResultsPanel: React.FC<ModernBOQPanelProps> = ({ results, onClear, 
       if (results.headers3m > 0)
         rows.push(`3m DN150 Header Pipes,Quick-connect lever couplings,"L=3.0m DN150 Bauer",${results.headers3m},pcs`);
     }
-    if (results.wellpoints > 0)
-      rows.push(`Wellpoint Riser Pipes,Self-jetting tip,"L=6.0m, 1m C/C spacing",${results.wellpoints},pcs`);
+    if (results.wellpoints > 0) {
+      const pipeLen = results.wellpointLength || 6;
+      rows.push(`${pipeLen}m Filter Pipes,1.0m slotted intake screen from tip,"L=${pipeLen}.0m, 1m C/C spacing",${results.wellpoints},pcs`);
+    }
     if (results.swingJoints > 0)
       rows.push(`Flexible Swing Joints,Reinforced braided PVC,"1½″ BSP",${results.swingJoints},pcs`);
     if (results.pumps > 0)
@@ -112,8 +114,8 @@ export const ResultsPanel: React.FC<ModernBOQPanelProps> = ({ results, onClear, 
       extra: results.headers3m > 0 ? `+ ${results.headers3m} × 3m` : undefined,
     },
     results.wellpoints > 0 && {
-      label: 'Wellpoint Riser Pipes',
-      sub: 'L=6.0m, self-jetting tip',
+      label: `${results.wellpointLength || 6}m Filter Pipes`,
+      sub: `L=${results.wellpointLength || 6}.0m riser, 1.0m slotted screen from tip`,
       qty: `${results.wellpoints} pcs`,
       extra: '1m C/C',
     },

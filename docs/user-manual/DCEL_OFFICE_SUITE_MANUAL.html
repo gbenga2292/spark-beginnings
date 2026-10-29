@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <base href="file:///C:/Users/USER/Desktop/assign/spark-beginnings/docs/user-manual/">
+  <title>DCEL Office Suite — Comprehensive Instruction Manual</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm 18mm 16mm;
+      @bottom-right {
+        content: "Page " counter(page);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+      @bottom-left {
+        content: "DCEL Office Suite — Official Instruction Manual (v1.5.3+)";
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.55;
+      color: #1e293b;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ── Cover Page ── */
+    .cover-page {
+      page-break-after: always;
+      break-after: page;
+      min-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 3px solid #1e3a8a;
+      border-radius: 8px;
+      padding: 48px 40px;
+      background: linear-gradient(175deg, #ffffff 0%, #f8fafc 100%);
+    }
+
+    .cover-header {
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 20px;
+    }
+
+    .company-name {
+      font-size: 14pt;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #0369a1;
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    .company-sub {
+      font-size: 9pt;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+    }
+
+    .cover-body {
+      margin: 60px 0;
+    }
+
+    .doc-badge {
+      display: inline-block;
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+
+    .doc-title {
+      font-size: 28pt;
+      font-weight: 900;
+      color: #0f172a;
+      line-height: 1.15;
+      margin: 0 0 16px 0;
+    }
+
+    .doc-subtitle {
+      font-size: 13pt;
+      color: #334155;
+      line-height: 1.45;
+      max-width: 650px;
+      margin: 0;
+    }
+
+    .cover-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      background: #f1f5f9;
+      padding: 20px;
+      border-radius: 6px;
+      border-left: 4px solid #0284c7;
+      margin-top: 30px;
+    }
+
+    .meta-item {
+      font-size: 9pt;
+    }
+
+    .meta-label {
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      font-size: 8pt;
+      letter-spacing: 0.5px;
+    }
+
+    .meta-val {
+      color: #0f172a;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .cover-footer {
+      border-top: 1px solid #cbd5e1;
+      padding-top: 16px;
+      font-size: 8pt;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ── Table of Contents ── */
+    .toc-page {
+      page-break-after: always;
+      break-after: page;
+      padding-top: 20px;
+    }
+
+    .toc-title {
+      font-size: 18pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 8px;
+      margin-bottom: 24px;
+    }
+
+    .toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .toc-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px dashed #cbd5e1;
+      font-size: 10pt;
+    }
+
+    .toc-name {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .toc-file {
+      font-size: 8.5pt;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    /* ── Headings & Sectioning ── */
+    .chapter-break {
+      page-break-before: always;
+      break-before: page;
+      padding-top: 10px;
+    }
+
+    h1 {
+      font-size: 20pt;
+      font-weight: 800;
+      color: #0f172a;
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 8px;
+      margin-top: 0;
+      margin-bottom: 16px;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: 700;
+      color: #0369a1;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    h3 {
+      font-size: 11.5pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    h4 {
+      font-size: 10.5pt;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+
+    p {
+      margin: 0 0 10px 0;
+      text-align: justify;
+    }
+
+    /* ── Tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 8.5pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 7px 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 7.5pt;
+      letter-spacing: 0.5px;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    /* ── Code Blocks & ASCII Schematics ── */
+    pre {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+      font-size: 8pt;
+      line-height: 1.4;
+      overflow-x: auto;
+      margin: 14px 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    code {
+      font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+      font-size: 8.5pt;
+      background: #f1f5f9;
+      color: #0369a1;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    pre code {
+      background: transparent;
+      color: #f8fafc;
+      padding: 0;
+    }
+
+    /* ── GitHub Callouts / Alerts ── */
+    .alert {
+      border-left: 4px solid;
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      margin: 16px 0;
+      background: #f8fafc;
+      font-size: 9pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .alert-title {
+      font-weight: 800;
+      font-size: 8.5pt;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .alert-note {
+      border-color: #0284c7;
+      background: #f0f9ff;
+    }
+    .alert-note .alert-title { color: #0284c7; }
+
+    .alert-tip {
+      border-color: #10b981;
+      background: #ecfdf5;
+    }
+    .alert-tip .alert-title { color: #059669; }
+
+    .alert-important {
+      border-color: #0284c7;
+      background: #f8fafc;
+    }
+    .alert-important .alert-title { color: #0369a1; }
+
+    .alert-warning {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .alert-warning .alert-title { color: #d97706; }
+
+    .alert-caution {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+    /* ── Screenshots & Images ── */
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+      margin: 16px 0;
+      display: block;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* ── List Elements ── */
+    ul, ol {
+      margin: 0 0 12px 0;
+      padding-left: 20px;
+    }
+
+    li {
+      margin-bottom: 4px;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid #e2e8f0;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Page -->
+  <div class="cover-page">
+    <div class="cover-header">
+      <div class="company-name">DEWATERING CONSTRUCTION ETC. LIMITED</div>
+      <div class="company-sub">Groundwater Control, Foundation Dewatering & Construction Engineering</div>
+    </div>
+
+    <div class="cover-body">
+      <div class="doc-badge">Official Staff Instruction Manual</div>
+      <h1 class="doc-title">DCEL Office Suite</h1>
+      <p class="doc-subtitle">
+        Simple Step-by-Step User Guide and Workflow Playbook for Construction Site Operations, Heavy Machinery, Daily Attendance, Automated Payroll, and DewaterCAD Engineering.
+      </p>
+
+      <div class="cover-meta-grid">
+        <div class="meta-item">
+          <div class="meta-label">Software Application</div>
+          <div class="meta-val">DCEL Office Suite (v1.5.3+)</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Target Audience</div>
+          <div class="meta-val">Site Supervisors, Engineers, HR, Accounts & Field Staff</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Operating Platforms</div>
+          <div class="meta-val">Web Browser, Windows Desktop App, Android / iOS Mobile</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Publication Date</div>
+          <div class="meta-val">October 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      <div>CONFIDENTIAL & PROPRIETARY — FOR INTERNAL STAFF USE ONLY</div>
+      <div>DEWATERING CONSTRUCTION ETC. LIMITED (DCEL)</div>
+    </div>
+  </div>
+
+  <!-- Table of Contents -->
+  <div class="toc-page">
+    <div class="toc-title">Table of Contents</div>
+    <ul class="toc-list">
+      <li class="toc-item">
+        <span class="toc-name">Visual Screen Map: Where to Find Every Tool and Screen</span>
+        <span class="toc-file">APP_ATLAS.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 1: Getting Started, Signing In & Screen Layout</span>
+        <span class="toc-file">01-GETTING-STARTED.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 2: Human Resources & Staff Management (Attendance, Leaves, HMO)</span>
+        <span class="toc-file">02-HR-AND-WORKFORCE.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 3: Finance, Payroll & Invoicing (Salaries, Invoices, Expenses)</span>
+        <span class="toc-file">03-FINANCE-PAYROLL-AND-ACCOUNTS.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 4: Operations, Machinery & Diesel Fuel (Waybills, Maintenance, Fuel)</span>
+        <span class="toc-file">04-OPERATIONS-AND-ASSETS.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 5: Clients, Site Diaries & DewaterCAD (Blueprints, Excavation Tracing)</span>
+        <span class="toc-file">05-CLIENTS-AND-SITE-ENGINEERING.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 6: Tasks, Team Chat & Meeting Minutes (Work Orders, Reminders)</span>
+        <span class="toc-file">06-TASKS-AND-COMMUNICATIONS.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 7: Reports, User Accounts & Settings (Weekly Digest, Permissions)</span>
+        <span class="toc-file">07-REPORTS-AND-ADMINISTRATION.md</span>
+      </li>
+      <li class="toc-item">
+        <span class="toc-name">Chapter 8: Everyday Help & Frequently Asked Questions (Quick Fixes, Support)</span>
+        <span class="toc-file">08-TROUBLESHOOTING-AND-FAQ.md</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Chapters Content -->
+  
+      <section class="chapter-break" id="atlas">
+        <h1>DCEL Office Suite — Visual Screen Map &amp; Navigation Guide</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Document Type:</strong> Non-Technical Screen Directory &amp; Menu Guide<br><strong>For:</strong> All Office Staff, Site Supervisors, Engineers, and Managers  </p>
+</blockquote>
+<hr>
+<h2>🧭 How Navigation Works in DCEL Office Suite</h2>
+<p>DCEL Office Suite organizes all company tools into <strong>9 clear departments</strong> located in the sidebar menu on the left side of your screen.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│ 🏠 Dashboard        ➔ Your daily overview and task list     │
+│ 🏢 Clients          ➔ Client profiles, contacts, and hours  │
+│ 💬 Communication    ➔ Tasks, chat, reminders, and minutes   │
+│ 🛠️ Tools            ➔ Dewatering calculators &amp; simulators   │
+│ 👥 HR               ➔ Staff directory, attendance &amp; leaves  │
+│ 📦 Operations       ➔ Equipment, diesel, waybills &amp; repairs │
+│ 💰 Accounts         ➔ Invoices, payroll, expenses &amp; budget  │
+│ 📁 Reports          ➔ Summary sheets and printable exports  │
+│ ⚙️ Settings         ➔ Users, passwords, and system rules    │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<ul>
+<li>Click any department in the sidebar to open its list of screens.</li>
+<li>Click the <strong>&quot;← Back to All Categories&quot;</strong> arrow at the top of the menu anytime to switch departments.</li>
+<li>If you need a wider view on a laptop screen, click the <strong>Collapse Menu</strong> icon (<code>⇥</code>) at the top left.</li>
+</ul>
+<hr>
+<h2>📋 Complete List of Screens &amp; What You Can Do There</h2>
+<h3>1. Dashboard (Main Hub)</h3>
+<ul>
+<li><strong>Dashboard (<code>/tasks/dashboard</code>):</strong> See your active tasks, urgent company reminders, and quick progress numbers for the week.</li>
+</ul>
+<h3>2. Clients &amp; Site Reconciliation</h3>
+<ul>
+<li><strong>Client 360 (<code>/client-360</code>):</strong> View a client’s full profile—their active construction sites, machines currently working for them, and payment status.</li>
+<li><strong>Phonebook (<code>/clients/phonebook</code>):</strong> Company contact directory. You can search phone numbers or take a picture of a paper business card to automatically save the contact.</li>
+<li><strong>Machine Recon (<code>/operations/machine-reconciliation</code>):</strong> Compare the machine hours logged on site with the hours approved by the client for billing.</li>
+<li><strong>Site Analytics (<code>/operations/site-analytics</code>):</strong> Simple charts showing which equipment is working, which is idle, and how much diesel each site is using.</li>
+</ul>
+<h3>3. Communication &amp; Daily Field Records</h3>
+<ul>
+<li><strong>Task Register (<code>/tasks</code>):</strong> See all your assigned jobs in a List or Board view. Add comments, attach photos, and check off completed subtasks.</li>
+<li><strong>Task Reminders (<code>/tasks/reminders</code>):</strong> Set pop-up reminders for yourself or your team so important deadlines are never forgotten.</li>
+<li><strong>External Comms (<code>/comm-log</code>):</strong> Keep a record of letters, approvals, and emails sent to or received from clients and government agencies.</li>
+<li><strong>Daily Journal (<code>/daily-journal</code>):</strong> A daily work diary for site supervisors to record what was done today, what went well, and what was delayed.</li>
+<li><strong>Meeting Minutes (<code>/minutes</code>):</strong> Type up meeting notes, assign action items to attendees, and sign digitally right on screen.</li>
+<li><strong>Site Requests (<code>/operations/site-requests</code>):</strong> Site engineers can request urgent cash, tools, diesel, or spare parts from the head office.</li>
+</ul>
+<h3>4. Technical &amp; Engineering Tools</h3>
+<ul>
+<li><strong>DewaterCAD Simulator (<code>/operations/simulator</code>):</strong> Draw or upload a site drawing, trace your excavation pit, and let the software place dewatering pumps, pipes, and hoses for you.</li>
+<li><strong>Dewatering Calculator (<code>/operations/dewatering-calculator</code>):</strong> Quickly calculate water flow rates, required pump capacity, and water drawdown.</li>
+<li><strong>Logistics Estimator (<code>/operations/estimator</code>):</strong> Calculate truck haulage, mobilization costs, and fuel needed before quoting a job.</li>
+<li><strong>VAT &amp; Tax Calculator (<code>/operations/vat-calculator</code>):</strong> A quick calculator for 7.5% VAT and 5% Withholding Tax on quotes and invoices.</li>
+</ul>
+<h3>5. Human Resources (HR)</h3>
+<ul>
+<li><strong>HR Dashboard (<code>/hr-dashboard</code>):</strong> At-a-glance staff count, today’s attendance rate, who is on leave, and hospital insurance status.</li>
+<li><strong>Daily Attendance (<code>/attendance</code>):</strong> Mark daily site registers for day and night shifts, Sunday work, and overtime hours.</li>
+<li><strong>Employees (<code>/employees</code>):</strong> Staff list with photos, phone numbers, emergency contacts, job titles, and bank account numbers.</li>
+<li><strong>Onboarding (<code>/onboarding</code>):</strong> Register new employees, automatically generate their employment contracts, and handle exit clearances.</li>
+<li><strong>Leaves (<code>/leaves</code>):</strong> Apply for annual holiday, sick leave, or emergency leave, and view your remaining vacation days.</li>
+<li><strong>Salary Loans (<code>/salary-loans</code>):</strong> Apply for short-term salary advances and track monthly repayments.</li>
+<li><strong>HMO Healthcare (<code>/hmo</code>):</strong> Check health insurance hospital lists and register spouses and children for company medical cover.</li>
+<li><strong>Evaluations (<code>/evaluations</code>):</strong> Complete bi-annual employee performance reviews.</li>
+<li><strong>Interviews (<code>/interviews</code>):</strong> Manage job applicants and drag-and-drop resumes for automatic reading.</li>
+<li><strong>Performance &amp; Conduct (<code>/performance-conduct</code>):</strong> Keep records of formal employee queries, warnings, and positive commendations.</li>
+</ul>
+<h3>6. Operations, Equipment &amp; Fuel</h3>
+<ul>
+<li><strong>Operations Overview (<code>/operations</code>):</strong> Summary of where all company equipment is currently working.</li>
+<li><strong>Equipment Inventory (<code>/operations/assets</code>):</strong> Complete catalog of pumps, generators, pipes, and tools with QR codes and location tags.</li>
+<li><strong>Waybills (<code>/operations/waybills</code>):</strong> Create delivery waybills when moving machines or pipes to a site, complete with driver names and signatures.</li>
+<li><strong>Quick Checkout (<code>/operations/checkout</code>):</strong> Scan a tool barcode to borrow it for site work.</li>
+<li><strong>Maintenance (<code>/operations/maintenance</code>):</strong> Track machine oil changes, servicing schedules, and breakdown repairs.</li>
+<li><strong>Diesel Refill (<code>/operations/diesel</code>):</strong> Log fuel tanker deliveries into storage tanks and daily liters poured into generators and pumps.</li>
+<li><strong>Vehicles (<code>/operations/vehicles</code>):</strong> Check truck and pickup roadworthiness dates, insurance renewals, and driver assignments.</li>
+<li><strong>Sites (<code>/operations/sites</code>):</strong> List of all active and completed project sites.</li>
+</ul>
+<h3>7. Accounts &amp; Finance</h3>
+<ul>
+<li><strong>Client Accounts (<code>/client-accounts</code>):</strong> Create and send client invoices for machine rentals and dewatering jobs; log client bank transfers.</li>
+<li><strong>Payroll (<code>/payroll</code>):</strong> Automatically calculate monthly salaries based on attendance, overtime, tax, and pension, then print payslips.</li>
+<li><strong>Beneficiaries (<code>/beneficiaries</code>):</strong> Pay casual site labor, temporary workers, and suppliers who are not on monthly salaries.</li>
+<li><strong>General Ledger (<code>/ledger</code>):</strong> Company cash flow records, official income, and daily site expenses with receipt photos.</li>
+<li><strong>Bank Statement Import (<code>/bank-import</code>):</strong> Upload your bank statement PDF to automatically match payments against client invoices.</li>
+<li><strong>Vendor Invoices (<code>/vendor-invoices</code>):</strong> Record supplier bills for parts, filters, and safety gear awaiting payment approval.</li>
+<li><strong>Budget (<code>/budget</code>):</strong> Track department spending limits against actual spending so projects stay on budget.</li>
+</ul>
+<h3>8. Reports</h3>
+<ul>
+<li><strong>HR Reports (<code>/reports</code>):</strong> Printable attendance summaries, staff lists, and leave balances.</li>
+<li><strong>Financial Reports (<code>/financial-reports</code>):</strong> Revenue by site, overdue client invoices, and tax schedules.</li>
+<li><strong>Task Reports (<code>/tasks/reports</code>):</strong> See how fast tasks are being completed across departments.</li>
+<li><strong>Weekly Executive Report (<code>/weekly-report</code>):</strong> A clean summary for directors every Monday morning covering sites, hours, diesel, and money.</li>
+</ul>
+<h3>9. Settings</h3>
+<ul>
+<li><strong>User Accounts (<code>/users</code>):</strong> Manage login accounts and control which screens each staff member can see.</li>
+<li><strong>Settings (<code>/settings</code>):</strong> Company official address, current tax rates, and default monthly workdays.</li>
+<li><strong>Activity Log (<code>/activity-log</code>):</strong> A history log showing who created, edited, or deleted records.</li>
+</ul>
+
+      </section>
+    
+      <section class="chapter-break" id="ch1">
+        <h1>Chapter 1: Getting Started &amp; Using the App</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Every employee using the app on a phone, laptop, or office PC  </p>
+</blockquote>
+<hr>
+<h2>1.1 How to Open the App</h2>
+<p>You can access DCEL Office Suite in three simple ways depending on where you are working:</p>
+<ol>
+<li><strong>On Any Office Computer or Laptop (Web Browser):</strong><br>Open Google Chrome or Microsoft Edge and go to your company link (e.g. <code>https://dcel.office.com</code>).</li>
+<li><strong>On Your Work Desktop (Desktop App):</strong><br>Double-click the <strong>DCEL Office Suite</strong> icon on your Windows computer desktop.</li>
+<li><strong>On Your Smartphone or Tablet (Mobile App):</strong><br>Tap the <strong>DCEL Office</strong> app icon on your company phone or personal Android/iPhone.</li>
+</ol>
+<hr>
+<h2>1.2 How to Log In</h2>
+<p>When you open the app, you will see the <strong>Sign In</strong> screen.</p>
+<p><img src="./screenshots/01-login-screen.png" alt="DCEL Office Suite Login Screen"></p>
+<h3>Steps to Sign In:</h3>
+<ol>
+<li>Type your company email address into the <strong>Email Address</strong> box.</li>
+<li>Type your secret password into the <strong>Password</strong> box.</li>
+<li>Click the blue <strong>Sign In</strong> button.</li>
+<li>You will immediately be taken to your <strong>Home</strong> screen or <strong>Dashboard</strong>.</li>
+</ol>
+<div class="alert alert-tip"><div class="alert-title">💡 TIP</div><p>
+<strong>Forgot Your Password?</strong><br>Click <strong>&quot;Forgot your password?&quot;</strong> on the login screen, enter your email address, and check your inbox for a reset link. If you do not receive it within 5 minutes, ask your HR manager to issue a temporary password for you.</p>
+</div>
+<hr>
+<h2>1.3 Understanding Your Screen</h2>
+<p>Once logged in, the screen is laid out cleanly so you never feel lost:</p>
+<p><img src="./screenshots/02-dashboard.png" alt="DCEL Office Suite Main Dashboard"></p>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
+│ [DCEL Logo]   [ 🔍 Search Ctrl+/ ]              [ 🌙 Night Mode ] [ 👤 Profile ] │
+├───────────────┬─────────────────────────────────────────────────────────────┤
+│ DEPARTMENTS   │ WHERE YOU ARE: Home &gt; Human Resources &gt; Daily Attendance    │
+│               ├─────────────────────────────────────────────────────────────┤
+│ 🏠 Dashboard  │                                                             │
+│ 🏢 Clients    │   [ + Mark Attendance ]     Date: [ Today, Oct 27, 2026 ]   │
+│ 💬 Comms      │                                                             │
+│ 🛠️ Tools      │   Worker Name       | Shift | Present | Site Location       │
+│ 👥 HR         │   ──────────────────┼───────┼─────────┼───────────────────  │
+│ 📦 Operations │   Musa Ibrahim      | Day   | [x] Yes | Eko Atlantic Site   │
+│ 💰 Accounts   │   Chinedu Eze       | Night | [x] Yes | Dangote Site        │
+│ 📁 Reports    │                                                             │
+│ ⚙️ Settings   │                                                             │
+└───────────────┴─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>The 4 Main Areas of the Screen:</h3>
+<ol>
+<li><strong>The Left Sidebar Menu (Departments):</strong><br>Lists the main parts of the company: Dashboard, Clients, Communication, Tools, HR, Operations, Accounts, Reports, and Settings. Click any one to open its tools.</li>
+<li><strong>The Top Bar:</strong>  <ul>
+<li><strong>Search Bar (<code>Ctrl + /</code>):</strong> Instantly find any worker, tool, site, or invoice by typing a name or number.</li>
+<li><strong>Night Mode Toggle (Moon/Sun):</strong> Switch between bright white and soft dark colors for easy reading at night.</li>
+<li><strong>Profile Icon:</strong> Click your photo or name at the top right to view your account details or sign out.</li>
+</ul>
+</li>
+<li><strong>The Breadcrumb Trail (Top of the page):</strong><br>Shows you exactly where you are inside the app (for example: <code>Home &gt; Operations &gt; Equipment</code>). You can click any word in that line to jump back.</li>
+<li><strong>The Working Area (Center of the screen):</strong><br>Where your work happens—whether you are checking a site register, typing an invoice, or viewing a machine checklist.</li>
+</ol>
+<hr>
+<h2>1.4 How to Change Your Password &amp; Update Your Profile</h2>
+<ol>
+<li>Click your name or profile circle in the top right corner.</li>
+<li>Select <strong>Account Settings</strong>.</li>
+<li>To change your password:<ul>
+<li>Type your <strong>Current Password</strong>.</li>
+<li>Type your <strong>New Password</strong> (use at least 8 letters and numbers).</li>
+<li>Click <strong>Save Password</strong>.</li>
+</ul>
+</li>
+<li>You can also verify that your mobile phone number and job title are spelled correctly.</li>
+</ol>
+
+      </section>
+    
+      <section class="chapter-break" id="ch2">
+        <h1>Chapter 2: Human Resources &amp; Staff Management</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Site Foremen, HR Officers, Department Managers, and All Employees  </p>
+</blockquote>
+<hr>
+<h2>2.1 Daily Site Attendance (How to Mark the Daily Register)</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>Daily Register</strong> (<code>/attendance</code>)</p>
+<p>The Daily Register records which workers were on duty each day. The system uses this exact information at the end of the month to calculate salaries and overtime pay.</p>
+<p><img src="./screenshots/03-daily-register-filled.png" alt="Daily Attendance Register Screen (Interactive Duty Record)"></p>
+<h3>What the Columns Mean:</h3>
+<ul>
+<li><strong>Present:</strong> Check the box if the worker reported to work. Leave it unchecked if absent.</li>
+<li><strong>Day Site / Night Site:</strong> Choose the site where the worker was stationed from the dropdown menu (e.g., <em>Eko Atlantic</em>, <em>Dangote</em>, <em>Lekki Phase 1</em>, or <em>Head Office</em>).</li>
+<li><strong>Shift:</strong> Choose whether they worked the <strong>Day</strong>, <strong>Night</strong>, or <strong>Both</strong> (Double Shift).</li>
+<li><strong>OT (Overtime):</strong> Number of extra hours worked beyond their normal shift. Working on Sundays or public holidays automatically counts towards overtime pay.</li>
+<li><strong>Next Day? (NDW):</strong> Check this box if the worker is scheduled to work again tomorrow so the site supervisor knows they are returning.</li>
+</ul>
+<h3>Step-by-Step: How to Fill the Register</h3>
+<ol>
+<li>Go to <strong>HR</strong> ➔ <strong>Daily Register</strong>.</li>
+<li>Select the date using the date box at the top.</li>
+<li>Check the <strong>Present</strong> box for each worker who is on site today.</li>
+<li>Select their site location.</li>
+<li>If someone worked extra hours, type the hours into the <strong>OT</strong> box.</li>
+<li>Click the blue <strong>Save Attendance</strong> button at the bottom of the page.</li>
+</ol>
+<hr>
+<h2>2.2 Finding Workers in the Employee Directory</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>Employees</strong> (<code>/employees</code>)</p>
+<p>Need to call a technician, check an emergency contact, or look up bank details?</p>
+<p><img src="./screenshots/04-employees.png" alt="Employee Directory &amp; Staff Records"></p>
+<h3>How To: Search for a Colleague</h3>
+<ol>
+<li>Go to <strong>HR</strong> ➔ <strong>Employees</strong>.</li>
+<li>Type any part of their name or job title into the search box.</li>
+<li>Click on the worker’s name to open their profile.</li>
+<li>You can see their:<ul>
+<li>Phone number and email</li>
+<li>Emergency contact person (next of kin)</li>
+<li>Job title and department</li>
+<li>Bank account number (restricted to HR &amp; Accounts)</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>2.3 How to Onboard a New Worker &amp; Print Their Contract</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>Onboarding</strong> (<code>/onboarding</code>)</p>
+<p>When a new engineer, mechanic, or site technician joins the company:</p>
+<p><img src="./screenshots/05-onboarding.png" alt="Employee Onboarding &amp; Contracts"></p>
+<h3>Step 1: Add Their Details</h3>
+<ol>
+<li>Click <strong>+ Register New Hire</strong>.</li>
+<li>Type in their full legal name, phone number, address, and date of birth.</li>
+<li>Select their job title, department, and starting monthly salary.</li>
+<li>Upload a copy of their photo ID, resume, and medical fitness form.</li>
+<li>Click <strong>Save New Employee</strong>.</li>
+</ol>
+<h3>Step 2: Generate Their Official Employment Contract</h3>
+<ol>
+<li>In the onboarding menu, click <strong>Generate Contract</strong>.</li>
+<li>Select the worker&#39;s name.</li>
+<li>Choose the contract template (e.g. <em>Full-Time Staff Contract</em> or <em>Site Technician Agreement</em>).</li>
+<li>The system automatically types in their name, salary in words, job title, and company rules.</li>
+<li>Click <strong>Download / Print PDF</strong> to give to the worker to sign.</li>
+</ol>
+<hr>
+<h2>2.4 How to Apply for Vacation or Sick Leave</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>Leaves</strong> (<code>/leaves</code>)</p>
+<p>Every full-time staff member is entitled to annual paid leave, plus sick leave and emergency leave when needed.</p>
+<p><img src="./screenshots/06-leaves.png" alt="Leave &amp; Vacation Requests Management"></p>
+<h3>Official Staff Leave Application Form (Interactive Form Modal)</h3>
+<p>Clicking <strong>+ File Leave</strong> opens the official DCEL Staff Leave Application Form:</p>
+<p><img src="./screenshots/06-leaves-modal.png" alt="Staff Leave Application Form Modal"></p>
+<h3>Step-by-Step: Submitting Your Leave Request</h3>
+<ol>
+<li>Go to <strong>HR</strong> ➔ <strong>Leaves</strong> and click <strong>+ Request Leave</strong>.</li>
+<li>Select the <strong>Leave Type</strong> (Annual Vacation, Sick Leave, Maternity/Paternity, or Compassionate).</li>
+<li>Pick your <strong>Start Date</strong> and <strong>End Date</strong>. The app automatically calculates how many working days you are taking (it does not count weekends or holidays).</li>
+<li>Choose a coworker as your <strong>Relieving Staff</strong> who will handle your urgent duties while you are away.</li>
+<li>Click <strong>Submit Leave Request</strong>.</li>
+<li>Your manager will get an alert to approve your request. Once approved, the attendance sheet will automatically mark you as &quot;On Leave.&quot;</li>
+</ol>
+<hr>
+<h2>2.5 Salary Advances &amp; Emergency Loans</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>Salary &amp; Loans</strong> (<code>/salary-loans</code>)</p>
+<p>If an employee needs an emergency advance or personal loan from the company:</p>
+<p><img src="./screenshots/07-salary-loans.png" alt="Salary Advances &amp; Loan Tracking"></p>
+<h3>Finance Portal &amp; Loan Application Form</h3>
+<p><img src="./screenshots/07-salary-loans-form.png" alt="Finance Portal Loan Request Form"></p>
+<ol>
+<li>Click <strong>+ Apply for Loan</strong>.</li>
+<li>Select the worker&#39;s name.</li>
+<li>Enter the total loan amount requested (e.g. ₦100,000).</li>
+<li>Choose the monthly deduction (e.g. ₦25,000 per month for 4 months).</li>
+<li>Once HR and Finance approve the loan, the payroll system will automatically deduct ₦25,000 each month until the full amount is repaid.</li>
+</ol>
+<hr>
+<h2>2.6 Health Insurance (HMO) &amp; Hospital Care</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>HMO Management</strong> (<code>/hmo</code>)</p>
+<p>Dewatering Construction Etc. Limited provides health insurance for staff and their families.</p>
+<p><img src="./screenshots/08-hmo.png" alt="HMO Healthcare &amp; Hospital Plans"></p>
+<h3>What You Can Do Here:</h3>
+<ul>
+<li><strong>View Your Hospital Plan:</strong> See whether you are on the Executive, Senior, or Site Operative plan and find which private hospitals in your city are covered.</li>
+<li><strong>Add Dependents:</strong> Register your spouse and children with their names and birth certificates so they can receive hospital care under your plan.</li>
+</ul>
+<hr>
+<h2>2.7 Recruitment &amp; Automatic Resume Reading</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>HR</strong> ➔ <strong>Interviews</strong> (<code>/interviews</code>)</p>
+<p>When hiring new site engineers or technicians:</p>
+<ol>
+<li>Drag and drop any applicant&#39;s PDF resume directly onto the screen.</li>
+<li>The system reads the resume automatically, filling in the applicant&#39;s name, years of dewatering or civil experience, past employers, and qualifications.</li>
+<li>Click <strong>Schedule Interview</strong> to book a date with the candidate.</li>
+</ol>
+
+      </section>
+    
+      <section class="chapter-break" id="ch3">
+        <h1>Chapter 3: Finance, Payroll &amp; Invoicing</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Accountants, Billing Officers, Site Supervisors submitting expenses, and Staff checking their payslips  </p>
+</blockquote>
+<hr>
+<h2>3.1 Understanding How Monthly Payroll Works</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Accounts</strong> ➔ <strong>Payroll</strong> (<code>/payroll</code>)</p>
+<p>The payroll system in DCEL Office Suite does all the math automatically at the end of every month. It combines employee salary agreements with daily attendance records.</p>
+<h3>How an Employee&#39;s Pay Is Calculated:</h3>
+<pre><code>   [ Base Salary (pro-rated by days worked) ]
++  [ Allowances: Housing, Transport, Utility ]
++  [ Overtime Earnings (Sunday shifts &amp; extra hours) ]
+─────────────────────────────────────────────────────────────
+=  GROSS EARNINGS
+-  [ Pension Savings (8% saved for your retirement) ]
+-  [ PAYE Income Tax (Official government tax deduction) ]
+-  [ Loan Deductions (Monthly repayment on salary advance) ]
+─────────────────────────────────────────────────────────────
+=  FINAL NET SALARY (Cash deposited to your bank account)
+</code></pre>
+<ol>
+<li><strong>Days Worked vs Official Days:</strong><br>If there are 22 working days in a month, and an employee was present or on approved paid leave for all 22 days, they receive 100% of their base salary. If they missed 2 days without approval, they are paid for 20 days.</li>
+<li><strong>Overtime Pay:</strong><br>Hours worked on Sundays, holidays, or emergency night shifts recorded in the Daily Register are automatically multiplied by the company overtime rate and added to the paycheck.</li>
+<li><strong>Statutory Deductions:</strong>  <ul>
+<li><strong>Pension (8%):</strong> Deducted and remitted directly into your registered Pension Fund Administrator (PFA) account for your future retirement.</li>
+<li><strong>PAYE Tax:</strong> Calculated strictly according to official Nigerian tax regulations after applying the statutory Consolidated Relief Allowance (CRA).</li>
+</ul>
+</li>
+<li><strong>Loan Repayments:</strong><br>If you have an active salary advance, your agreed monthly installment is deducted automatically so you never have to remember to make manual payments.</li>
+</ol>
+<hr>
+<h2>3.2 Step-by-Step: How to Run the Monthly Payroll</h2>
+<p>For Accounts Officers and HR Managers:</p>
+<p><img src="./screenshots/09-payroll.png" alt="Monthly Payroll Engine Screen"></p>
+<pre><code>┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ MONTHLY PAYROLL WIZARD — October 2026                                                  │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Official Working Days: [ 22 ]               Overtime Rate: [ 1.5x Daily Rate ]         │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ Employee Name    │ Days │ Base Pay    │ Allowances │ Overtime │ Deductions│ Net Pay (₦)│
+├──────────────────┼──────┼─────────────┼────────────┼──────────┼───────────┼────────────┤
+│ Ibrahim Musa     │ 22   │ ₦250,000.00 │ ₦120,000   │ ₦18,500  │ ₦63,100   │ ₦325,400.00│
+│ Samuel Okon      │ 20   │ ₦180,000.00 │ ₦80,000    │ ₦0       │ ₦38,800   │ ₦221,200.00│
+│ Chinedu Eze      │ 22   │ ₦300,000.00 │ ₦150,000   │ ₦42,000  │ ₦93,200   │ ₦398,800.00│
+├──────────────────┴──────┴─────────────┴────────────┴──────────┴───────────┴────────────┤
+│ TOTAL MONTHLY SALARY OUTFLOW: ₦ 14,850,200.00       [ Approve &amp; Issue Payslips ]       │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<ol>
+<li>Go to <strong>Accounts</strong> ➔ <strong>Payroll</strong>.</li>
+<li>Click <strong>+ New Payroll Run</strong>.</li>
+<li>Select the month and year.</li>
+<li>Verify the total official workdays for that month.</li>
+<li>Click <strong>Calculate Payroll</strong>. In less than two seconds, the system pulls in all attendance logs, overtime hours, and active loans, and shows the full breakdown for every worker.</li>
+<li>Check for any amber warning badges (such as someone who joined mid-month).</li>
+<li>Click <strong>Approve Payroll</strong>.</li>
+<li>Click <strong>Export Bank Schedule</strong> to download the payment file for your online bank portal (e.g. Access Bank, Zenith, GTBank).</li>
+<li>Click <strong>Email All Payslips</strong> to automatically send confidential PDF payslips to each worker&#39;s inbox.</li>
+</ol>
+<hr>
+<h2>3.3 How to Create a Client Invoice</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Accounts</strong> ➔ <strong>Client Accounts</strong> (<code>/client-accounts</code>)</p>
+<p>When billing a client for dewatering contracts, pump rentals, or generator hire:</p>
+<p><img src="./screenshots/10-client-accounts.png" alt="Client Accounts &amp; Invoicing Screen"></p>
+<ol>
+<li>Click <strong>+ Create Invoice</strong>.</li>
+<li>Select the <strong>Client Name</strong> and the <strong>Site Location</strong>.</li>
+<li>Add the billing items:<ul>
+<li>Example 1: <em>6-inch Sykes Vacuum Pump Rental — 30 Days @ ₦120,000/day</em></li>
+<li>Example 2: <em>Wellpoint Jetting &amp; Installation Fee — Lump sum ₦1,500,000</em></li>
+<li>Example 3: <em>Diesel Fuel Surcharge — 5,000 Liters @ ₦1,200/L</em></li>
+</ul>
+</li>
+<li>The system automatically adds <strong>7.5% VAT</strong> and displays the <strong>5% Withholding Tax (WHT)</strong> deduction.</li>
+<li>Click <strong>Save &amp; Generate Invoice</strong>.</li>
+<li>You can print the official PDF with company letterhead, signature, and bank payment instructions to send to the client.</li>
+</ol>
+<hr>
+<h2>3.4 How to Record Client Payments &amp; Bank Transfers</h2>
+<p>When a client transfers money for an invoice:</p>
+<ol>
+<li>Go to <strong>Accounts</strong> ➔ <strong>Client Accounts</strong>.</li>
+<li>Click on the invoice number.</li>
+<li>Click <strong>+ Record Payment</strong>.</li>
+<li>Enter the amount paid, payment date, and bank reference/receipt number.</li>
+<li>If the client deducted 5% Withholding Tax, check the <strong>&quot;WHT Deducted&quot;</strong> box.</li>
+<li>The invoice status updates to <strong>Paid</strong> or <strong>Partially Paid</strong>, and the payment appears on the client&#39;s balance sheet.</li>
+</ol>
+<hr>
+<h2>3.5 Paying Casual Site Labor &amp; Artisans</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Accounts</strong> ➔ <strong>Non-Employee Directory</strong> (<code>/beneficiaries</code>)</p>
+<p>Construction sites frequently hire temporary daily laborers, welders, or haulage truck drivers who are not full-time employees:</p>
+<p><img src="./screenshots/11-beneficiaries.png" alt="Beneficiaries Directory &amp; Casual Labor Payments"></p>
+<ol>
+<li>Click <strong>+ Add Beneficiary</strong>.</li>
+<li>Type their name, phone number, and bank account details.</li>
+<li>Enter the amount approved for their work.</li>
+<li>Click <strong>Create Payment Voucher</strong>. This allows accounts to make payments directly without mixing temporary labor with full-time staff payroll.</li>
+</ol>
+<hr>
+<h2>3.6 How to Submit Site Expenses &amp; Receipts</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Accounts</strong> ➔ <strong>General Ledger</strong> (<code>/ledger</code>)</p>
+<p>When a site engineer buys spare bolts, motor oil, or emergency diesel on site:</p>
+<p><img src="./screenshots/12-ledger.png" alt="General Ledger &amp; Company Expenses"></p>
+<ol>
+<li>Click <strong>+ Log Expense</strong>.</li>
+<li>Choose the <strong>Site</strong> and the <strong>Category</strong> (e.g. <em>Machine Repairs</em>, <em>Site Consumables</em>, <em>Transport</em>).</li>
+<li>Type the amount spent.</li>
+<li>Click <strong>Attach Receipt</strong> to take a picture of the paper receipt with your phone camera.</li>
+<li>Click <strong>Submit Expense</strong>. The office accountant will review and reimburse the money.</li>
+</ol>
+<hr>
+<h2>3.7 Uploading Bank Statements for Automatic Matching</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Accounts</strong> ➔ <strong>Bank AI Import</strong> (<code>/bank-import</code>)</p>
+<p>Instead of matching dozens of bank transactions by hand:</p>
+<p><img src="./screenshots/13-bank-import.png" alt="Bank Statement AI Reconciliation"></p>
+<ol>
+<li>Download your monthly bank statement in PDF or CSV from your bank portal.</li>
+<li>Drag and drop the file onto the screen.</li>
+<li>The system scans the statement, matches client deposits against pending invoices, and highlights any unmatched payments.</li>
+<li>Click <strong>Confirm Matches</strong> to update client balances automatically.</li>
+</ol>
+
+      </section>
+    
+      <section class="chapter-break" id="ch4">
+        <h1>Chapter 4: Operations, Machinery &amp; Diesel Fuel</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Yard Foremen, Site Supervisors, Logistics Officers, Mechanics, and Drivers  </p>
+</blockquote>
+<hr>
+<h2>4.1 Equipment Inventory &amp; Machine Locations</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Inventory</strong> (<code>/operations/assets</code>)</p>
+<p>Need to know where 6-inch vacuum pump #3 is, or check if an extra 150kVA generator is available in the yard?</p>
+<p><img src="./screenshots/14-operations-overview.png" alt="Operations Overview Dashboard"></p>
+<p><img src="./screenshots/15-assets-inventory.png" alt="Machinery &amp; Equipment Inventory Screen"></p>
+<pre><code>┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ MACHINERY &amp; EQUIPMENT INVENTORY                                                        │
+├───────────────┬─────────────────────────┬───────────────┬──────────────┬───────────────┤
+│ Asset Tag     │ Machine Description     │ Status        │ Location     │ Service Due   │
+├───────────────┼─────────────────────────┼───────────────┼──────────────┼───────────────┤
+│ DCEL-PMP-001  │ 6&quot; Sykes Vacuum Pump    │ Active on Site│ Eko Atlantic │ In 120 Hours  │
+│ DCEL-PMP-004  │ 6&quot; Godwin CD150M Diesel │ In Yard/Ready │ Central Yard │ Ready         │
+│ DCEL-GEN-002  │ 150kVA Perkins GenSet   │ Active on Site│ Dangote Ref. │ In 45 Hours   │
+│ DCEL-JET-003  │ High-Pressure Jet Pump  │ In Workshop   │ Yard Workshop│ Under Repair  │
+└───────────────┴─────────────────────────┴───────────────┴──────────────┴───────────────┘
+</code></pre>
+<h3>What You Can Do Here:</h3>
+<ul>
+<li><strong>Search Any Machine:</strong> Type a machine number (e.g. <code>PMP-001</code>) or equipment type into the search bar.</li>
+<li><strong>Check Status:</strong> See at a glance if a pump is <strong>Available in the Yard</strong>, <strong>Working on Site</strong>, or <strong>Under Maintenance</strong>.</li>
+<li><strong>Scan Machine QR Code:</strong> Tap the camera icon on your phone to scan the physical QR sticker on any pump. It immediately opens the machine&#39;s service history, user handbook, and current project assignment.</li>
+</ul>
+<hr>
+<h2>4.2 How to Create a Delivery Waybill (Moving Equipment to Site)</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Waybills</strong> (<code>/operations/waybills</code>)</p>
+<p>Whenever heavy machinery, pipes, suction hoses, or fuel drums leave the central yard for a construction site, you must create an official <strong>Transit Waybill</strong>.</p>
+<p><img src="./screenshots/16-waybills.png" alt="Transit Waybills Register"></p>
+<h3>Official Transit Waybill Creation Screen</h3>
+<p><img src="./screenshots/16-waybill-modal.png" alt="Transit Waybill Creation Screen"></p>
+<h3>Step-by-Step Instructions:</h3>
+<ol>
+<li>Click <strong>+ Create Waybill</strong>.</li>
+<li>Select where the items are leaving from (e.g. <em>Central Yard</em>) and where they are going (e.g. <em>Eko Atlantic Site</em>).</li>
+<li>Type the truck plate number, driver&#39;s name, and driver&#39;s mobile phone number.</li>
+<li>Select the equipment and enter the quantity of pipes, hoses, and accessories being loaded.</li>
+<li>Sign on the screen with your finger or mouse and click <strong>Issue Waybill</strong>.</li>
+<li>Print the paper copy to hand to the truck driver.</li>
+<li><strong>When the truck arrives on site:</strong> The site engineer opens the waybill on their phone, checks off that all items arrived safely, and signs the receiving box. The machine&#39;s location updates automatically!</li>
+</ol>
+<hr>
+<h2>4.3 Borrowing Tools from the Yard (Quick Checkout)</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Quick Checkout</strong> (<code>/operations/checkout</code>)</p>
+<p>When a technician needs a pipe wrench, safety harness, angle grinder, or pressure gauge:</p>
+<p><img src="./screenshots/17-checkout.png" alt="Tool Quick Checkout Kiosk"></p>
+<ol>
+<li>Tap <strong>Quick Checkout</strong> on the phone or store tablet.</li>
+<li>Scan the technician’s staff ID badge or type their name.</li>
+<li>Scan the barcode on the tool.</li>
+<li>Tap <strong>Done</strong>. The tool is assigned to that technician until returned, preventing lost tools.</li>
+</ol>
+<hr>
+<h2>4.4 Machine Servicing &amp; Oil Changes (Maintenance)</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Maintenance</strong> (<code>/operations/maintenance</code>)</p>
+<p>Dewatering pumps and generators run 24 hours a day. Missing an oil change causes catastrophic engine failure.</p>
+<p><img src="./screenshots/18-maintenance.png" alt="Preventive Maintenance &amp; Servicing Records"></p>
+<h3>How Service Alerts Work:</h3>
+<ul>
+<li>Every time a site supervisor logs daily operating hours, the app counts down to the next service (every 250 hours for diesel engine oil and filters).</li>
+<li>When a machine reaches 250 hours, an orange <strong>&quot;Service Due&quot;</strong> alert appears on the Operations dashboard.</li>
+</ul>
+<h3>How a Mechanic Fills a Service Work Order:</h3>
+<ol>
+<li>Open the machine&#39;s maintenance card.</li>
+<li>Check off the completed tasks:<ul>
+<li><em>Engine oil drained and refilled (15W-40)</em></li>
+<li><em>New primary and secondary fuel filters installed</em></li>
+<li><em>Vacuum pump priming belt tension checked</em></li>
+<li><em>Water pump impeller inspected</em></li>
+</ul>
+</li>
+<li>Type any notes (e.g. &quot;Replaced worn rubber seal on pump head&quot;).</li>
+<li>Click <strong>Complete Service &amp; Reset Counter</strong>. The machine is certified safe to run for another 250 hours.</li>
+</ol>
+<hr>
+<h2>4.5 Logging Daily Diesel Fuel &amp; Operating Hours</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Diesel Refill</strong> (<code>/operations/diesel</code>)</p>
+<p>Diesel is the biggest daily cost on construction sites. Supervisors must record fuel usage every morning.</p>
+<p><img src="./screenshots/19-diesel-refill.png" alt="Diesel Refill &amp; Fuel Tracking Register"></p>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│                 DAILY DIESEL &amp; HOURS LOG                    │
+├─────────────────────────────────────────────────────────────┤
+│  Site:          [ Eko Atlantic Site                  ▼ ]    │
+│  Equipment:     [ DCEL-PMP-001 (6&quot; Sykes Pump)       ▼ ]    │
+│  Date:          [ Today, Oct 27, 2026 ]                     │
+│                                                             │
+│  Hours Run Today:       [ 24 Hours ]                        │
+│  Diesel Added Today:    [ 180 Liters ]                      │
+│  Meter Reading:         [ 3,420 Hours ]                     │
+│                                                             │
+│                   [ Save Fuel Entry ]                       │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Steps to Log Fuel:</h3>
+<ol>
+<li>Select your <strong>Site</strong> and choose the <strong>Machine</strong>.</li>
+<li>Type in how many <strong>Hours</strong> the machine ran over the last 24 hours.</li>
+<li>Type in how many <strong>Liters of Diesel</strong> were poured into its tank.</li>
+<li>Click <strong>Save Fuel Entry</strong>.</li>
+</ol>
+<div class="alert alert-note"><div class="alert-title">ℹ️ NOTE</div><p>
+<strong>High Fuel Warning:</strong> The system automatically checks how many liters the machine burned per hour. If a 6-inch pump normally burns 7.5 Liters/Hour and suddenly logs 14 Liters/Hour, the screen shows a yellow warning to alert the supervisor to check for fuel leaks or theft.</p>
+</div>
+<hr>
+<h2>4.6 Fleet Vehicles &amp; Inspections</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Vehicles</strong> (<code>/operations/vehicles</code>)</p>
+<p>Keep company pickups, haulage trucks, and staff buses roadworthy and compliant:</p>
+<p><img src="./screenshots/20-vehicles.png" alt="Fleet Vehicles Management"></p>
+<ul>
+<li><strong>Paperwork Expiry Alerts:</strong> The app reminds you 30 days before vehicle roadworthiness, state permits, or insurance policies expire.</li>
+<li><strong>Driver Assignments:</strong> View who is currently responsible for each vehicle.</li>
+</ul>
+
+      </section>
+    
+      <section class="chapter-break" id="ch5">
+        <h1>Chapter 5: Clients, Site Diaries &amp; DewaterCAD</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Site Engineers, Project Managers, and Geotechnical Field Staff  </p>
+</blockquote>
+<hr>
+<h2>5.1 Client 360: All Client Information in One Place</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Clients</strong> ➔ <strong>Client 360</strong> (<code>/client-360</code>)</p>
+<p>When a client calls or when you are preparing for a site meeting:</p>
+<p><img src="./screenshots/21-client-360.png" alt="Client 360 Comprehensive Dossier"></p>
+<ol>
+<li>Select any client company from the list (e.g. <em>Julius Berger</em>, <em>Dangote</em>, <em>Cappa &amp; D&#39;Alberto</em>).</li>
+<li>The screen immediately displays:<ul>
+<li><strong>Active Job Sites:</strong> Every site where DCEL is currently working for them.</li>
+<li><strong>Machines on Hire:</strong> Exactly which pumps and generators are currently running on their projects.</li>
+<li><strong>Account Summary:</strong> Total invoices sent, money paid, and any pending balance.</li>
+<li><strong>Key Contacts:</strong> Phone numbers and email addresses of their project managers and site consultants.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>5.2 Scanning Paper Business Cards with Your Phone</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Clients</strong> ➔ <strong>Phonebook</strong> (<code>/clients/phonebook</code>)</p>
+<p>When you meet a client engineer, consultant, or subcontractor on site and they give you a paper business card:</p>
+<p><img src="./screenshots/22-phonebook.png" alt="Business Phonebook &amp; Business Card Scanner"></p>
+<ol>
+<li>Open <strong>Phonebook</strong> on your phone.</li>
+<li>Tap the <strong>Scan Business Card</strong> button.</li>
+<li>Hold your phone camera over the paper business card.</li>
+<li>The app automatically reads the card and fills in the contact&#39;s Name, Company, Job Title, Phone Number, and Email Address.</li>
+<li>Tap <strong>Save Contact</strong>. It is now stored in the company directory for everyone to access.</li>
+</ol>
+<hr>
+<h2>5.3 Daily Site Diary (The Site Engineer’s Daily Log)</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Operations</strong> ➔ <strong>Sites</strong> ➔ Choose your site ➔ Click <strong>Site Diary</strong> (<code>/sites/diary/:siteId</code>)</p>
+<p>Every construction site must submit a daily engineering log. This protects the company legally and ensures project managers know exactly what happened on site.</p>
+<p><img src="./screenshots/23-sites-list.png" alt="Project Sites Directory &amp; Field Status"></p>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│ DAILY SITE DIARY — Eko Atlantic Marina Basin                │
+├─────────────────────────────────────────────────────────────┤
+│ Date: [ 2026-10-27 ]           Weather: [ Sunny / Clear ▼ ] │
+│                                                             │
+│ GROUNDWATER &amp; EXCAVATION STATUS:                            │
+│ • Initial Water Table:  [ -1.20 meters below ground ]       │
+│ • Current Water Level:  [ -6.80 meters below ground ]       │
+│ • Excavation Depth:     [ -6.50 meters formation level ]    │
+│ • Water Flow Condition: [ Dry &amp; Stable Excavation Bottom ]  │
+│                                                             │
+│ WORK DONE TODAY:                                            │
+│ [ 2x 6&quot; pumps operated continuously for 24 hours. Wellpoint │
+│   line jetted along southern wall completed today.          │
+│   Excavator deepened pit by 1.5m without water boiling. ]   │
+│                                                             │
+│ SITE PHOTOS: [ + Take / Attach Photo from Phone ]           │
+│                                                             │
+│                  [ Submit Daily Diary ]                     │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3>Steps to Fill Your Daily Diary:</h3>
+<ol>
+<li>Select the <strong>Weather</strong> (Sunny, Rain, Heavy Downpour, or Flooded).</li>
+<li>Record the <strong>Water Level</strong> measured with your dip tape.</li>
+<li>Record the current <strong>Excavation Depth</strong>.</li>
+<li>Type a short description of the work completed today.</li>
+<li>Tap <strong>Attach Photo</strong> to take a clear photo of the dry excavation pit or pump installation.</li>
+<li>Tap <strong>Submit Daily Diary</strong>. The head office management team can review your report immediately.</li>
+</ol>
+<hr>
+<h2>5.4 Using the DewaterCAD Simulator &amp; AI Blueprint Tool</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Tools</strong> ➔ <strong>Simulator</strong> (<code>/operations/simulator</code>)</p>
+<p>The DewaterCAD Simulator allows site engineers to plan an entire groundwater dewatering installation on a site drawing before sending a single pipe to the site.</p>
+<p><img src="./screenshots/24-dewatercad-simulator.png" alt="DewaterCAD Simulator Canvas"></p>
+<pre><code>┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ DewaterCAD Simulator: Eko Atlantic Basin                                  [ 2D / 3D ]  │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ [ + AI Dewatering Assistant ]  [ 📐 Calibrate Scale ]  [ 💾 Export BOM ] [ 🖨️ PDF ]   │
+│                                                                                        │
+│     ========================================================================           │
+│     || [Pump #1] ─── Header Line (Pipes with Filter Points every 1m) ──────┐ ||        │
+│     ||                                                                     │ ||        │
+│     ||   ┌────────────────────────────────────────────────────────────┐    │ ||        │
+│     ||   │               EXCAVATION PIT TO BE DEWATERED               │    │ ||        │
+│     ||   │               Formation Depth: -6.50m                      │    │ ||        │
+│     ||   │               Target Water Drawdown: -7.00m                │    │ ||        │
+│     ||   └────────────────────────────────────────────────────────────┘    │ ||        │
+│     ||                                                                     │ ||        │
+│     || ═══ VEHICLE INGRESS RAMP (Clear entrance for dump trucks) ──────────┘ ||        │
+│     ========================================================================           │
+│                                                                                        │
+│ SUMMARY: Header: 144m | 6m Pipes: 24 | Pumps: 2x 6&quot; Diesel | 3D View Ready             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<hr>
+<h3>Step-by-Step: How to Design a Dewatering Layout with AI</h3>
+<h4>Step 1: Upload Your Site Drawing</h4>
+<ol>
+<li>Open the simulator and click <strong>AI Dewatering Assistant</strong>.</li>
+<li>Upload your architectural site drawing, CAD plan, or excavation drawing (as a PNG or JPG picture).</li>
+</ol>
+<h4>Step 2: Set the Scale (Calibrate Measurement)</h4>
+<ol>
+<li>Click the <strong>Calibrate Scale</strong> tool.</li>
+<li>Click on two grid lines or structural building columns on the drawing where you know the real distance.</li>
+<li>Type in the real distance in meters (for example: <code>25 meters</code>). The software now knows the exact real-world dimensions of the drawing.</li>
+</ol>
+<h4>Step 3: Trace Your Excavation Pit</h4>
+<ol>
+<li>Click the <strong>Trace Pit</strong> tool.</li>
+<li>Click on each corner of your excavation pit on the drawing to outline the hole.</li>
+<li>Double-click the last corner to close the shape. The app shows you the exact length around the pit (perimeter) and square meters (area).</li>
+</ol>
+<h4>Step 4: Choose Your Site Settings</h4>
+<p>Fill in a few simple questions:</p>
+<ul>
+<li><strong>How deep is the excavation?</strong> (e.g. <code>-6.5 meters</code>).</li>
+<li><strong>Where is the natural ground water?</strong> (e.g. <code>-1.2 meters</code>).</li>
+<li><strong>Which side will trucks drive into the pit?</strong> Select North, South, East, or West, and set the ramp width (e.g. <code>6 meters</code>). The software will make sure no pipes or pumps block the truck entrance ramp!</li>
+<li><strong>Pipe Size:</strong> Choose <code>6m Modular Pipes</code>.</li>
+</ul>
+<h4>Step 5: Click Generate Layout!</h4>
+<p>Click the blue <strong>Generate Dewatering Blueprint</strong> button:</p>
+<ul>
+<li>The app automatically places header pipes all the way around your excavation.</li>
+<li>It inserts wellpoint riser pipes every 1 meter.</li>
+<li>It places 6-inch diesel vacuum pumps in safe spots away from the truck ramp.</li>
+<li>It runs discharge hoses to your water disposal channel.</li>
+<li>Click <strong>3D View</strong> to rotate and look at your deep excavation in realistic 3D!</li>
+</ul>
+<h4>Step 6: Export Your Pipe &amp; Pump List (BOM)</h4>
+<p>Click <strong>Export Bill of Materials (BOM)</strong>:</p>
+<ul>
+<li>The app instantly gives you an exact count:<ul>
+<li><em>24 pieces of 6-meter header pipes</em></li>
+<li><em>48 wellpoint risers and filters</em></li>
+<li><em>2 Sykes 6-inch diesel pumps</em></li>
+<li><em>Couplings, bends, and layflat discharge hoses</em></li>
+</ul>
+</li>
+<li>Click <strong>Send to Waybill</strong> to immediately pass this list to the Yard Foreman so they can load the delivery truck!</li>
+</ul>
+<hr>
+<h2>5.5 Quick Dewatering &amp; Logistics Calculators</h2>
+<h3>1. Water Flow Calculator (<code>/operations/dewatering-calculator</code>)</h3>
+<p><img src="./screenshots/25-dewatering-calculator.png" alt="Hydraulic Dewatering Calculator"></p>
+<p>Select your soil type (Sand, Gravel, or Clay), type your excavation depth, and the calculator tells you how many cubic meters of water per hour the pumps must discharge to keep the excavation dry.</p>
+<h3>2. Haulage &amp; Logistics Estimator (<code>/operations/estimator</code>)</h3>
+<p>Type the distance to the job site (e.g. <code>120 km</code>), choose how many flatbed trucks and cranes are needed, and the app calculates the total transport cost and diesel fuel needed for mobilization.</p>
+
+      </section>
+    
+      <section class="chapter-break" id="ch6">
+        <h1>Chapter 6: Tasks, Team Chat &amp; Meeting Minutes</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> All Staff, Project Managers, Supervisors, and Meeting Secretaries  </p>
+</blockquote>
+<hr>
+<h3>6.1 Managing Daily Work &amp; Tasks</h3>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Communication</strong> ➔ <strong>Task Register</strong> (<code>/tasks</code>)</p>
+<p>The Task Register keeps everyone on the same page regarding machine repairs, site surveys, payroll deadlines, and client meetings.</p>
+<p><img src="./screenshots/26-task-register.png" alt="Task Register &amp; Departmental Work Orders"></p>
+<h3>Task Creation &amp; Delegation Dialog</h3>
+<p><img src="./screenshots/26-task-create-dialog.png" alt="Task Creation Dialog"></p>
+<h3>How to Create a New Task:</h3>
+<ol>
+<li>Click the blue <strong>+ Create Task</strong> button.</li>
+<li>Type a clear title (e.g. <em>&quot;Service 150kVA Generator at Dangote Site&quot;</em>).</li>
+<li>Select the <strong>Department</strong> and choose the worker in <strong>Assigned To</strong>.</li>
+<li>Set the <strong>Due Date</strong> and <strong>Priority</strong> (High, Medium, or Low).</li>
+<li>Add subtasks if needed (e.g., <em>1. Drain oil, 2. Fit new filter, 3. Test run</em>).</li>
+<li>Click <strong>Save Task</strong>. The assigned worker will get an instant alert on their phone and computer.</li>
+</ol>
+<h3>Checking Off Subtasks &amp; Completing Work:</h3>
+<ul>
+<li>As you complete each step, click its checkbox. The progress bar moves forward (e.g. <code>2 of 3 Completed - 67%</code>).</li>
+<li>When all work is done, change the status to <strong>Completed</strong>.</li>
+</ul>
+<div class="alert alert-note"><div class="alert-title">ℹ️ NOTE</div><p>
+<strong>Why is a task marked &quot;Pending Approval&quot;?</strong><br>Sensitive actions (such as spending company money or decommissioning machinery) require a manager to review and approve the task before it can be closed.</p>
+</div>
+<hr>
+<h2>6.2 Chatting on Tasks (WhatsApp-Style Messages)</h2>
+<p>No more lost messages in personal WhatsApp groups! Every task has its own built-in conversation feed.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────┐
+│ TASK: Overhaul Sykes 6&quot; Pump #004                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   [Tunde Adebayo - 10:14 AM]                                │
+│   ┌──────────────────────────────────────────────────────┐  │
+│   │ I have opened the pump head. The impeller is worn out│  │
+│   │ and needs replacement before we test run.            │  │
+│   └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│                [Head of Operations - 10:22 AM]              │
+│                ┌─────────────────────────────────────────┐  │
+│                │ Approved. Collect a new 6&quot; impeller     │  │
+│                │ from Central Yard Stores Tag #IMP-012.  │  │
+│                └─────────────────────────────────────────┘  │
+│                                                             │
+│   [ 📷 Take / Attach Photo ]  [ Type your message... ]  [▶] │
+│└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<ol>
+<li>Click on any task to open its details.</li>
+<li>Scroll to the bottom to see the chat timeline.</li>
+<li>Type an update or tap the <strong>Camera</strong> icon to attach a photo of a broken part or completed work.</li>
+<li>Tap the <strong>Send</strong> arrow (<code>▶</code>). Everyone assigned to the task sees your message immediately.</li>
+</ol>
+<hr>
+<h2>6.3 Setting Pop-Up Reminders</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Communication</strong> ➔ <strong>Task Reminders</strong> (<code>/tasks/reminders</code>)</p>
+<p>Have an important deadline coming up, such as submitting attendance by 4:00 PM or renewing truck insurance?</p>
+<p><img src="./screenshots/27-task-reminders.png" alt="Task Reminders &amp; Priority Alerts"></p>
+<ol>
+<li>Click <strong>+ Add Reminder</strong>.</li>
+<li>Type what you need to remember.</li>
+<li>Pick the exact date and time.</li>
+<li>When the time arrives, a reminder card will pop up on your screen. You can click <strong>Go to Task</strong> to take action or click <strong>Snooze (1 hour)</strong> to be reminded again later.</li>
+</ol>
+<hr>
+<h2>6.4 Recording Meeting Minutes &amp; Signing Digitally</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Communication</strong> ➔ <strong>Minutes</strong> (<code>/minutes</code>)</p>
+<p>Keep professional records of weekly management meetings, site safety toolbox meetings, or client progress discussions:</p>
+<p><img src="./screenshots/28-minutes.png" alt="Meeting Minutes &amp; Digital Signatures"></p>
+<ol>
+<li>Click <strong>+ New Meeting Minutes</strong>.</li>
+<li>Type the meeting title, date, and location.</li>
+<li>Select which workers were present.</li>
+<li>Type the discussion notes and decisions made.</li>
+<li>In the <strong>Action Items</strong> table, list specific jobs assigned during the meeting, who is responsible, and the deadline.</li>
+<li><strong>Sign On Screen:</strong> The meeting chairman and secretary can sign directly on the screen with their finger or mouse.</li>
+<li>Click <strong>Generate PDF</strong> to print or email the official meeting minutes to everyone.</li>
+</ol>
+<hr>
+<h2>6.5 Requesting Emergency Cash, Diesel or Tools from Site</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Communication</strong> ➔ <strong>Site Requests</strong> (<code>/operations/site-requests</code>)</p>
+<p>When a site engineer runs out of fuel or urgently needs spare fittings:</p>
+<p><img src="./screenshots/29-site-requests.png" alt="Field Requisitions &amp; Emergency Site Requests"></p>
+<h3>New Site Requisition Modal</h3>
+<p><img src="./screenshots/29-site-request-modal.png" alt="New Site Requisition Request Modal"></p>
+<ol>
+<li>Click <strong>+ New Request</strong>.</li>
+<li>Choose your site.</li>
+<li>Select what you need: <strong>Cash</strong>, <strong>Diesel</strong>, <strong>Spare Parts</strong>, or <strong>Tools</strong>.</li>
+<li>Type the explanation (e.g. <em>&quot;Emergency 500L diesel needed for continuous night pumping during heavy rain&quot;</em>).</li>
+<li>Click <strong>Submit Requisition</strong>.</li>
+<li>The Operations and Finance managers review the request on their screen and click <strong>Approve</strong> for immediate disbursement.</li>
+</ol>
+
+      </section>
+    
+      <section class="chapter-break" id="ch7">
+        <h1>Chapter 7: Reports, User Accounts &amp; Settings</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Managing Directors, Department Leads, and Office Administrators  </p>
+</blockquote>
+<hr>
+<h2>7.1 The Monday Morning Executive Weekly Report</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Reports</strong> ➔ <strong>Weekly Report</strong> (<code>/weekly-report</code>)</p>
+<p>Designed specifically for the Managing Director and Department Heads for their Monday morning review:</p>
+<p><img src="./screenshots/30-weekly-report.png" alt="Monday Morning Executive Weekly Report"></p>
+<pre><code>┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ DCEL OFFICE SUITE — EXECUTIVE WEEKLY SUMMARY: WEEK 43 (October 2026)                   │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1. OPERATIONS &amp; SITE SITES:                                                            │
+│    • Total Active Sites: 6 (Eko Atlantic, Lekki Phase 1, Dangote, Victoria Island)     │
+│    • Total Machine Run-Hours Logged: 1,840 Hours (94.2% Fleet Availability)            │
+│    • Diesel Consumed: 14,200 Liters (Average 7.7 L/h per active pump)                  │
+│                                                                                        │
+│ 2. COMMERCIAL &amp; MONEY INFLOW:                                                          │
+│    • Invoices Issued This Week: ₦ 18,500,000.00                                        │
+│    • Client Payments Received:  ₦ 12,200,000.00                                        │
+│    • Pending Client Receivables:₦ 46,300,000.00                                        │
+│                                                                                        │
+│ 3. WORKFORCE &amp; SAFETY:                                                                 │
+│    • Total Field Staff: 84 Workers                                                     │
+│    • Overtime Shifts: 18 Shifts (Sunday emergency foundation pour)                     │
+│    • Safety Record: Zero Accidents or Lost Time Incidents                              │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ [ Print Executive Summary PDF ]                      [ Send to Directors by Email ]    │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+</code></pre>
+<ul>
+<li>Simply click <strong>Print Executive Summary</strong> to print a clean paper copy or click <strong>Send to Directors</strong> to email the report.</li>
+</ul>
+<hr>
+<h2>7.2 Human Resources &amp; Financial Reports</h2>
+<h3>1. HR Reports (<code>/reports</code>)</h3>
+<p><img src="./screenshots/31-hr-reports.png" alt="HR Attendance &amp; Workforce Reports"></p>
+<ul>
+<li><strong>Monthly Attendance Report:</strong> Print a clean spreadsheet showing the exact days every worker reported to work.</li>
+<li><strong>Leave Balance Report:</strong> Check how many vacation days each worker has left before the year ends.</li>
+</ul>
+<h3>2. Financial Reports (<code>/financial-reports</code>)</h3>
+<p><img src="./screenshots/32-financial-reports.png" alt="Financial Accounting &amp; Invoicing Reports"></p>
+<ul>
+<li><strong>Revenue by Client:</strong> See which clients and projects generated the most billing this month or this quarter.</li>
+<li><strong>Overdue Invoices:</strong> A list of clients who have not yet paid their bills, including the number of days overdue (30 days, 60 days, 90+ days).</li>
+<li><strong>Custom Report Builder:</strong> Pick your own columns (such as <em>Client Name</em>, <em>Machine Tag</em>, <em>Liters of Diesel Used</em>, <em>Total Cost</em>) and click <strong>Export to Excel</strong>.</li>
+</ul>
+<hr>
+<h2>7.3 Managing User Accounts &amp; Access Rights</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Settings</strong> ➔ <strong>User Management</strong> (<code>/users</code>)</p>
+<p>As an administrator, you control who can access the app and which screens each person can see:</p>
+<p><img src="./screenshots/33-users-management.png" alt="User Accounts &amp; Access Control Management"></p>
+<h3>Comprehensive User Permissions Editor</h3>
+<p><img src="./screenshots/33-user-permissions-editor.png" alt="User Account Permissions Editor"></p>
+<h3>How to Create a New User Account:</h3>
+<ol>
+<li>Click <strong>+ Add User</strong>.</li>
+<li>Type the employee&#39;s name and work email address.</li>
+<li>Set an initial password for them.</li>
+<li><strong>Choose their permissions:</strong> Check the boxes for the departments they need. For example:<ul>
+<li><em>Site Engineers:</em> Check <strong>Sites</strong>, <strong>Tools</strong>, and <strong>Communication</strong>.</li>
+<li><em>Accountants:</em> Check <strong>Accounts</strong>, <strong>Payroll</strong>, and <strong>Reports</strong>.</li>
+</ul>
+</li>
+<li>Click <strong>Save User</strong>.</li>
+</ol>
+<h3>How to Deactivate an Account When an Employee Leaves:</h3>
+<ol>
+<li>Open their user profile.</li>
+<li>Uncheck the <strong>Active Account</strong> box.</li>
+<li>Click <strong>Save</strong>. The user is immediately logged out and can no longer sign in.</li>
+</ol>
+<hr>
+<h2>7.4 Company Settings &amp; Operational Variables</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Settings</strong> ➔ <strong>System Settings</strong> (<code>/settings</code>)</p>
+<p>Manage corporate parameters, business tax rates, and default workday rules:</p>
+<p><img src="./screenshots/34-settings.png" alt="System Settings &amp; Operational Variables"></p>
+<ul>
+<li><strong>Corporate Details:</strong> Official headquarters address, support phone lines, and billing entity details.</li>
+<li><strong>Tax &amp; Pension Defaults:</strong> Standard 7.5% VAT, 5% WHT, and 8% statutory employee pension rates.</li>
+<li><strong>Calendar &amp; Shift Standards:</strong> Standard official monthly workdays (22 days) and site overtime calculation multipliers.</li>
+</ul>
+<hr>
+<h2>7.5 Checking the Activity History (Who Changed What?)</h2>
+<p><strong>Where to go:</strong> In the left menu, click <strong>Settings</strong> ➔ <strong>Activity Log</strong> (<code>/activity-log</code>)</p>
+<p>Need to know who approved a payment, who edited an attendance record, or when a waybill was issued?</p>
+<p><img src="./screenshots/35-activity-log.png" alt="System Activity Audit Log"></p>
+<ul>
+<li>The Activity Log shows every action with the exact time, the name of the worker who did it, and what was changed.</li>
+<li>Records in this log cannot be altered or erased by anyone, protecting the company and keeping everyone honest.</li>
+</ul>
+
+      </section>
+    
+      <section class="chapter-break" id="ch8">
+        <h1>Chapter 8: Everyday Help &amp; Frequently Asked Questions</h1>
+<blockquote>
+<p><strong>Company:</strong> Dewatering Construction Etc. Limited (DCEL)<br><strong>Who is this for?</strong> Any worker needing quick assistance with common issues  </p>
+</blockquote>
+<hr>
+<h2>8.1 Common Problems &amp; Quick Fixes</h2>
+<table>
+<thead>
+<tr>
+<th align="left">Problem</th>
+<th align="left">What Happened?</th>
+<th align="left">How to Fix It</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>&quot;I forgot my password&quot;</strong></td>
+<td align="left">You mistyped or forgot your login password.</td>
+<td align="left">On the sign-in screen, click <strong>&quot;Forgot your password?&quot;</strong> and check your email for the reset link, or contact your HR manager.</td>
+</tr>
+<tr>
+<td align="left"><strong>&quot;Access Denied: Account Inactive&quot;</strong></td>
+<td align="left">Your profile was set to inactive.</td>
+<td align="left">Ask an administrator in <strong>Settings ➔ Users</strong> to check the <strong>Active Account</strong> box on your profile.</td>
+</tr>
+<tr>
+<td align="left"><strong>&quot;I am on a remote site with no phone signal&quot;</strong></td>
+<td align="left">No cellular or WiFi connection on site.</td>
+<td align="left">Continue entering your daily attendance, site diary, and fuel logs normally. The app saves everything locally on your phone and will upload automatically as soon as you return to an area with signal.</td>
+</tr>
+<tr>
+<td align="left"><strong>&quot;The screen didn&#39;t update after I saved&quot;</strong></td>
+<td align="left">Your web browser is showing an old cached view.</td>
+<td align="left">Press <code>Ctrl + Shift + R</code> on your computer keyboard to refresh the page, or pull down on your phone screen to reload.</td>
+</tr>
+<tr>
+<td align="left"><strong>&quot;I cannot mark a task as Completed&quot;</strong></td>
+<td align="left">The task has a &quot;Pending Approval&quot; restriction.</td>
+<td align="left">This task involves spending money or moving machinery and requires your manager to sign off first. Ask your department head to approve it.</td>
+</tr>
+<tr>
+<td align="left"><strong>&quot;When printing, the edges of the page are cut off&quot;</strong></td>
+<td align="left">Your printer margins are set too wide.</td>
+<td align="left">In the printer preview window, change <strong>Margins</strong> from &quot;Default&quot; to <strong>&quot;None&quot;</strong> and check the box for <strong>&quot;Background Graphics&quot;</strong>.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8.2 Frequently Asked Questions (FAQ)</h2>
+<h3>Q1: Why is my monthly salary slightly different this month?</h3>
+<p><strong>Answer:</strong> Salaries for field staff are linked to the official attendance register.</p>
+<ul>
+<li>Check if you missed any days without an approved paid leave.</li>
+<li>Check if you had approved overtime (Sunday shifts or night shifts) which would increase your salary.</li>
+<li>Check if you have an active salary advance loan installment being deducted.</li>
+</ul>
+<h3>Q2: How do I print my payslip?</h3>
+<p><strong>Answer:</strong></p>
+<ol>
+<li>In the left menu, go to <strong>Accounts</strong> ➔ <strong>Payroll</strong>.</li>
+<li>Click on the current month&#39;s payroll.</li>
+<li>Locate your name and click the <strong>Print Payslip (PDF)</strong> icon next to your row.</li>
+</ol>
+<h3>Q3: How do I attach photos from my phone?</h3>
+<p><strong>Answer:</strong> Whenever you see an <strong>Attach Photo</strong> or <strong>Camera</strong> button (in Tasks, Site Diaries, or Expenses):</p>
+<ul>
+<li>Tap the button.</li>
+<li>Choose <strong>Take Photo</strong> to snap a fresh picture using your camera, or choose <strong>Photo Library</strong> to upload a picture you took earlier.</li>
+</ul>
+<h3>Q4: Can I use the app on my personal phone?</h3>
+<p><strong>Answer:</strong> Yes! DCEL Office Suite works on any Android phone, iPhone, tablet, or home computer. Simply visit the company web link or ask IT for the mobile app installation file.</p>
+<hr>
+<h2>8.3 Who to Contact for Technical Support</h2>
+<p>If you run into any issue that is not answered in this handbook:</p>
+<ul>
+<li><strong>Internal IT &amp; Systems Helpdesk:</strong> Call or message the IT office via the Communication Log (<code>/comm-log</code>).</li>
+<li><strong>HR &amp; Payroll Questions:</strong> Contact the HR Department at Head Office.</li>
+<li><strong>Operations &amp; Equipment Requisitions:</strong> Contact the Central Yard Operations Supervisor.</li>
+</ul>
+
+      </section>
+    
+
+</body>
+</html>

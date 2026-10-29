@@ -33,7 +33,17 @@ import { ClientContactsPanel } from './ClientContactsPanel';
 import { CreateTaskDialog } from './Tasks/CreateTaskDialog';
 import { buildSettlementMap } from '@/src/lib/settlementUtils';
 
-const EMPTY_FORM = { name: '', client: '', vat: 'No' as 'Yes' | 'No' | 'Add', status: 'Active' as 'Active' | 'Inactive' | 'Ended', startDate: new Date().toISOString().split('T')[0], endDate: '' };
+const EMPTY_FORM = { 
+  name: '', 
+  client: '', 
+  vat: 'No' as 'Yes' | 'No' | 'Add', 
+  status: 'Active' as 'Active' | 'Inactive' | 'Ended', 
+  startDate: new Date().toISOString().split('T')[0], 
+  endDate: '',
+  projectType: 'DEWATERING' as 'DEWATERING' | 'WATERPROOFING' | 'ALLIED' | 'MAINTENANCE' | 'SALES' | string,
+  contractValue: 0,
+  retentionPercentage: 5.0,
+};
 
 function ClientSummary() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -395,6 +405,16 @@ export function Sites() {
   const setPendingSites = useAppStore((s) => s.setPendingSites);
   const updatePendingSite = useAppStore((s) => s.updatePendingSite);
   const deletePendingSite = useAppStore((s) => s.deletePendingSite);
+  const getServiceTemplates = useAppStore((s) => s.getServiceTemplates);
+
+  const availableServices = useMemo(() => {
+    const list = getServiceTemplates().map(t => t.serviceName.trim()).filter(Boolean);
+    if (!list.some(s => s.toLowerCase() === 'dewatering')) {
+      list.unshift('Dewatering');
+    }
+    return list;
+  }, [getServiceTemplates]);
+
   const { mainTasks, createMainTask, users } = useAppData();
   const { isDark } = useTheme();
 
@@ -785,6 +805,9 @@ export function Sites() {
       status: calcStatus,
       startDate: normalizeDate(addForm.startDate),
       endDate: normalizeDate(addForm.endDate),
+      projectType: addForm.projectType || 'DEWATERING',
+      contractValue: Number(addForm.contractValue) || 0,
+      retentionPercentage: Number(addForm.retentionPercentage) || 5.0,
       ...(addForm.endDate ? {
         currentProgressPercentage: 100,
         currentDewateringStage: 'demobilisation',
@@ -808,7 +831,17 @@ export function Sites() {
 
   const handleEditStart = (site: Site) => {
     setEditingId(site.id);
-    setEditForm({ name: site.name, client: site.client, vat: site.vat, status: site.status, startDate: site.startDate || '', endDate: site.endDate || '' });
+    setEditForm({ 
+      name: site.name, 
+      client: site.client, 
+      vat: site.vat, 
+      status: site.status, 
+      startDate: site.startDate || '', 
+      endDate: site.endDate || '',
+      projectType: site.projectType || 'DEWATERING',
+      contractValue: site.contractValue || 0,
+      retentionPercentage: site.retentionPercentage ?? 5.0,
+    });
   };
 
   const handleSaveEdit = () => {
@@ -838,6 +871,8 @@ export function Sites() {
     updateSite(editingId, {
       ...editForm,
       status: submitStatus,
+      contractValue: Number(editForm.contractValue) || 0,
+      retentionPercentage: Number(editForm.retentionPercentage) || 5.0,
       ...(editForm.endDate ? {
         currentProgressPercentage: 100,
         currentDewateringStage: 'demobilisation',
@@ -1396,6 +1431,8 @@ export function Sites() {
                       Status <SortIcon field="status" />
                     </div>
                   </TableHead>
+                  <TableHead className="w-28 text-center">Service Line</TableHead>
+                  <TableHead className="w-32 text-right">Contract Value</TableHead>
                   {hasActions && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -1486,6 +1523,42 @@ export function Sites() {
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                        {editingId === site.id ? (
+                          <select
+                            value={editForm.projectType || availableServices[0] || 'Dewatering'}
+                            onChange={e => setEditForm({ ...editForm, projectType: e.target.value })}
+                            className="h-8 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 text-xs font-semibold"
+                          >
+                            {availableServices.map(srv => (
+                              <option key={srv} value={srv}>{srv}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300">
+                            {site.projectType || 'DEWATERING'}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-right" onClick={e => e.stopPropagation()}>
+                        {editingId === site.id ? (
+                          <Input
+                            type="number"
+                            value={editForm.contractValue || ''}
+                            onChange={e => setEditForm({ ...editForm, contractValue: parseFloat(e.target.value) || 0 })}
+                            placeholder="Contract ₦"
+                            className="h-8 w-28 text-xs font-mono text-right"
+                          />
+                        ) : (
+                          site.contractValue ? (
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              ₦{Number(site.contractValue).toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600">—</span>
+                          )
+                        )}
                       </TableCell>
                       {hasActions && (
                         <TableCell className="text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
@@ -1625,7 +1698,7 @@ export function Sites() {
                 })}
                 {filteredSites.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={hasActions ? 8 : 7} className="text-center py-12 text-slate-400 italic">
+                    <TableCell colSpan={hasActions ? 10 : 9} className="text-center py-12 text-slate-400 italic">
                       No matching project sites found.
                     </TableCell>
                   </TableRow>
@@ -1713,6 +1786,17 @@ export function Sites() {
                             <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300">{toDisplayDate(site.endDate) || '-'}</span>
                           </div>
                         </div>
+
+                        {site.contractValue ? (
+                          <div className="mb-3 p-2 rounded-sm bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 flex items-center justify-between text-xs">
+                            <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                              {site.projectType || 'DEWATERING'}
+                            </span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                              ₦{Number(site.contractValue).toLocaleString()}
+                            </span>
+                          </div>
+                        ) : null}
 
                         <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800 mt-2">
                           <div className="flex items-center gap-2">

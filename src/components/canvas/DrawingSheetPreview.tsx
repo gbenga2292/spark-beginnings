@@ -20,7 +20,7 @@ import { DewateringSectionView } from './DewateringSectionView';
 import { DewateringInput, DewateringCalculationResult, DEFAULT_DEWATERING_INPUT } from '../../utils/dewateringCalculator';
 
 export interface ExportOptions {
-  layoutFormat: 'combined' | 'multi-view' | 'plan-section' | 'pure-section' | 'pure-2d' | 'pure-3d';
+  layoutFormat: 'combined' | 'multi-view' | 'tri-view-a1' | 'plan-section' | 'pure-section' | 'pure-2d' | 'pure-3d';
   includeSitePlan: boolean;
   includeSectionView: boolean;
   include3DView: boolean;
@@ -309,7 +309,7 @@ const BOMTable: React.FC<{ bomResults: DewateringSimulationResult; compact?: boo
     { label: 'Header Pipes (6m)', qty: bomResults.headers6m, unit: 'No.' },
     { label: 'Header Pipes (3m)', qty: bomResults.headers3m, unit: 'No.' },
     { label: 'Vacuum Pump Units', qty: bomResults.pumps, unit: 'No.' },
-    { label: 'Wellpoint Filters', qty: bomResults.wellpoints, unit: 'No.' },
+    { label: `${bomResults.wellpointLength || 6}m Filter Pipes`, qty: bomResults.wellpoints, unit: 'No.' },
     { label: 'Swing Joints', qty: bomResults.swingJoints, unit: 'No.' },
     { label: 'Elbow Connectors', qty: bomResults.elbows, unit: 'No.' },
     { label: 'Tee Connectors', qty: bomResults.tees, unit: 'No.' },
@@ -859,6 +859,7 @@ const MultiViewSheet: React.FC<DrawingSheetPreviewProps> = ({
                   result={calculationResult}
                   theme="print"
                   hideControls={true}
+                  hideMetrics={true}
                   readOnly={true}
                   className="scale-90 origin-center"
                 />
@@ -902,6 +903,302 @@ const MultiViewSheet: React.FC<DrawingSheetPreviewProps> = ({
           sheetNo="A-103"
           drawingType="Multi-View Master: Plan + Section Profile + 3D Isometric"
           scale="NTS"
+          sheetDetails={sheetDetails}
+          onWidthsChange={onWidthsChange}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────
+   Tri-View Legend Component (Civil Engineering Blueprint Style)
+───────────────────────────────────────────────────────── */
+const TriViewLegend: React.FC = () => {
+  const legendItems = [
+    {
+      label: 'Site boundary',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <line x1="2" y1="6" x2="22" y2="6" stroke="#16a34a" strokeWidth="2.5" />
+          <rect x="1" y="4" width="3" height="4" fill="#16a34a" />
+          <rect x="20" y="4" width="3" height="4" fill="#16a34a" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Excavation area',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <rect x="2" y="2" width="20" height="8" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Header pipe (HDPE)',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <line x1="2" y1="6" x2="22" y2="6" stroke="#0284c7" strokeWidth="3.5" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Wellpoint',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <circle cx="12" cy="6" r="4.5" fill="#0284c7" stroke="#0369a1" strokeWidth="1.5" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Header joint / bend',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <circle cx="12" cy="6" r="4.5" fill="#f59e0b" stroke="#b45309" strokeWidth="1.5" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Dewatering pump',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <rect x="4" y="2" width="14" height="8" rx="1.5" fill="#0284c7" />
+          <rect x="18" y="4" width="3" height="4" fill="#0369a1" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Suction hose',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <line x1="2" y1="6" x2="22" y2="6" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Discharge hose',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <line x1="2" y1="6" x2="18" y2="6" stroke="#f97316" strokeWidth="2.5" />
+          <polygon points="17,3 22,6 17,9" fill="#f97316" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Groundwater level',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <line x1="2" y1="6" x2="22" y2="6" stroke="#0284c7" strokeWidth="2" strokeDasharray="4 2" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Drawdown curve',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <path d="M2,3 Q12,10 22,7" fill="none" stroke="#2563eb" strokeWidth="2" strokeDasharray="3 1 1 1" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Soil / backfill',
+      icon: (
+        <svg width="22" height="12" viewBox="0 0 24 12" className="flex-shrink-0">
+          <rect x="2" y="2" width="20" height="8" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
+          <circle cx="6" cy="5" r="0.8" fill="#94a3b8" />
+          <circle cx="11" cy="7" r="0.8" fill="#94a3b8" />
+          <circle cx="16" cy="4" r="0.8" fill="#94a3b8" />
+          <circle cx="18" cy="8" r="0.8" fill="#94a3b8" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-white select-none">
+      <div className="bg-[#0b2447] text-white px-2 py-0.5 border-b-[2px] border-black flex items-center justify-between">
+        <span className="text-[8.5px] font-black uppercase tracking-wider">LEGEND</span>
+        <span className="text-[6.5px] text-blue-200 font-mono">BS 8004</span>
+      </div>
+      <div className="flex-1 p-1 flex flex-col justify-around text-slate-800">
+        {legendItems.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-1.5 py-0.5 min-w-0">
+            <div className="w-5 flex items-center justify-center flex-shrink-0">{item.icon}</div>
+            <span className="text-[7.5px] font-bold text-slate-900 truncate leading-none">{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────
+   SHEET A1: Civil Engineering Tri-View (Plan + 3D + Section + Tech Data)
+───────────────────────────────────────────────────────── */
+const TriViewA1Sheet: React.FC<DrawingSheetPreviewProps> = ({
+  companyInfo,
+  logoSrc,
+  layoutName,
+  sitePlanDataUrl,
+  perspectiveDataUrl,
+  bomResults,
+  dateStr,
+  exportOptions,
+  sheetDetails,
+  onWidthsChange,
+  calculatorInputs,
+  calculationResult,
+}) => {
+  const showTitleBlock = exportOptions.includeTitleBlock !== false;
+  const effectiveInputs = calculatorInputs || DEFAULT_DEWATERING_INPUT;
+  const L = effectiveInputs.excavationLength || 6.0;
+  const W = effectiveInputs.excavationWidth || 6.0;
+  const D = effectiveInputs.excavationDepth || 4.0;
+  const gwLevel = effectiveInputs.waterTableDepth ?? 2.0;
+  const drawdown = effectiveInputs.requiredDrawdown ?? 1.0;
+  const spacing = 1.5;
+  const totalWp = bomResults?.wellpoints || Math.ceil(((L + W) * 2) / spacing);
+  const pumpQty = bomResults?.pumps || 1;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-white">
+      {/* ── Tier 1: Top Row (2D Plan + 3D Isometric + Legend) ── */}
+      <div className="flex-[4.8] flex border-b-[2px] border-black min-h-0">
+        {/* 01: DEWATERING PLAN VIEW (2D) */}
+        <div className="flex-[4.6] flex flex-col border-r-[2px] border-black min-w-0 relative bg-white">
+          <div className="bg-[#0b2447] text-white px-2 py-0.5 flex items-center border-b-[2px] border-black select-none">
+            <span className="text-[8.5px] font-black uppercase tracking-wider">
+              01 &nbsp; DEWATERING PLAN VIEW (2D)
+            </span>
+          </div>
+          <div className="flex-1 relative flex items-center justify-center p-1 overflow-hidden min-h-0">
+            {/* North Arrow Symbol */}
+            <div className="absolute top-1.5 left-2 z-10 flex flex-col items-center pointer-events-none select-none">
+              <div className="w-5 h-5 rounded-full border border-blue-900 flex items-center justify-center bg-white/90 shadow-xs">
+                <div className="w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-b-[8px] border-b-blue-900 mb-0.5" />
+              </div>
+              <span className="text-[7px] font-black text-blue-900 leading-none mt-0.5">N</span>
+            </div>
+            {sitePlanDataUrl ? (
+              <img src={sitePlanDataUrl} alt="2D Site Plan" className="w-full h-full object-contain" />
+            ) : (
+              <div className="text-gray-400 text-xs font-mono">2D Site Plan Not Available</div>
+            )}
+          </div>
+        </div>
+
+        {/* 02: ISOMETRIC INSTALLATION VIEW (3D) */}
+        <div className="flex-[4.2] flex flex-col border-r-[2px] border-black min-w-0 relative bg-white">
+          <div className="bg-[#0b2447] text-white px-2 py-0.5 flex items-center border-b-[2px] border-black select-none">
+            <span className="text-[8.5px] font-black uppercase tracking-wider">
+              02 &nbsp; ISOMETRIC INSTALLATION VIEW (3D)
+            </span>
+          </div>
+          <div className="flex-1 relative flex items-center justify-center overflow-hidden min-h-0 bg-white">
+            {perspectiveDataUrl ? (
+              <img src={perspectiveDataUrl} alt="3D Isometric View" className="w-full h-full object-contain p-1" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs font-mono">
+                3D Perspective Not Captured
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* LEGEND */}
+        <div className="flex-[2.0] flex flex-col min-w-0 bg-white">
+          <TriViewLegend />
+        </div>
+      </div>
+
+      {/* ── Tier 2: Middle Row (03 SECTION A-A — Full Width) ── */}
+      <div className="flex-[5.5] flex flex-col border-b-[2px] border-black min-h-0 relative bg-white">
+        <div className="bg-[#0b2447] text-white px-2 py-0.5 flex items-center border-b-[2px] border-black select-none">
+          <span className="text-[8.5px] font-black uppercase tracking-wider">
+            03 &nbsp; SECTION A-A — GROUND PROFILE &amp; DRAWDOWN
+          </span>
+        </div>
+        <div className="flex-1 w-full h-full p-1 flex items-center justify-center overflow-hidden min-h-0">
+          <DewateringSectionView
+            inputs={effectiveInputs}
+            result={calculationResult}
+            theme="print"
+            hideControls={true}
+            hideMetrics={true}
+            readOnly={true}
+            className="w-full h-full scale-[0.98] origin-center"
+          />
+        </div>
+      </div>
+
+      {/* ── Tier 3: Technical Data Ribbon ── */}
+      <div className="border-b-[2px] border-black bg-white flex items-stretch select-none flex-shrink-0">
+        <div className="bg-[#0b2447] text-white px-3 py-1 flex items-center justify-center flex-shrink-0 border-r-[2px] border-black">
+          <span className="text-[8px] font-black tracking-widest uppercase">TECHNICAL DATA</span>
+        </div>
+        <div className="flex-1 grid grid-cols-8 divide-x-[1.5px] divide-black text-center py-0.5 bg-slate-50">
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">EXCAVATION DIMENSIONS</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              {L.toFixed(2)}m × {W.toFixed(2)}m × {D.toFixed(2)}m
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">FORMATION LEVEL</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              -{D.toFixed(2)} m (approx.)
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">GROUNDWATER LEVEL</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              -{gwLevel.toFixed(2)} m (approx.)
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">TARGET DRAWDOWN</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              -{drawdown.toFixed(2)} m
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">WELLPOINT SPACING</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              {spacing.toFixed(2)} m (typ.)
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">TOTAL WELLPOINTS</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              {totalWp} pcs (approx)
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">PUMP QUANTITY</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none">
+              {pumpQty} units
+            </span>
+          </div>
+          <div className="px-1 py-0.5 flex flex-col justify-center">
+            <span className="text-[6.5px] font-black uppercase text-gray-600 tracking-tight">DISCHARGE POINT</span>
+            <span className="text-[7.5px] font-black text-gray-900 mt-0.5 leading-none truncate">
+              Safe outlet / drainage
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Tier 4: ISO Title Block ── */}
+      {showTitleBlock && (
+        <TitleBlock
+          companyInfo={companyInfo}
+          logoSrc={logoSrc}
+          layoutName={sheetDetails?.layoutName || layoutName || "MULTI-VIEW MASTER PLAN + SECTION PROFILE"}
+          dateStr={dateStr}
+          sheetNo="A1"
+          drawingType="DEWATERING SYSTEM LAYOUT"
+          scale="NTS"
+          revNo="00"
           sheetDetails={sheetDetails}
           onWidthsChange={onWidthsChange}
         />
@@ -967,6 +1264,7 @@ const PlanSectionSheet: React.FC<DrawingSheetPreviewProps> = ({
                 result={calculationResult}
                 theme="print"
                 hideControls={true}
+                hideMetrics={true}
                 readOnly={true}
                 className="scale-95 origin-center"
               />
@@ -1202,7 +1500,8 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
     regNumber: props.companyInfo?.regNumber || 'RC-141299',
     layoutName: props.layoutName || 'Dewatering System Layout',
     dateStr: props.dateStr || new Date().toLocaleDateString(),
-    sheetNo: layoutFormat === 'combined' ? 'A-100'
+    sheetNo: layoutFormat === 'tri-view-a1' ? 'A1'
+      : layoutFormat === 'combined' ? 'A-100'
       : layoutFormat === 'pure-2d' ? 'A-101'
       : layoutFormat === 'pure-3d' ? 'A-102'
       : layoutFormat === 'multi-view' ? 'A-103'
@@ -1214,7 +1513,8 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
   });
 
   const sheetLabel =
-    layoutFormat === 'combined' ? 'A-100 — Combined Sheet'
+    layoutFormat === 'tri-view-a1' ? 'A1 — Civil Engineering Tri-View (Plan + 3D + Section)'
+    : layoutFormat === 'combined' ? 'A-100 — Combined Sheet'
     : layoutFormat === 'pure-2d' ? 'A-101 — 2D Floor Plan'
     : layoutFormat === 'pure-3d' ? 'A-102 — 3D Perspective'
     : layoutFormat === 'multi-view' ? 'A-103 — Multi-View (Plan + Section + 3D)'
@@ -1266,7 +1566,8 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
             }
             setSheetDetails(prev => ({
               ...prev,
-              sheetNo: nextFmt === 'combined' ? 'A-100'
+              sheetNo: nextFmt === 'tri-view-a1' ? 'A1'
+                : nextFmt === 'combined' ? 'A-100'
                 : nextFmt === 'pure-2d' ? 'A-101'
                 : nextFmt === 'pure-3d' ? 'A-102'
                 : nextFmt === 'multi-view' ? 'A-103'
@@ -1276,6 +1577,7 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
           }}
           className="bg-slate-50 border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-sm"
         >
+          <option value="tri-view-a1">A1: Civil Engineering Tri-View (2D + 3D + Section)</option>
           <option value="multi-view">A-103: Multi-View (Plan + Section + 3D)</option>
           <option value="plan-section">A-104: Plan + Section Profile</option>
           <option value="pure-section">A-105: Cross-Section Blueprint</option>
@@ -1720,6 +2022,7 @@ export const DrawingSheetPreview: React.FC<DrawingSheetPreviewProps> = (props) =
             className="absolute flex flex-col bg-white transition-all duration-150"
             style={{ inset: sheetDetails.marginSize || '3mm' }}
           >
+            {layoutFormat === 'tri-view-a1' && <TriViewA1Sheet {...updatedProps} />}
             {layoutFormat === 'combined' && <CombinedSheet {...updatedProps} />}
             {layoutFormat === 'pure-2d' && <Pure2DSheet {...updatedProps} />}
             {layoutFormat === 'pure-3d' && <Pure3DSheet {...updatedProps} />}

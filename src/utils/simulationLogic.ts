@@ -126,6 +126,8 @@ export interface DewateringSimulationResult {
   dischargeHoseMeters: number;
   totalLengthMeters: number;
   totalPumpCapacity: number; // Total dewatering capacity in m³/h
+  wellpointLength?: number; // m (filter pipe length, e.g. 4.0m, 6.0m)
+  slottedLength?: number; // m (hardcoded to 1.0m from tip up)
 }
 
 export const DEFAULT_HEADER_LENGTH_METERS = 6; 
@@ -140,7 +142,8 @@ export function calculateBOM(
   lines: LineData[], 
   placedComponents: PlacedComponent[] = [],
   scalePxPerMeter: number = PIXELS_PER_METER,
-  hoses: HoseData[] = []
+  hoses: HoseData[] = [],
+  filterPipeLength: number = 6.0
 ): DewateringSimulationResult {
   let totalLengthPx = 0;
   let detectedElbows = 0;
@@ -273,6 +276,8 @@ export function calculateBOM(
     suctionHoses,
     dischargeHoseMeters,
     totalLengthMeters,
-    totalPumpCapacity
+    totalPumpCapacity,
+    wellpointLength: filterPipeLength,
+    slottedLength: 1.0,
   };
 }

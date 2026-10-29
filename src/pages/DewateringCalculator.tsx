@@ -766,8 +766,13 @@ function SiteCrossSection({
   const target = result?.targetDepth || (depth + 0.5);
   const offset = result?.designOffset || 1.0;
 
-  const tipDepth = Math.max(depth + 2.0, 6.0);
-  const maxScaleDepth = Math.max(tipDepth + 1.2, 7.5);
+  const filterPipeLength = inputs.filterPipeLength && inputs.filterPipeLength > 0
+    ? inputs.filterPipeLength
+    : (result?.filterPipeLength || 6.0);
+  const slottedLength = 1.0; // hardcoded 1.0m from tip up
+  const tipDepth = filterPipeLength;
+  const slottedTopDepth = Math.max(0, tipDepth - slottedLength);
+  const maxScaleDepth = Math.max(tipDepth + 1.2, depth + 2.0, 7.5);
 
   const yGL = 58;
   const availH = H - yGL - 35;
@@ -779,6 +784,7 @@ function SiteCrossSection({
   const yWT = getY(wt);
   const yTarget = getY(target);
   const yTip = getY(tipDepth);
+  const ySlottedTop = getY(slottedTopDepth);
 
   const cx = W / 2;
   const pitHalfW = 110;
@@ -848,8 +854,17 @@ function SiteCrossSection({
       {/* Left Wellpoint & Pump */}
       <g>
         <circle cx={wpLeft} cy={yGL} r="3.5" fill="#f59e0b" stroke="#92400e" strokeWidth="1" />
-        <line x1={wpLeft} y1={yGL} x2={wpLeft} y2={yTip} stroke="#64748b" strokeWidth="2" />
-        <line x1={wpLeft} y1={yTip - 24} x2={wpLeft} y2={yTip} stroke="#10b981" strokeWidth="3.6" strokeLinecap="round" />
+        {/* Solid upper riser */}
+        <line x1={wpLeft} y1={yGL} x2={wpLeft} y2={ySlottedTop} stroke="#64748b" strokeWidth="2" />
+        {/* 1.0m Slotted screen from tip up */}
+        <line x1={wpLeft} y1={ySlottedTop} x2={wpLeft} y2={yTip} stroke="#10b981" strokeWidth="3.8" strokeLinecap="round" />
+        {[0.25, 0.5, 0.75].map(ratio => {
+          const ySlot = ySlottedTop + (yTip - ySlottedTop) * ratio;
+          return (
+            <line key={ratio} x1={wpLeft - 3} y1={ySlot} x2={wpLeft + 3} y2={ySlot} stroke="#047857" strokeWidth="1" />
+          );
+        })}
+        <polygon points={`${wpLeft - 2.5},${yTip} ${wpLeft + 2.5},${yTip} ${wpLeft},${yTip + 4}`} fill="#10b981" />
 
         {/* Pump on surface */}
         <rect x={wpLeft - 22} y={yGL - 16} width="16" height="13" fill="#1d4ed8" rx="2" />
@@ -860,16 +875,31 @@ function SiteCrossSection({
         <text x={wpLeft - 5} y={yTip - 6} textAnchor="end" fontSize="7.5" fill={targetText} fontWeight="700">
           FILTER TIP -{tipDepth.toFixed(1)}m
         </text>
+        <text x={wpLeft - 5} y={yTip + 3} textAnchor="end" fontSize="6.5" fill={targetText} fontWeight="600">
+          (1.0m Slotted)
+        </text>
       </g>
 
       {/* Right Wellpoint */}
       {showRightWp && (
         <g>
           <circle cx={wpRight} cy={yGL} r="3.5" fill="#f59e0b" stroke="#92400e" strokeWidth="1" />
-          <line x1={wpRight} y1={yGL} x2={wpRight} y2={yTip} stroke="#64748b" strokeWidth="2" />
-          <line x1={wpRight} y1={yTip - 24} x2={wpRight} y2={yTip} stroke="#10b981" strokeWidth="3.6" strokeLinecap="round" />
+          {/* Solid upper riser */}
+          <line x1={wpRight} y1={yGL} x2={wpRight} y2={ySlottedTop} stroke="#64748b" strokeWidth="2" />
+          {/* 1.0m Slotted screen from tip up */}
+          <line x1={wpRight} y1={ySlottedTop} x2={wpRight} y2={yTip} stroke="#10b981" strokeWidth="3.8" strokeLinecap="round" />
+          {[0.25, 0.5, 0.75].map(ratio => {
+            const ySlot = ySlottedTop + (yTip - ySlottedTop) * ratio;
+            return (
+              <line key={ratio} x1={wpRight - 3} y1={ySlot} x2={wpRight + 3} y2={ySlot} stroke="#047857" strokeWidth="1" />
+            );
+          })}
+          <polygon points={`${wpRight - 2.5},${yTip} ${wpRight + 2.5},${yTip} ${wpRight},${yTip + 4}`} fill="#10b981" />
           <text x={wpRight + 5} y={yTip - 6} textAnchor="start" fontSize="7.5" fill={targetText} fontWeight="700">
             FILTER TIP -{tipDepth.toFixed(1)}m
+          </text>
+          <text x={wpRight + 5} y={yTip + 3} textAnchor="start" fontSize="6.5" fill={targetText} fontWeight="600">
+            (1.0m Slotted)
           </text>
         </g>
       )}
@@ -966,7 +996,7 @@ export default function DewateringCalculator() {
       '',
       `Header pipes, 6m: ${result.headers6m} pcs`,
       ...(result.headers3m > 0 ? [`Header pipes, 3m: ${result.headers3m} pcs`] : []),
-      `Wellpoint filters (1.0m c/c): ${result.filters}`,
+      `${result.filterPipeLength || 6}m filter pipes: ${result.filters} pcs`,
       `Vacuum pumps (100 m3/hr, max 60m): ${result.pumps}`,
       `Elbows: ${result.elbows90} pcs`,
       `Tee connectors: ${result.tees} pcs`,
@@ -1023,17 +1053,18 @@ export default function DewateringCalculator() {
     const pitX = Math.round(centerX - pitW / 2);
     const pitY = Math.round(centerY - pitH / 2);
 
+    const filterLen = inputs.filterPipeLength || 6;
     const glLevel: ElevationLevel = {
       id: 'level-gl',
       name: 'Ground Level (GL 0.0m)',
       depthFromGL: 0,
-      wellpointDepth: Math.max(6, Math.ceil(depth + 1.5)),
+      wellpointDepth: filterLen,
     };
     const pitLevel: ElevationLevel = {
       id: 'level-pit',
       name: `Pit Formation Level (-${depth.toFixed(1)}m)`,
       depthFromGL: depth,
-      wellpointDepth: Math.max(6, Math.ceil(depth + 1.5)),
+      wellpointDepth: filterLen,
     };
 
     const pitArea: AreaData = {
@@ -1604,6 +1635,8 @@ export default function DewateringCalculator() {
                     onChange={v => setField('excavationDepth', v)} />
                   <CompactNumber label="Water Table Depth" value={inputs.waterTableDepth} unit="m"
                     onChange={v => setField('waterTableDepth', v)} />
+                  <CompactNumber label="Filter Pipe Length" value={inputs.filterPipeLength ?? 6} unit="m" min={1} step={0.5}
+                    onChange={v => setField('filterPipeLength', v)} />
                 </div>
               </div>
 
@@ -2062,7 +2095,7 @@ export default function DewateringCalculator() {
                 {/* Clean Single List with Original Naming */}
                 <div className="space-y-0.5">
                   <BoqRow label="Loop perimeter" value={result.loopPerimeter.toFixed(2)} unit="m" />
-                  <BoqRow label="Wellpoint filters (1.0m c/c)" value={result.filters} />
+                  <BoqRow label={`${result.filterPipeLength || 6}m filter pipes`} value={result.filters} unit="pcs" />
                   <BoqRow
                     label="Vacuum pumps (100 m3/hr, max 60m)"
                     value={result.pumps}
@@ -2314,10 +2347,10 @@ function PrintSpecificationView({
                           <td className="py-1 px-3 text-center text-slate-500">m</td>
                         </tr>
                         <tr>
-                          <td className="py-1 px-3 font-medium text-slate-900">Wellpoint filters (1.0m c/c)</td>
-                          <td className="py-1 px-3 text-slate-500 text-[10px]">Self-jetting 1.0m spaced wellpoints</td>
+                          <td className="py-1 px-3 font-medium text-slate-900">{result.filterPipeLength || 6}m filter pipes</td>
+                          <td className="py-1 px-3 text-slate-500 text-[10px]">Riser pipe with 1.0m slotted intake screen (1.0m c/c)</td>
                           <td className="py-1 px-3 text-right font-mono font-bold text-amber-600">{result.filters}</td>
-                          <td className="py-1 px-3 text-center text-slate-500">units</td>
+                          <td className="py-1 px-3 text-center text-slate-500">pcs</td>
                         </tr>
                         <tr>
                           <td className="py-1 px-3 font-medium text-slate-900">Vacuum pumps (100 m3/hr, max 60m)</td>
@@ -2457,9 +2490,9 @@ function PrintSpecificationView({
                             <td className="py-0.5 px-2 text-center text-slate-500">m</td>
                           </tr>
                           <tr>
-                            <td className="py-0.5 px-2.5 font-medium text-slate-900">Wellpoint filters (1.0m c/c)</td>
+                            <td className="py-0.5 px-2.5 font-medium text-slate-900">{result.filterPipeLength || 6}m filter pipes</td>
                             <td className="py-0.5 px-2.5 text-right font-mono font-bold text-amber-600">{result.filters}</td>
-                            <td className="py-0.5 px-2 text-center text-slate-500">units</td>
+                            <td className="py-0.5 px-2 text-center text-slate-500">pcs</td>
                           </tr>
                           <tr>
                             <td className="py-0.5 px-2.5 font-medium text-slate-900">Vacuum pumps (100 m3/hr, max 60m)</td>

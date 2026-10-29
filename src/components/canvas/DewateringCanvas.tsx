@@ -900,9 +900,9 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
 
       placedComponents.forEach((c: any) => {
         if (c.type === 'pump' && isConnTool) {
-          // Calculate suction and discharge based on flipped state and rotation
-          const sOffset = c.flipped ? { x: 20, y: 0 } : { x: -20, y: 0 };
-          const dOffset = c.flipped ? { x: -20, y: 0 } : { x: 20, y: 0 };
+          // Calculate suction and discharge based on flipped state and rotation (1.7m length = 17px, offset ±8.5px)
+          const sOffset = c.flipped ? { x: 8.5, y: 0 } : { x: -8.5, y: 0 };
+          const dOffset = c.flipped ? { x: -8.5, y: 0 } : { x: 8.5, y: 0 };
           const sRot = rotatePort(sOffset.x, sOffset.y, c.rotation || 0);
           const dRot = rotatePort(dOffset.x, dOffset.y, c.rotation || 0);
           const suctionPt = { x: c.x + sRot.x, y: c.y + sRot.y };
@@ -2882,12 +2882,14 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
       case 'pump': {
         const flowRate = comp.flowRate ?? 150;
         const isFlipped = !!comp.flipped;
-        // Normal: Suction on left (-20), Discharge on right (+20)
-        // Flipped: Suction on right (+20), Discharge on left (-20)
-        const suctionX = isFlipped ? 20 : -20;
-        const dischargeX = isFlipped ? -20 : 20;
-        const suctionLabelX = isFlipped ? 26 : -58;
-        const dischargeLabelX = isFlipped ? -62 : 26;
+        // 1.7m length x 0.9m width @ 10px/m (PIXELS_PER_METER = 10):
+        // Half-length = 8.5px, Half-width = 4.5px
+        // Normal: Suction on left (-8.5), Discharge on right (+8.5)
+        // Flipped: Suction on right (+8.5), Discharge on left (-8.5)
+        const suctionX = isFlipped ? 8.5 : -8.5;
+        const dischargeX = isFlipped ? -8.5 : 8.5;
+        const suctionLabelX = isFlipped ? 13 : -38;
+        const dischargeLabelX = isFlipped ? -42 : 13;
 
         return (
           <Group 
@@ -2897,40 +2899,36 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
             rotation={comp.rotation || 0}
             {...base}
           >
-            {isLocked && <Text x={-5} y={-30} text="📌" fontSize={14} rotation={-(comp.rotation || 0)} listening={false} />}
-            {/* Pump body shadow */}
-            <Rect x={-22} y={-17} width={44} height={34} fill="rgba(0,0,0,0.1)" cornerRadius={3} listening={false} />
-            {/* Main pump block */}
-            <Rect x={-20} y={-15} width={40} height={30} fill={del ? '#fca5a5' : '#0ea5e9'} stroke={isSelected ? '#fbbf24' : '#0284c7'} strokeWidth={isSelected ? 2.5 : 2} cornerRadius={2} />
-            <Rect x={-10} y={-8} width={20} height={16} fill="#bae6fd" />
+            {isLocked && <Text x={-4} y={-20} text="📌" fontSize={11} rotation={-(comp.rotation || 0)} listening={false} />}
+            {/* Pump body shadow (19px x 11px) */}
+            <Rect x={-9.5} y={-5.5} width={19} height={11} fill="rgba(0,0,0,0.12)" cornerRadius={2} listening={false} />
+            {/* Main pump block (17px x 9px = 1.7m x 0.9m) */}
+            <Rect x={-8.5} y={-4.5} width={17} height={9} fill={del ? '#fca5a5' : '#0ea5e9'} stroke={isSelected ? '#fbbf24' : '#0284c7'} strokeWidth={isSelected ? 2 : 1.5} cornerRadius={1.5} />
+            {/* Engine / pump chamber interior accent */}
+            <Rect x={-4.5} y={-2.5} width={9} height={5} fill="#bae6fd" />
             
             {/* Suction port indicator */}
-            <Circle x={suctionX} y={0} radius={5} fill="#fbbf24" stroke="#78350f" strokeWidth={1} />
-            <Circle x={suctionX} y={0} radius={2} fill="#fff" />
-            <Text x={suctionLabelX} y={-4} text="Suction" fill="#78350f" fontSize={7} fontStyle="bold" listening={false} />
+            <Circle x={suctionX} y={0} radius={3} fill="#fbbf24" stroke="#78350f" strokeWidth={1} />
+            <Circle x={suctionX} y={0} radius={1.2} fill="#fff" />
+            <Text x={suctionLabelX} y={-3.5} text="Suct." fill="#78350f" fontSize={6} fontStyle="bold" listening={false} />
 
             {/* Discharge port indicator */}
-            <Circle x={dischargeX} y={0} radius={5} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={1} />
-            <Circle x={dischargeX} y={0} radius={2} fill="#fff" />
-            <Text x={dischargeLabelX} y={-4} text="Discharge" fill="#1d4ed8" fontSize={7} fontStyle="bold" listening={false} />
+            <Circle x={dischargeX} y={0} radius={3} fill="#3b82f6" stroke="#1d4ed8" strokeWidth={1} />
+            <Circle x={dischargeX} y={0} radius={1.2} fill="#fff" />
+            <Text x={dischargeLabelX} y={-3.5} text="Disch." fill="#1d4ed8" fontSize={6} fontStyle="bold" listening={false} />
 
             {/* Directional Flow Arrow Dash from Suction to Discharge */}
             <Line
-              points={isFlipped ? [10, 0, -10, 0] : [-10, 0, 10, 0]}
+              points={isFlipped ? [3.5, 0, -3.5, 0] : [-3.5, 0, 3.5, 0]}
               stroke="#0369a1"
-              strokeWidth={1.5}
-              dash={[3, 2]}
+              strokeWidth={1}
+              dash={[2, 1.5]}
               listening={false}
             />
 
-            {/* Labels */}
-            <Text x={-35} y={-28} text={comp.label || "Dewatering Pump"} fill="#0284c7" fontSize={9} fontStyle="bold" listening={false} />
-            <Text x={-35} y={19} text={`Cap: ${flowRate} m³/h`} fill="#475569" fontSize={8} fontStyle="bold" listening={false} />
-
-            {/* Interactive hint when selected */}
-            {isSelected && (
-              <Text x={-36} y={-38} text="↺ rotate · ⇄ flip · ⚙ flow" fill="#f59e0b" fontSize={7} fontStyle="bold" listening={false} />
-            )}
+            {/* Labels (Compact & neatly positioned above/below) */}
+            <Text x={-26} y={-14} text={comp.label || "Dewatering Pump"} fill="#0284c7" fontSize={7.5} fontStyle="bold" listening={false} />
+            <Text x={-20} y={6.5} text={`Cap: ${flowRate} m³/h`} fill="#475569" fontSize={6.5} fontStyle="bold" listening={false} />
           </Group>
         );
       }
@@ -2973,9 +2971,6 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 <Circle x={0} y={8} radius={2} fill="#facc15" listening={false} />
               </>
             )}
-
-            {/* Flip hint when selected */}
-            {isSelected && <Text x={-18} y={-16} text="↺ rotate" fill="#f59e0b" fontSize={7} fontStyle="bold" listening={false} />}
           </Group>
         );
       }
@@ -3016,8 +3011,6 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 <Circle x={0} y={12} radius={2} fill="#06b6d4" listening={false} />
               </>
             )}
-
-            {isSelected && <Text x={-18} y={-20} text="↺ rotate" fill="#f59e0b" fontSize={7} fontStyle="bold" listening={false} />}
           </Group>
         );
       }
@@ -3049,8 +3042,6 @@ export const DewateringCanvas: React.FC<DewateringCanvasProps> = ({
                 <Circle x={0} y={0} radius={2.5} fill="#06b6d4" listening={false} />
               </>
             )}
-
-            {isSelected && <Text x={-18} y={-36} text="↺ rotate" fill="#0284c7" fontSize={7} fontStyle="bold" listening={false} />}
           </Group>
         );
       }

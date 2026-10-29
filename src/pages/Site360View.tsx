@@ -11,11 +11,13 @@ import {
   CheckSquare, ShieldAlert, ShieldCheck, ClipboardList, Package, Truck, X, Phone, Mail, Droplets,
   PauseCircle, PlayCircle, History, RotateCcw,
   Zap, ListPlus, Check, ListTodo,
+  TrendingUp, Calculator, Coins,
 } from 'lucide-react';
 
 import { Badge } from '@/src/components/ui/badge';
 import { Button } from '@/src/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/src/components/ui/dialog';
+import { Input } from '@/src/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/src/components/ui/dialog';
 import { cn } from '@/src/lib/utils';
 import { useTheme } from '@/src/hooks/useTheme';
 import { toast } from 'sonner';
@@ -319,7 +321,7 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [showCommDialog, setShowCommDialog] = useState(false);
   const [finTab, setFinTab] = useState<'invoices' | 'payments' | 'expenses' | 'vat'>('invoices');
 
-  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets, sitePumpDates, siteHoldPeriods, addSiteHold, endSiteHold } = useOperations();
+  const { dailyMachineLogs, maintenanceAssets, maintenanceSessions, waybills, assets, sitePumpDates, siteHoldPeriods, addSiteHold, endSiteHold, dieselRefills } = useOperations();
   const { mainTasks, subtasks } = useAppData();
 
   // ── Site Hold state & handlers ───────────────────────────────────────────
@@ -374,12 +376,30 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   }, [invoices, payments]);
 
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
+  const vendorInvoices = useAppStore(s => s.vendorInvoices || []);
+  const updateSite = useAppStore(s => s.updateSite);
   const vatRate = useAppStore(s => s.payrollVariables.vatRate);
   const commLogs = useAppStore(s => s.commLogs);
   const addCommLog = useAppStore(s => s.addCommLog);
   const clientContacts = useAppStore(s => s.clientContacts);
   const dailyJournals = useAppStore(s => s.dailyJournals);
   const siteJournalEntries = useAppStore(s => s.siteJournalEntries);
+  const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
+
+  const availableServices = useMemo(() => {
+    const list = getServiceTemplates().map(t => t.serviceName.trim()).filter(Boolean);
+    if (!list.some(s => s.toLowerCase() === 'dewatering')) {
+      list.unshift('Dewatering');
+    }
+    return list;
+  }, [getServiceTemplates]);
+
+  // ── Site Contract & Job Costing Modal State ──────────────────────────────
+  const [showContractEditModal, setShowContractEditModal] = useState(false);
+  const [contractValInput, setContractValInput] = useState<number>(site.contractValue || 0);
+  const [projectTypeInput, setProjectTypeInput] = useState<string>(site.projectType || 'Dewatering');
+  const [retentionPctInput, setRetentionPctInput] = useState<number>(site.retentionPercentage ?? 5.0);
+  const [isSavingContract, setIsSavingContract] = useState(false);
 
   const getInvoiceDates = (inv: any) => {
     const startDate = normalizeDate(inv.startDate || inv.date);
@@ -859,6 +879,25 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
     const activePumpsCount = pumpsOnSite.filter(p => !p.pumpStopDate).length;
 
+    // Job Costing aggregations
+    const contractValue = site.contractValue || 0;
+    const projectType = site.projectType || 'DEWATERING';
+    const retentionPercentage = site.retentionPercentage ?? 5.0;
+
+    const totalDieselCost = (dieselRefills || [])
+      .filter(r => (r.siteId === site.id || r.siteName?.trim().toLowerCase() === site.name.trim().toLowerCase()) && isWithinFilter(r.date))
+      .reduce((sum, r) => sum + (r.totalCost || 0), 0);
+
+    const totalVendorCost = (vendorInvoices || [])
+      .filter(v => ((v as any).siteId === site.id || (v as any).site_id === site.id || (v as any).siteName?.trim().toLowerCase() === site.name.trim().toLowerCase() || (v as any).site_name?.trim().toLowerCase() === site.name.trim().toLowerCase()) && isWithinFilter(v.dateReceived))
+      .reduce((sum, v) => sum + (Number(v.totalAmount) || 0), 0);
+
+    const totalDirectCosts = totalDieselCost + totalVendorCost + totalCost;
+    const grossMargin = totalBilled - totalDirectCosts;
+    const marginPct = totalBilled > 0 ? (grossMargin / totalBilled) * 100 : 0;
+    const billedVsContractPct = contractValue > 0 ? (totalBilled / contractValue) * 100 : null;
+    const estimatedRetentionWithheld = (totalBilled * (retentionPercentage / 100));
+
     return {
       siteInvoices, sitePayments, siteCosts, totalBilled, totalReceived, outstanding, vatGenerated, totalCost,
       periodVatCollected, unpaidVatBroughtForward, periodVatRemitted, totalVatRemitted,
@@ -868,8 +907,11 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
       siteTasks, pendingSiteTasks, approvalSiteTasks, completedSiteTasks, siteComms, siteContacts, alerts,
       profit: totalBilled - totalCost,
       pumpsOnSite, earliestPumpStart, latestPumpStop, activePumpsCount,
+      contractValue, projectType, retentionPercentage,
+      totalDieselCost, totalVendorCost, totalDirectCosts,
+      grossMargin, marginPct, billedVsContractPct, estimatedRetentionWithheld,
     };
-  }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets, sitePumpDates]);
+  }, [site, filterMonth, filterYear, invoices, payments, vatPayments, ledgerEntries, vatRate, dailyMachineLogs, maintenanceAssets, maintenanceSessions, mainTasks, subtasks, commLogs, clientContacts, waybills, assets, sitePumpDates, dieselRefills, vendorInvoices]);
 
   const card = cn('p-4 sm:p-5 rounded-md border shadow-none', isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200');
 
@@ -1609,7 +1651,136 @@ Answer site-specific questions and field progress accurately using this context.
 
             {/* FINANCIALS */}
             {activeTab === 'financials' && (
-              <div className="space-y-3 transition-opacity duration-150">
+              <div className="space-y-4 transition-opacity duration-150">
+                {/* Executive Job Costing & Profitability Summary Banner */}
+                {currentUser?.privileges?.billing?.canViewAmounts && (
+                  <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                          <TrendingUp className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-900 dark:text-white text-base">Site Job Costing & Profitability</h3>
+                            <Badge className={cn(
+                              "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 border",
+                              data.projectType === 'DEWATERING' ? "bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200" :
+                              data.projectType === 'WATERPROOFING' ? "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-200" :
+                              data.projectType === 'ALLIED' ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200" :
+                              data.projectType === 'MAINTENANCE' ? "bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200" :
+                              "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200"
+                            )}>
+                              {data.projectType}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">Direct site costs vs. client billing & contract value</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setContractValInput(site.contractValue || 0);
+                            setProjectTypeInput(site.projectType || 'DEWATERING');
+                            setRetentionPctInput(site.retentionPercentage ?? 5.0);
+                            setShowContractEditModal(true);
+                          }}
+                          className="h-8 text-xs font-semibold gap-1.5 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit Contract</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* KPI Grid */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      {/* 1. Contract Value */}
+                      <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Contract Value</span>
+                        <p className="text-lg font-black font-mono text-slate-900 dark:text-white">
+                          {data.contractValue > 0 ? `₦${Math.round(data.contractValue).toLocaleString()}` : <span className="text-slate-400 text-sm font-normal">Not Set</span>}
+                        </p>
+                        <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                          <span>Billed:</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{data.billedVsContractPct !== null ? `${data.billedVsContractPct.toFixed(1)}%` : '—'}</span>
+                        </div>
+                      </div>
+
+                      {/* 2. Total Billed */}
+                      <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Billed</span>
+                        <p className="text-lg font-black font-mono text-blue-600 dark:text-blue-400">
+                          ₦{Math.round(data.totalBilled).toLocaleString()}
+                        </p>
+                        <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                          <span>Invoices:</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">{data.siteInvoices.length} issued</span>
+                        </div>
+                      </div>
+
+                      {/* 3. Total Direct Costs */}
+                      <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Direct Site Costs</span>
+                        <p className="text-lg font-black font-mono text-rose-600 dark:text-rose-400">
+                          ₦{Math.round(data.totalDirectCosts).toLocaleString()}
+                        </p>
+                        <div className="text-[10px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                          <span>Diesel: ₦{Math.round(data.totalDieselCost).toLocaleString()}</span>
+                          <span>·</span>
+                          <span>Ops: ₦{Math.round(data.totalCost).toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {/* 4. Gross Margin */}
+                      <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 space-y-1">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Est. Gross Margin</span>
+                        <p className={cn(
+                          "text-lg font-black font-mono",
+                          data.grossMargin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                        )}>
+                          ₦{Math.round(data.grossMargin).toLocaleString()}
+                        </p>
+                        <div className="text-[11px] flex items-center justify-between">
+                          <span className="text-slate-500">Margin:</span>
+                          <span className={cn(
+                            "font-bold px-1.5 py-0.5 rounded text-[11px]",
+                            data.marginPct >= 40 ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 dark:text-emerald-300" :
+                            data.marginPct >= 15 ? "text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300" :
+                            "text-rose-700 bg-rose-50 dark:bg-rose-950/60 dark:text-rose-300"
+                          )}>
+                            {data.marginPct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar of Billing against Contract Value */}
+                    {data.contractValue > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span>Contract Billing Progress</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
+                            ₦{Math.round(data.totalBilled).toLocaleString()} of ₦{Math.round(data.contractValue).toLocaleString()} ({data.billedVsContractPct?.toFixed(1)}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              (data.billedVsContractPct || 0) > 100 ? "bg-amber-500" : "bg-blue-600"
+                            )}
+                            style={{ width: `${Math.min(100, data.billedVsContractPct || 0)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Flat Financial Segmented Pills */}
                 <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-800 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
                   {[
@@ -2655,8 +2826,107 @@ Answer site-specific questions and field progress accurately using this context.
           currentUserId={currentUser?.id || authUser?.id || ""}
           teamId={workspaceId || "dcel-team"}
           workspaceId={workspaceId || "dcel-team"}
-          isDarkTheme={isDark}
         />
+      )}
+
+      {showContractEditModal && (
+        <Dialog open={showContractEditModal} onOpenChange={setShowContractEditModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                <Calculator className="w-5 h-5 text-blue-600" />
+                <span>Site Contract & Job Costing</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Update contract billing target and project classification for <span className="font-semibold text-slate-800 dark:text-slate-200">{site.name}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Project Type / Service Line
+                </label>
+                <select
+                  value={projectTypeInput}
+                  onChange={e => setProjectTypeInput(e.target.value)}
+                  className="w-full h-9 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 text-xs font-medium"
+                >
+                  {availableServices.map(srv => (
+                    <option key={srv} value={srv}>{srv}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Contract Value (₦)
+                </label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 45000000"
+                  value={contractValInput || ''}
+                  onChange={e => setContractValInput(parseFloat(e.target.value) || 0)}
+                  className="h-9 font-mono text-sm"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Total agreed contract/PO value before taxes.</p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Retention Rate (%)
+                </label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  placeholder="5.0"
+                  value={retentionPctInput}
+                  onChange={e => setRetentionPctInput(parseFloat(e.target.value) || 0)}
+                  className="h-9 font-mono text-sm"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">Standard construction contract retention is 5.0% to 10.0%.</p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setShowContractEditModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={isSavingContract}
+                onClick={async () => {
+                  setIsSavingContract(true);
+                  try {
+                    updateSite(site.id, {
+                      contractValue: contractValInput,
+                      projectType: projectTypeInput,
+                      retentionPercentage: retentionPctInput,
+                    });
+                    site.contractValue = contractValInput;
+                    site.projectType = projectTypeInput;
+                    site.retentionPercentage = retentionPctInput;
+                    onSiteChange({
+                      ...site,
+                      contractValue: contractValInput,
+                      projectType: projectTypeInput,
+                      retentionPercentage: retentionPctInput,
+                    });
+                    toast.success('Contract details updated successfully!');
+                    setShowContractEditModal(false);
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to update contract');
+                  } finally {
+                    setIsSavingContract(false);
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              >
+                {isSavingContract ? 'Saving...' : 'Save Contract Details'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -270,6 +270,34 @@ export function SiteDetailDialog({ site, filterMonth, filterYear, onClose, onEdi
           {/* ── FINANCIALS TAB ── */}
           {activeTab === 'financials' && (
             <div className="space-y-5">
+              {/* Job Costing & Contract Header Banner */}
+              <div className={cn(card, "bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-slate-900 dark:to-slate-900 border-blue-200/60 dark:border-blue-900/40 p-4")}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                        Service Line: {site.projectType || 'DEWATERING'}
+                      </span>
+                      <Badge variant="outline" className="text-[10px] font-mono border-blue-300 dark:border-blue-700">
+                        Retention: {site.retentionPercentage ?? 5.0}%
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mt-1">
+                      Agreed Contract Target: <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">{site.contractValue ? `₦${Number(site.contractValue).toLocaleString()}` : 'Not Specified'}</span>
+                    </p>
+                  </div>
+
+                  {site.contractValue && site.contractValue > 0 ? (
+                    <div className="text-right">
+                      <p className="text-[11px] text-slate-500 font-medium">Contract Realized</p>
+                      <p className="text-base font-black font-mono text-blue-600 dark:text-blue-400">
+                        {((data.totalBilled / site.contractValue) * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
               {/* KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[

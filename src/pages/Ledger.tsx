@@ -17,6 +17,7 @@ import { toast, showConfirm } from '@/src/components/ui/toast';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { generateId, cn } from '@/src/lib/utils';
 import { fetchLedgerData } from '@/src/lib/supabaseService';
+import { DCEL_CHART_OF_ACCOUNTS } from '@/src/constants/chartOfAccounts';
 
 export type VatMode = 'No' | 'Yes' | 'Add';
 
@@ -1417,10 +1418,17 @@ export function Ledger() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Category</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Category / Account</label>
                         <select className="w-full h-9 px-2 rounded-md border border-slate-200 text-xs bg-white truncate" value={item.category} onChange={e => setItemField(idx, 'category', e.target.value)}>
-                          <option value="">Select...</option>
-                          {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                          <option value="">Select Category / Account...</option>
+                          <optgroup label="Chart of Accounts (COA - Direct & Operating Costs)">
+                            {DCEL_CHART_OF_ACCOUNTS.filter(a => a.type === 'EXPENSE').map(a => (
+                              <option key={a.code} value={`${a.code} - ${a.name}`}>{a.code} · {a.name}</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="General Categories">
+                            {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                          </optgroup>
                         </select>
                       </div>
                       <div className="space-y-1.5">
@@ -1559,8 +1567,15 @@ export function Ledger() {
                     </td>
                     <td className={tdClass}>
                       <select className={inputClass} value={item.category} onChange={e => setItemField(idx, 'category', e.target.value)}>
-                        <option value=""></option>
-                        {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        <option value="">Select Category / Account</option>
+                        <optgroup label="Chart of Accounts (COA - Direct & Operating Costs)">
+                          {DCEL_CHART_OF_ACCOUNTS.filter(a => a.type === 'EXPENSE').map(a => (
+                            <option key={a.code} value={`${a.code} - ${a.name}`}>{a.code} · {a.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="General Categories">
+                          {sortedCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </optgroup>
                       </select>
                     </td>
                     <td className={tdClass}>

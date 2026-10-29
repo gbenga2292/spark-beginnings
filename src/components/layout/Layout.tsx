@@ -32,6 +32,9 @@ export function Layout() {
   // On the /home launchpad, hide the sidebar entirely
   const isHomePage = location.pathname === '/home' || hideLayout;
 
+  // On the simulator, hide the global app header — DewaterCAD has its own ribbon
+  const isSimulator = location.pathname.includes('/simulator');
+
   // Start network monitoring
   useEffect(() => {
     const cleanup = startNetworkMonitor();
@@ -111,12 +114,12 @@ export function Layout() {
           </div>
         )}
 
-        {!isHomePage && <Header onMenuClick={() => setIsSidebarOpen(true)} />}
+        {!isHomePage && !isSimulator && <Header onMenuClick={() => setIsSidebarOpen(true)} />}
         <div className="flex-1 relative overflow-hidden">
           <main 
             ref={mainRef}
             className={`h-full w-full ${
-              isHomePage ? 'overflow-hidden' : 'overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6'
+              isHomePage || isSimulator ? 'overflow-hidden' : 'overflow-y-auto pt-4 px-2 pb-4 md:pt-4 md:px-6 md:pb-6'
             } ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}
           >
             <Outlet />

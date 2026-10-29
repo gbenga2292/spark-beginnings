@@ -1,7 +1,7 @@
 {
   "name": "dcel-office-app",
   "private": true,
-  "version": "2.1.8",
+  "version": "2.1.9",
   "description": "DCEL Office Suite - Comprehensive HR and Operations Management for Construction",
   "author": "Alconsult",
   "type": "module",
@@ -27,7 +27,9 @@
     "android:open": "cap open android",
     "android:build": "npm run build && npx cap sync android",
     "build:web": "vite build --outDir dist-web",
-    "dev:web": "vite --port=3001"
+    "dev:web": "vite --port=3001",
+    "manual:pdf": "node scripts/compile-manual-pdf.mjs",
+    "manual:screenshots": "npx tsx scripts/capture-manual-screenshots.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
@@ -121,8 +123,11 @@
     "autoprefixer": "^10.4.21",
     "electron": "^41.0.0",
     "electron-builder": "^26.8.1",
+    "marked": "^18.1.2",
     "patch-package": "^8.0.0",
+    "playwright": "^1.64.1",
     "postinstall-postinstall": "^2.1.0",
+    "puppeteer-core": "^25.16.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

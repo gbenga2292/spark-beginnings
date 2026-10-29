@@ -33,6 +33,7 @@ export interface DewateringInput {
   customPumps?: number; // User override for total number of pumps
   pumpSides?: PumpSide[]; // Configured sides for pumps
   dischargeDirection?: PumpSide; // Designated direction for all pump discharge lines (default: 'east')
+  filterPipeLength?: number; // m (length of filter pipes / riser, e.g. 4.0m, 6.0m)
 }
 
 export interface RunSegment {
@@ -65,6 +66,9 @@ export interface DewateringCalculationResult {
   runs: RunSegment[];
   loopPerimeter: number; // total active line length (m)
   filters: number; // wellpoint filters (1.0m c/c)
+  filterPipeLength: number; // m (length of filter pipe, e.g. 4m, 6m)
+  filterTipDepth: number; // m b.g.l. (-filterPipeLength)
+  slottedLength: number; // m (hardcoded 1.0m slotted intake screen from tip up)
   pumps: number; // vacuum pumps
   predictedPumps: number; // auto-calculated vacuum pumps
   isPumpsOverridden: boolean;
@@ -134,6 +138,7 @@ export const EMPTY_DEWATERING_INPUT: DewateringInput = {
   manualOffset: 1.0,
   minOffset: 0.75,
   dischargeDirection: 'east',
+  filterPipeLength: 6.0,
 };
 
 export const DEFAULT_DEWATERING_INPUT: DewateringInput = {
@@ -153,6 +158,7 @@ export const DEFAULT_DEWATERING_INPUT: DewateringInput = {
   manualOffset: 1.0,
   minOffset: 0.75,
   dischargeDirection: 'east',
+  filterPipeLength: 6.0,
 };
 
 export const PRESET_SCENARIOS: {
@@ -568,6 +574,11 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
 
   // Step 5: Wellpoints / Filters (1.0m c/c along active lines)
   const filters = Math.max(4, Math.ceil(loopPerimeter / 1.0));
+  const filterPipeLength = typeof inputs.filterPipeLength === 'number' && inputs.filterPipeLength > 0
+    ? inputs.filterPipeLength
+    : 6.0;
+  const filterTipDepth = filterPipeLength;
+  const slottedLength = 1.0; // 1.0m slotted intake portion hardcoded from tip upward
 
   // Step 6: Pumps (100 m³/hr vacuum pumps, max 60m header coverage per pump)
   const predictedPumps = Math.max(1, Math.ceil(loopPerimeter / 60));
@@ -658,6 +669,9 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
     runs,
     loopPerimeter,
     filters,
+    filterPipeLength,
+    filterTipDepth,
+    slottedLength,
     pumps,
     predictedPumps,
     isPumpsOverridden,
@@ -685,6 +699,7 @@ function createErrorResult(
   const target = inputs.excavationDepth + (inputs.requiredDrawdown || 0.5);
   const offsetL = (inputs.landLength - inputs.excavationLength) / 2;
   const offsetW = (inputs.landWidth - inputs.excavationWidth) / 2;
+  const filterPipeLength = inputs.filterPipeLength || 6.0;
 
   return {
     status: 'ERROR',
@@ -704,6 +719,9 @@ function createErrorResult(
     runs: [],
     loopPerimeter: 0,
     filters: 0,
+    filterPipeLength,
+    filterTipDepth: filterPipeLength,
+    slottedLength: 1.0,
     pumps: 0,
     predictedPumps: 0,
     isPumpsOverridden: false,
