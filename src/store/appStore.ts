@@ -4,6 +4,7 @@ import { db, fetchAttendanceByYear, fetchLedgerByYear } from '@/src/lib/supabase
 import { SiteQuestionnaire } from '@/src/types/SiteQuestionnaire';
 import { Vehicle, VehicleTripLeg, VehicleDocumentType, ConsumableUsageLog } from '@/src/types/operations';
 import { InterviewCandidate } from '@/src/types/interviews';
+import { ChartAccount, DCEL_CHART_OF_ACCOUNTS, DEFAULT_CATEGORY_COA_MAP } from '@/src/constants/chartOfAccounts';
 import { openDB } from 'idb';
 
 const dbPromise = openDB('dcel-hr-db', 1, {
@@ -454,6 +455,11 @@ export interface MonthlySalary {
   sep: number; oct: number; nov: number; dec: number;
 }
 
+export interface YearlyCompensation {
+  monthlySalaries: MonthlySalary;
+  rent: number;
+}
+
 export interface OnboardingTask {
   id: string;
   title: string;
@@ -564,6 +570,9 @@ export interface Employee {
   lineManager?: string;            // ID of the line manager (typically CEO or Head of Dept)
   phone?: string;
   email?: string;
+  address?: string;
+  dateOfBirth?: string;
+  yearlyCompensation?: Record<string, YearlyCompensation>;
   payeeType?: string;
   typeOfPay?: string;
   startMonthOfPay?: string;
@@ -1185,6 +1194,8 @@ interface AppState {
     periodStartDay: number;
     departmentWorkDays?: Record<string, number>;
     defaultVatableSections?: InvoiceVatableSections;
+    chartOfAccounts?: ChartAccount[];
+    categoryCoaMap?: Record<string, string>;
   };
   updatePayrollVariables: (variables: Partial<AppState['payrollVariables']>) => void;
   payeTaxVariables: {
@@ -1347,6 +1358,8 @@ export const useAppStore = create<AppState>()(
           installation: true,
           damages: false,
         },
+        chartOfAccounts: [...DCEL_CHART_OF_ACCOUNTS],
+        categoryCoaMap: { ...DEFAULT_CATEGORY_COA_MAP },
       },
       payeTaxVariables: {
         craBase: 800000, rentReliefRate: 0.20,

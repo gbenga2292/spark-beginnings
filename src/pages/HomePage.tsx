@@ -275,6 +275,7 @@ export function HomePage() {
           { name: 'Asset Maintenance', href: '/operations/maintenance', icon: Cpu, privKey: 'opsMaintenance', privField: 'canView' },
           { name: 'Diesel Refills', href: '/operations/diesel', icon: Cpu, privKey: 'opsDiesel', privField: 'canView' },
           { name: 'Fleet Vehicles', href: '/operations/vehicles', icon: Cpu, privKey: 'opsVehicles', privField: 'canView' },
+          { name: 'Damage Logs', href: '/operations/damages', icon: Cpu, privKey: 'opsDamages', privField: 'canView' },
           { name: 'Active Sites', href: '/operations/sites', icon: Cpu, privKey: 'opsSites', privField: 'canView' },
         ],
       },

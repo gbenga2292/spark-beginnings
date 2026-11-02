@@ -187,6 +187,7 @@ export const navigation: NavCategory[] = [
       { name: 'Maintenance', href: '/operations/maintenance', icon: Activity, privKey: 'opsMaintenance', privField: 'canView' },
       { name: 'Diesel Refill', href: '/operations/diesel', icon: Fuel, privKey: 'opsDiesel', privField: 'canView' },
       { name: 'Vehicles', href: '/operations/vehicles', icon: Truck, privKey: 'opsVehicles', privField: 'canView' },
+      { name: 'Damage Logs', href: '/operations/damages', icon: AlertTriangle, privKey: 'opsDamages', privField: 'canView' },
       { name: 'Sites', href: '/operations/sites', icon: MapPin, privKey: 'opsSites', privField: 'canView' },
     ],
   },

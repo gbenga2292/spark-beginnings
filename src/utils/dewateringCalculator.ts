@@ -434,6 +434,9 @@ export function calculateDewatering(inputs: DewateringInput): DewateringCalculat
       couplings: 0,
       suctionHoses: 0,
       dischargeHoseMeters: 0,
+      filterPipeLength: 0,
+      filterTipDepth: 0,
+      slottedLength: 0,
       autoSummary: summary,
     };
   }

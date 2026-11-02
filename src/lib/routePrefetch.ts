@@ -51,6 +51,7 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/operations/maintenance': () => import('@/src/pages/MaintenanceManager'),
   '/operations/diesel': () => import('@/src/pages/DieselRefillManager'),
   '/operations/vehicles': () => import('@/src/pages/VehicleManager'),
+  '/operations/damages': () => import('@/src/pages/DamageManager'),
   '/operations/sites': () => import('@/src/pages/SiteManager'),
   '/operations/analytics': () => import('@/src/pages/EmployeeAnalytics'),
   '/operations/site-analytics': () => import('@/src/pages/ActiveSiteAnalytics'),

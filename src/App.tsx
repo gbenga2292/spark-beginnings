@@ -85,6 +85,7 @@ const VatCalculator = lazy(() => import('./pages/VatCalculator').then(m => ({ de
 const Budget = lazy(() => import('./pages/Budget').then(m => ({ default: m.Budget })));
 const ActiveSiteAnalytics = lazy(() => import('./pages/ActiveSiteAnalytics').then(m => ({ default: m.ActiveSiteAnalytics })));
 const SiteRequests = lazy(() => import('./pages/SiteRequests').then(m => ({ default: m.SiteRequests })));
+const DamageManager = lazy(() => import('./pages/DamageManager').then(m => ({ default: m.DamageManager })));
 import { OperationsProvider } from './contexts/OperationsContext';
 
 // ── Suspense fallback ─────────────────────────────────────────────────────────
@@ -231,7 +232,7 @@ function AppContent() {
           '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/vendor-invoices',
           '/reports', '/financial-reports', '/tasks/reports', '/weekly-report', '/users',
           '/settings', '/activity-log', '/profile', '/operations/site-analytics', '/site-analytics',
-          '/operations/site-requests'
+          '/operations/site-requests', '/operations/damages'
         ];
         
         if (rootPaths.includes(path) || path === '') {
@@ -303,7 +304,7 @@ function AppContent() {
             {/* Operations & Analytics — Restricted on Web */}
             <Route path="operations/*" element={
               <Page label="Operations">
-                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites', 'simulator', 'opsSiteRequests']}>
+                <ProtectedRoute requiredModule={['operations', 'opsInventory', 'opsWaybills', 'opsCheckout', 'opsMaintenance', 'opsVehicles', 'opsSites', 'simulator', 'opsSiteRequests', 'opsDamages']}>
                   <>
                     <Routes>
                       <Route index element={<OperationsDashboard />} />
@@ -313,6 +314,7 @@ function AppContent() {
                       <Route path="maintenance" element={<ProtectedRoute requiredModule="opsMaintenance"><MaintenanceManager /></ProtectedRoute>} />
                       <Route path="diesel" element={<ProtectedRoute requiredModule="opsDiesel"><DieselRefillManager /></ProtectedRoute>} />
                       <Route path="vehicles" element={<ProtectedRoute requiredModule="opsVehicles"><VehicleManager /></ProtectedRoute>} />
+                      <Route path="damages" element={<ProtectedRoute requiredModule="opsDamages"><DamageManager /></ProtectedRoute>} />
                       <Route path="sites" element={<ProtectedRoute requiredModule="opsSites"><SiteManager /></ProtectedRoute>} />
                       <Route path="analytics" element={<ProtectedRoute requiredModule="opsCheckout"><EmployeeAnalytics /></ProtectedRoute>} />
                       <Route path="simulator" element={<ProtectedRoute requiredModule="simulator"><Simulator /></ProtectedRoute>} />

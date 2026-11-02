@@ -16,6 +16,7 @@ import { fetchEmployeesData, fetchInvoicesData, fetchLedgerData } from '@/src/li
 import { formatDisplayDate, normalizeDate, getPayrollPeriodDates } from '@/src/lib/dateUtils';
 import { generateId } from '@/src/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/src/components/ui/dialog';
+import { ChartAccount, AccountType, AccountCategory, DCEL_CHART_OF_ACCOUNTS, DEFAULT_CATEGORY_COA_MAP, resolveCategoryAccountCode } from '@/src/constants/chartOfAccounts';
 import * as XLSX from 'xlsx';
 
 export function Variables() {
@@ -117,7 +118,106 @@ export function Variables() {
   const addLedgerVendor = useAppStore((state) => state.addLedgerVendor);
   const removeLedgerVendor = useAppStore((state) => state.removeLedgerVendor);
 
+  const ledgerEntries = useAppStore((state) => state.ledgerEntries);
+  const updatePayrollVariablesStore = useAppStore((state) => state.updatePayrollVariables);
+
   const [newCat, setNewCat] = useState('');
+  const [newCatCoaCode, setNewCatCoaCode] = useState('5140');
+  const [coaTypeFilter, setCoaTypeFilter] = useState<'ALL' | AccountType>('ALL');
+  const [coaSearch, setCoaSearch] = useState('');
+  const [newCoaCode, setNewCoaCode] = useState('');
+  const [newCoaName, setNewCoaName] = useState('');
+  const [newCoaType, setNewCoaType] = useState<AccountType>('EXPENSE');
+  const [newCoaCategory, setNewCoaCategory] = useState<AccountCategory>('OPERATING_EXPENSE');
+  const [editingCoaCode, setEditingCoaCode] = useState<string | null>(null);
+  const [editCoaName, setEditCoaName] = useState('');
+  const [editCoaType, setEditCoaType] = useState<AccountType>('EXPENSE');
+  const [editCoaCategory, setEditCoaCategory] = useState<AccountCategory>('OPERATING_EXPENSE');
+
+  const activeChartOfAccounts = useMemo<ChartAccount[]>(() => {
+    const list = localPayrollVars.chartOfAccounts && localPayrollVars.chartOfAccounts.length > 0
+      ? localPayrollVars.chartOfAccounts
+      : DCEL_CHART_OF_ACCOUNTS;
+    return [...list].sort((a, b) => a.code.localeCompare(b.code));
+  }, [localPayrollVars.chartOfAccounts]);
+
+  const activeCategoryCoaMap = useMemo<Record<string, string>>(() => ({
+    ...DEFAULT_CATEGORY_COA_MAP,
+    ...(localPayrollVars.categoryCoaMap || {}),
+  }), [localPayrollVars.categoryCoaMap]);
+
+  const handleAssignCategoryToCoa = (categoryName: string, accountCode: string) => {
+    const nextMap = { ...activeCategoryCoaMap };
+    if (!accountCode) {
+      delete nextMap[categoryName];
+    } else {
+      nextMap[categoryName] = accountCode;
+    }
+    setLocalPayrollVars(prev => ({ ...prev, categoryCoaMap: nextMap }));
+    updatePayrollVariablesStore({ categoryCoaMap: nextMap });
+    toast.success(accountCode ? `Allocated "${categoryName}" to CoA [${accountCode}]` : `Cleared CoA allocation for "${categoryName}"`);
+  };
+
+  const handleAddChartAccount = () => {
+    const code = newCoaCode.trim();
+    const name = newCoaName.trim();
+    if (!code || !name) {
+      toast.error('Please enter both an Account Code and Account Title.');
+      return;
+    }
+    if (activeChartOfAccounts.some(a => a.code.toLowerCase() === code.toLowerCase())) {
+      toast.error(`Account code "${code}" already exists in the Chart of Accounts.`);
+      return;
+    }
+    const nextList: ChartAccount[] = [
+      ...activeChartOfAccounts,
+      { code, name, type: newCoaType, category: newCoaCategory },
+    ].sort((a, b) => a.code.localeCompare(b.code));
+    setLocalPayrollVars(prev => ({ ...prev, chartOfAccounts: nextList }));
+    updatePayrollVariablesStore({ chartOfAccounts: nextList });
+    setNewCoaCode('');
+    setNewCoaName('');
+    toast.success(`Added account [${code}] ${name} to Chart of Accounts.`);
+  };
+
+  const handleSaveEditChartAccount = (originalCode: string) => {
+    const name = editCoaName.trim();
+    if (!name) return;
+    const nextList = activeChartOfAccounts.map(acc =>
+      acc.code === originalCode
+        ? { ...acc, name, type: editCoaType, category: editCoaCategory }
+        : acc
+    );
+    setLocalPayrollVars(prev => ({ ...prev, chartOfAccounts: nextList }));
+    updatePayrollVariablesStore({ chartOfAccounts: nextList });
+    setEditingCoaCode(null);
+    toast.success(`Updated Chart of Account [${originalCode}].`);
+  };
+
+  const handleDeleteChartAccount = async (code: string, name: string) => {
+    const mappedCats = ledgerCategories.filter(c => resolveCategoryAccountCode(c.name, activeCategoryCoaMap) === code);
+    const msg = mappedCats.length > 0
+      ? `Delete account [${code}] "${name}"? Note: ${mappedCats.length} category(s) (${mappedCats.map(c => c.name).join(', ')}) are currently allocated to it.`
+      : `Delete account [${code}] "${name}" from Chart of Accounts?`;
+    const ok = await showConfirm(msg, { variant: 'danger' });
+    if (!ok) return;
+    const nextList = activeChartOfAccounts.filter(a => a.code !== code);
+    setLocalPayrollVars(prev => ({ ...prev, chartOfAccounts: nextList }));
+    updatePayrollVariablesStore({ chartOfAccounts: nextList });
+    toast.success(`Removed account [${code}] from Chart of Accounts.`);
+  };
+
+  const handleResetDefaultCoa = async () => {
+    const ok = await showConfirm('Restore all default DCEL Chart of Accounts and default Category allocations? Custom accounts and custom allocations will be merged with defaults.', { title: 'Restore Default Chart of Accounts' });
+    if (!ok) return;
+    const existingByCode = new Map(activeChartOfAccounts.map(a => [a.code, a]));
+    DCEL_CHART_OF_ACCOUNTS.forEach(def => existingByCode.set(def.code, def));
+    const mergedList = Array.from(existingByCode.values()).sort((a, b) => a.code.localeCompare(b.code));
+    const mergedMap = { ...activeCategoryCoaMap, ...DEFAULT_CATEGORY_COA_MAP };
+    setLocalPayrollVars(prev => ({ ...prev, chartOfAccounts: mergedList, categoryCoaMap: mergedMap }));
+    updatePayrollVariablesStore({ chartOfAccounts: mergedList, categoryCoaMap: mergedMap });
+    toast.success('Default Chart of Accounts & allocations restored.');
+  };
   const [newBank, setNewBank] = useState('');
   const [newVendorName, setNewVendorName] = useState('');
   const [newVendorTin, setNewVendorTin] = useState('');
@@ -398,6 +498,13 @@ export function Variables() {
         }
       } else if (type === 'ledgerCategory') {
         state.updateLedgerCategory(id!, { name: newValue });
+        const existingCode = resolveCategoryAccountCode(oldValue, activeCategoryCoaMap);
+        if (existingCode) {
+          const nextMap = { ...activeCategoryCoaMap, [newValue]: existingCode };
+          delete nextMap[oldValue];
+          setLocalPayrollVars(prev => ({ ...prev, categoryCoaMap: nextMap }));
+          state.updatePayrollVariables({ categoryCoaMap: nextMap });
+        }
         if (propagate) state.ledgerEntries.filter(l => l.category === oldValue).forEach(l => state.updateLedgerEntry(l.id, { category: newValue }));
       } else if (type === 'ledgerVendor') {
         state.updateLedgerVendor(id!, { name: newValue });
@@ -1683,13 +1790,66 @@ export function Variables() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="border-slate-200">
             <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
-              <CardTitle className="text-slate-800">Categories</CardTitle>
-              <CardDescription>Expense categories used for ledger entries.</CardDescription>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-slate-800">Categories &amp; CoA Allocation</CardTitle>
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 border border-blue-200">
+                  {ledgerCategories.filter(c => Boolean(resolveCategoryAccountCode(c.name, activeCategoryCoaMap))).length}/{ledgerCategories.length} Allocated
+                </span>
+              </div>
+              <CardDescription>Expense categories used for ledger entries. Allocate each category to a Chart of Account (CoA) code for P&amp;L and Balance Sheet reporting.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2">
-                <Input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="New Category" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newCat) { addLedgerCategory({id: generateId(), name: newCat}); setNewCat(''); } }}>Add</Button>
+                <Input value={newCat} onChange={e => setNewCat(e.target.value)} placeholder="New Category Name" className="flex-1" />
+                <select
+                  value={newCatCoaCode}
+                  onChange={e => setNewCatCoaCode(e.target.value)}
+                  disabled={!priv.canEdit}
+                  className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 max-w-[180px]"
+                  title="Allocate new category to Chart of Account"
+                >
+                  <option value="">-- Unallocated --</option>
+                  <optgroup label="Direct Costs / COGS (5000s)">
+                    {activeChartOfAccounts.filter(a => a.category === 'DIRECT_COST').map(a => (
+                      <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Operating Expenses / OPEX (5100s)">
+                    {activeChartOfAccounts.filter(a => a.category === 'OPERATING_EXPENSE').map(a => (
+                      <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Fixed Assets &amp; CapEx (1300s)">
+                    {activeChartOfAccounts.filter(a => a.category === 'FIXED_ASSET').map(a => (
+                      <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Tax &amp; Liabilities (2000s)">
+                    {activeChartOfAccounts.filter(a => a.type === 'LIABILITY').map(a => (
+                      <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Revenue / Income (4000s)">
+                    {activeChartOfAccounts.filter(a => a.type === 'INCOME').map(a => (
+                      <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Current Assets &amp; Equity">
+                    {activeChartOfAccounts.filter(a => a.category === 'CURRENT_ASSET' || a.type === 'EQUITY').map(a => (
+                      <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <Button disabled={!priv.canEdit} onClick={() => {
+                  const trimmed = newCat.trim();
+                  if (trimmed) {
+                    addLedgerCategory({ id: generateId(), name: trimmed });
+                    if (newCatCoaCode) {
+                      handleAssignCategoryToCoa(trimmed, newCatCoaCode);
+                    }
+                    setNewCat('');
+                  }
+                }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
@@ -1697,7 +1857,65 @@ export function Variables() {
                   <TableBody>
                     {ledgerCategories.map(c => (
                       <TableRow key={c.id}>
-                        <TableCell className="font-medium text-slate-700">{c.name}</TableCell>
+                        <TableCell className="font-medium text-slate-700 py-2">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-slate-800 text-xs">{c.name}</span>
+                              {priv.canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenRename('ledgerCategory', c.name, c.id)}
+                                  className="text-[10px] text-slate-400 hover:text-blue-600 inline-flex items-center gap-0.5"
+                                  title="Rename category"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                            <select
+                              value={resolveCategoryAccountCode(c.name, activeCategoryCoaMap) || ''}
+                              onChange={e => handleAssignCategoryToCoa(c.name, e.target.value)}
+                              disabled={!priv.canEdit}
+                              className={`h-7 w-full rounded border px-1.5 text-[11px] font-medium transition-colors ${
+                                resolveCategoryAccountCode(c.name, activeCategoryCoaMap)
+                                  ? 'border-blue-200 bg-blue-50/50 text-blue-800'
+                                  : 'border-amber-300 bg-amber-50 text-amber-800'
+                              }`}
+                            >
+                              <option value="">⚠ Unallocated — Select CoA Account</option>
+                              <optgroup label="Direct Costs / COGS (5000s)">
+                                {activeChartOfAccounts.filter(a => a.category === 'DIRECT_COST').map(a => (
+                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Operating Expenses / OPEX (5100s)">
+                                {activeChartOfAccounts.filter(a => a.category === 'OPERATING_EXPENSE').map(a => (
+                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Fixed Assets &amp; CapEx (1300s)">
+                                {activeChartOfAccounts.filter(a => a.category === 'FIXED_ASSET').map(a => (
+                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Tax &amp; Liabilities (2000s)">
+                                {activeChartOfAccounts.filter(a => a.type === 'LIABILITY').map(a => (
+                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Revenue / Income (4000s)">
+                                {activeChartOfAccounts.filter(a => a.type === 'INCOME').map(a => (
+                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Current Assets &amp; Equity">
+                                {activeChartOfAccounts.filter(a => a.category === 'CURRENT_ASSET' || a.type === 'EQUITY').map(a => (
+                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                ))}
+                              </optgroup>
+                            </select>
+                          </div>
+                        </TableCell>
                         <TableCell className="w-[50px]">
                           {priv.canEdit && (
                             <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete category "${c.name}"?`, { variant: 'danger' }); if (conf) removeLedgerCategory(c.id); }}>
@@ -1748,6 +1966,412 @@ export function Variables() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 md:col-span-2 lg:col-span-3">
+            <CardHeader className="bg-slate-50/70 rounded-t-xl border-b border-slate-200">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <CardTitle className="text-slate-800 flex items-center gap-2">
+                    <BookOpen className="h-5 w-5 text-blue-600" />
+                    Chart of Accounts (CoA) &amp; Category Allocation Directory
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your 4-digit Chart of Accounts and allocate where each Ledger Expense Category flows in the Profit &amp; Loss (P&amp;L), Trial Balance, and Balance Sheet reports.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {priv.canEdit && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetDefaultCoa}
+                      className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-100"
+                    >
+                      Restore Default CoA
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 pt-5">
+              {/* Summary Strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total CoA Accounts</div>
+                  <div className="text-lg font-extrabold text-slate-800 mt-0.5">{activeChartOfAccounts.length}</div>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Direct Costs (COGS)</div>
+                  <div className="text-lg font-extrabold text-amber-900 mt-0.5">
+                    {activeChartOfAccounts.filter(a => a.category === 'DIRECT_COST').length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Operating Expenses</div>
+                  <div className="text-lg font-extrabold text-rose-900 mt-0.5">
+                    {activeChartOfAccounts.filter(a => a.category === 'OPERATING_EXPENSE').length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Revenue Accounts</div>
+                  <div className="text-lg font-extrabold text-emerald-900 mt-0.5">
+                    {activeChartOfAccounts.filter(a => a.type === 'INCOME').length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Balance Sheet CoA</div>
+                  <div className="text-lg font-extrabold text-blue-900 mt-0.5">
+                    {activeChartOfAccounts.filter(a => a.type === 'ASSET' || a.type === 'LIABILITY' || a.type === 'EQUITY').length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Mapped Categories</div>
+                  <div className="text-lg font-extrabold text-slate-800 mt-0.5">
+                    {ledgerCategories.filter(c => Boolean(resolveCategoryAccountCode(c.name, activeCategoryCoaMap))).length} / {ledgerCategories.length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Add New Chart of Account Form */}
+              {priv.canEdit && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3.5">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2.5">
+                    Add New Chart of Account
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-center">
+                    <div className="lg:col-span-2">
+                      <Input
+                        value={newCoaCode}
+                        onChange={e => setNewCoaCode(e.target.value)}
+                        placeholder="Code (e.g. 5180)"
+                        className="h-9 bg-white text-xs font-mono"
+                      />
+                    </div>
+                    <div className="lg:col-span-4">
+                      <Input
+                        value={newCoaName}
+                        onChange={e => setNewCoaName(e.target.value)}
+                        placeholder="Account Title (e.g. Site Security &amp; Escort)"
+                        className="h-9 bg-white text-xs"
+                      />
+                    </div>
+                    <div className="lg:col-span-2">
+                      <select
+                        value={newCoaType}
+                        onChange={e => {
+                          const t = e.target.value as AccountType;
+                          setNewCoaType(t);
+                          if (t === 'EXPENSE') setNewCoaCategory('OPERATING_EXPENSE');
+                          else if (t === 'INCOME') setNewCoaCategory('REVENUE');
+                          else if (t === 'ASSET') setNewCoaCategory('CURRENT_ASSET');
+                          else if (t === 'LIABILITY') setNewCoaCategory('CURRENT_LIABILITY');
+                          else if (t === 'EQUITY') setNewCoaCategory('EQUITY');
+                        }}
+                        className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700"
+                      >
+                        <option value="EXPENSE">EXPENSE (P&amp;L)</option>
+                        <option value="INCOME">INCOME / REVENUE (P&amp;L)</option>
+                        <option value="ASSET">ASSET (Balance Sheet)</option>
+                        <option value="LIABILITY">LIABILITY (Balance Sheet)</option>
+                        <option value="EQUITY">EQUITY (Balance Sheet)</option>
+                      </select>
+                    </div>
+                    <div className="lg:col-span-3">
+                      <select
+                        value={newCoaCategory}
+                        onChange={e => setNewCoaCategory(e.target.value as AccountCategory)}
+                        className="h-9 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700"
+                      >
+                        <option value="DIRECT_COST">P&amp;L: Cost of Sales / Direct Cost (COGS)</option>
+                        <option value="OPERATING_EXPENSE">P&amp;L: Operating Expense (OPEX)</option>
+                        <option value="REVENUE">P&amp;L: Operating Revenue / Turnover</option>
+                        <option value="CURRENT_ASSET">Balance Sheet: Current Asset</option>
+                        <option value="FIXED_ASSET">Balance Sheet: Fixed Asset / CapEx</option>
+                        <option value="CURRENT_LIABILITY">Balance Sheet: Current Liability / Tax</option>
+                        <option value="EQUITY">Balance Sheet: Equity / Retained Earnings</option>
+                      </select>
+                    </div>
+                    <div className="lg:col-span-1">
+                      <Button
+                        type="button"
+                        onClick={handleAddChartAccount}
+                        className="w-full h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold gap-1"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Filter & Search Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-md">
+                  {(['ALL', 'EXPENSE', 'INCOME', 'ASSET', 'LIABILITY', 'EQUITY'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setCoaTypeFilter(tab)}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                        coaTypeFilter === tab
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {tab === 'ALL' ? 'All Accounts' : tab}
+                    </button>
+                  ))}
+                </div>
+                <div className="w-full sm:w-72">
+                  <Input
+                    value={coaSearch}
+                    onChange={e => setCoaSearch(e.target.value)}
+                    placeholder="Search code, account title, or category..."
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Chart of Accounts Table */}
+              <div className="border border-slate-200 rounded-md overflow-hidden max-h-[520px] overflow-y-auto">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50 sticky top-0 z-10">
+                      <TableRow>
+                        <TableHead className="w-[90px] text-xs font-bold">Code</TableHead>
+                        <TableHead className="min-w-[210px] text-xs font-bold">Account Title</TableHead>
+                        <TableHead className="w-[190px] text-xs font-bold">Statement Classification</TableHead>
+                        <TableHead className="min-w-[280px] text-xs font-bold">Allocated Ledger Categories</TableHead>
+                        <TableHead className="w-[90px] text-right text-xs font-bold">Vouchers</TableHead>
+                        <TableHead className="w-[80px] text-right text-xs font-bold">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeChartOfAccounts
+                        .filter(acc => coaTypeFilter === 'ALL' || acc.type === coaTypeFilter)
+                        .filter(acc => {
+                          if (!coaSearch.trim()) return true;
+                          const q = coaSearch.toLowerCase();
+                          const mappedCats = ledgerCategories
+                            .filter(c => resolveCategoryAccountCode(c.name, activeCategoryCoaMap) === acc.code)
+                            .map(c => c.name.toLowerCase());
+                          return (
+                            acc.code.toLowerCase().includes(q) ||
+                            acc.name.toLowerCase().includes(q) ||
+                            acc.category.toLowerCase().includes(q) ||
+                            mappedCats.some(m => m.includes(q))
+                          );
+                        })
+                        .map(acc => {
+                          const mappedCategories = ledgerCategories.filter(
+                            c => resolveCategoryAccountCode(c.name, activeCategoryCoaMap) === acc.code
+                          );
+                          const unmappedOrOtherCategories = ledgerCategories.filter(
+                            c => resolveCategoryAccountCode(c.name, activeCategoryCoaMap) !== acc.code
+                          );
+                          const voucherCount = ledgerEntries.filter(
+                            e => resolveCategoryAccountCode(e.category, activeCategoryCoaMap) === acc.code
+                          ).length;
+                          const isEditing = editingCoaCode === acc.code;
+
+                          const badgeClass =
+                            acc.category === 'DIRECT_COST'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : acc.category === 'OPERATING_EXPENSE'
+                              ? 'bg-rose-50 text-rose-800 border-rose-200'
+                              : acc.category === 'REVENUE'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : acc.type === 'ASSET'
+                              ? 'bg-blue-50 text-blue-800 border-blue-200'
+                              : acc.type === 'LIABILITY'
+                              ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200';
+
+                          const sectionLabel =
+                            acc.category === 'DIRECT_COST'
+                              ? 'P&L • Direct Cost (COGS)'
+                              : acc.category === 'OPERATING_EXPENSE'
+                              ? 'P&L • Operating Expense'
+                              : acc.category === 'REVENUE'
+                              ? 'P&L • Operating Revenue'
+                              : acc.category === 'FIXED_ASSET'
+                              ? 'BS • Fixed Asset (CapEx)'
+                              : acc.category === 'CURRENT_ASSET'
+                              ? 'BS • Current Asset'
+                              : acc.category === 'CURRENT_LIABILITY'
+                              ? 'BS • Current Liability'
+                              : 'BS • Equity';
+
+                          return (
+                            <TableRow key={acc.code} className="hover:bg-slate-50/70">
+                              <TableCell className="font-mono text-xs font-bold text-slate-800">
+                                <span className="inline-flex items-center rounded bg-slate-100 px-2 py-0.5 border border-slate-200">
+                                  {acc.code}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-xs font-semibold text-slate-800">
+                                {isEditing ? (
+                                  <Input
+                                    value={editCoaName}
+                                    onChange={e => setEditCoaName(e.target.value)}
+                                    className="h-7 text-xs"
+                                  />
+                                ) : (
+                                  acc.name
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isEditing ? (
+                                  <select
+                                    value={editCoaCategory}
+                                    onChange={e => {
+                                      const cat = e.target.value as AccountCategory;
+                                      setEditCoaCategory(cat);
+                                      if (cat === 'DIRECT_COST' || cat === 'OPERATING_EXPENSE') setEditCoaType('EXPENSE');
+                                      else if (cat === 'REVENUE') setEditCoaType('INCOME');
+                                      else if (cat === 'CURRENT_ASSET' || cat === 'FIXED_ASSET') setEditCoaType('ASSET');
+                                      else if (cat === 'CURRENT_LIABILITY') setEditCoaType('LIABILITY');
+                                      else setEditCoaType('EQUITY');
+                                    }}
+                                    className="h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px]"
+                                  >
+                                    <option value="DIRECT_COST">P&amp;L • Direct Cost (COGS)</option>
+                                    <option value="OPERATING_EXPENSE">P&amp;L • Operating Expense</option>
+                                    <option value="REVENUE">P&amp;L • Operating Revenue</option>
+                                    <option value="CURRENT_ASSET">BS • Current Asset</option>
+                                    <option value="FIXED_ASSET">BS • Fixed Asset (CapEx)</option>
+                                    <option value="CURRENT_LIABILITY">BS • Current Liability</option>
+                                    <option value="EQUITY">BS • Equity</option>
+                                  </select>
+                                ) : (
+                                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${badgeClass}`}>
+                                    {sectionLabel}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {mappedCategories.map(cat => (
+                                    <span
+                                      key={cat.id}
+                                      className="inline-flex items-center gap-1 rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-medium text-blue-800"
+                                    >
+                                      {cat.name}
+                                      {priv.canEdit && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAssignCategoryToCoa(cat.name, '')}
+                                          className="text-blue-400 hover:text-rose-600 ml-0.5"
+                                          title={`Unassign "${cat.name}" from [${acc.code}]`}
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                    </span>
+                                  ))}
+                                  {priv.canEdit && unmappedOrOtherCategories.length > 0 && (
+                                    <select
+                                      value=""
+                                      onChange={e => {
+                                        if (e.target.value) {
+                                          handleAssignCategoryToCoa(e.target.value, acc.code);
+                                        }
+                                      }}
+                                      className="h-6 rounded border border-dashed border-slate-300 bg-white px-1.5 text-[10px] text-slate-600 hover:border-blue-400"
+                                    >
+                                      <option value="">+ Allocate Category...</option>
+                                      {unmappedOrOtherCategories.map(cat => {
+                                        const curCode = resolveCategoryAccountCode(cat.name, activeCategoryCoaMap);
+                                        return (
+                                          <option key={cat.id} value={cat.name}>
+                                            {cat.name} {curCode ? `(currently [${curCode}])` : '(Unallocated)'}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  )}
+                                  {mappedCategories.length === 0 && !priv.canEdit && (
+                                    <span className="text-[11px] text-slate-400 italic">None allocated</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs text-slate-600">
+                                {voucherCount > 0 ? (
+                                  <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                                    {voucherCount.toLocaleString()}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {priv.canEdit && (
+                                  <div className="flex items-center justify-end gap-1">
+                                    {isEditing ? (
+                                      <>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
+                                          onClick={() => handleSaveEditChartAccount(acc.code)}
+                                          title="Save account changes"
+                                        >
+                                          <Save className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-slate-400 hover:text-slate-600"
+                                          onClick={() => setEditingCoaCode(null)}
+                                          title="Cancel"
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-slate-400 hover:text-blue-600"
+                                          onClick={() => {
+                                            setEditingCoaCode(acc.code);
+                                            setEditCoaName(acc.name);
+                                            setEditCoaType(acc.type);
+                                            setEditCoaCategory(acc.category);
+                                          }}
+                                          title="Edit account"
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-slate-400 hover:text-rose-500"
+                                          onClick={() => handleDeleteChartAccount(acc.code, acc.name)}
+                                          title="Delete account"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </CardContent>

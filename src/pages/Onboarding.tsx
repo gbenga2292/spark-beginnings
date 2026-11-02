@@ -516,6 +516,7 @@ export function Onboarding() {
     if (patch.payeNumberInput !== undefined) syncPatch.taxId = patch.payeNumberInput;
     if (patch.bankName !== undefined) syncPatch.bankName = patch.bankName;
     if (patch.accountNo !== undefined) syncPatch.accountNo = patch.accountNo;
+    if (patch.verifiedAddress !== undefined) syncPatch.address = patch.verifiedAddress;
     if (patch.verifiedStartDate !== undefined) syncPatch.verifiedStartDate = patch.verifiedStartDate;
 
     updateEmployee(selectedEmployee.id, syncPatch);
@@ -598,6 +599,7 @@ export function Onboarding() {
       status: 'Active',
       startDate: startDate,
       verifiedStartDate: cl.verifiedStartDate,
+      address: cl.verifiedAddress || selectedEmployee.address,
       bankName: cl.bankName || selectedEmployee.bankName,
       accountNo: cl.accountNo || selectedEmployee.accountNo,
       pensionNumber: cl.pensionNumberInput || selectedEmployee.pensionNumber,
@@ -1540,16 +1542,16 @@ export function Onboarding() {
                     <div className="space-y-1.5">
                       <LabeledInput
                         label="Employee Residential Address"
-                        value={cl.verifiedAddress ?? ''}
+                        value={cl.verifiedAddress ?? selectedEmployee.address ?? ''}
                         onChange={v => updateCL({ verifiedAddress: v, addressVerification: cl.addressVerification && v.trim() !== '' })}
                         placeholder="Enter employee's verified residential address"
                       />
                       <CheckRow
-                        label={cl.verifiedAddress?.trim() ? 'Address Verification document submitted' : 'Enter address above first'}
+                        label={(cl.verifiedAddress ?? selectedEmployee.address)?.trim() ? 'Address Verification document submitted' : 'Enter address above first'}
                         checked={cl.addressVerification}
                         onChange={v => updateCL({ addressVerification: v })}
-                        disabled={!cl.verifiedAddress?.trim()}
-                        hint={!cl.verifiedAddress?.trim() ? 'Type the verified address above before ticking this' : undefined}
+                        disabled={!(cl.verifiedAddress ?? selectedEmployee.address)?.trim()}
+                        hint={!(cl.verifiedAddress ?? selectedEmployee.address)?.trim() ? 'Type the verified address above before ticking this' : undefined}
                       />
                     </div>
                     <CheckRow label="Educational Qualification Credentials submitted" checked={cl.educationalCredentials} onChange={v => updateCL({ educationalCredentials: v })} />

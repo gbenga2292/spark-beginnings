@@ -226,6 +226,16 @@ const PRIV_GROUPS: PG[] = [
           { key: 'canCreate', label: 'Submit Requests', special: true },
           { key: 'canManage', label: 'Approve / Manage Requests' },
         ] },
+      { key: 'opsDamages', label: 'Damage Logs', parentKey: 'opsDamages', masterField: 'canView',
+        fields: [
+          { key: 'canView', label: 'View Damage Logs' },
+          { key: 'canCreate', label: 'Log Damage', special: true },
+          { key: 'canEdit', label: 'Edit Damage Log' },
+          { key: 'canAssess', label: 'Cost Assessment', special: true },
+          { key: 'canSignOff', label: 'Sign-off / Resolve', special: true },
+          { key: 'canDelete', label: 'Delete Log', danger: true },
+          { key: 'canExport', label: 'Export Reports' },
+        ] },
       { key: 'simulator', label: 'Layout Simulator', parentKey: 'simulator', masterField: 'canView',
         fields: [
           { key: 'canView', label: 'View' },

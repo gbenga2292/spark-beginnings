@@ -16,6 +16,7 @@ import { cn } from '@/src/lib/utils';
 import { normalizeDate } from '@/src/lib/dateUtils';
 import { useIncludeBroughtForward } from '@/src/hooks/useIncludeBroughtForward';
 import { TransactionDrilldownDialog, type DrillEntry } from './TransactionDrilldownDialog';
+import { DCEL_CHART_OF_ACCOUNTS, DEFAULT_CATEGORY_COA_MAP, resolveCategoryAccountCode } from '@/src/constants/chartOfAccounts';
 
 interface TrialBalanceReportProps {
   filterYears: string[];
@@ -142,6 +143,7 @@ export function TrialBalanceReport({
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
+  const payrollVariables = useAppStore(s => s.payrollVariables);
   const vendorInvoices = useAppStore(s => (s as any).vendorInvoices || []);
   const vendorInvoicePayments = useAppStore(s => (s as any).vendorInvoicePayments || []);
   const sites = useAppStore(s => s.sites);
@@ -397,23 +399,45 @@ export function TrialBalanceReport({
       `VAT billed on client invoices (₦${(vatBilled / 1e6).toFixed(2)}M) less ${vatRemitted.count} VAT remittances in Ledger`,
       [...lineEntries('vat', 'VAT billed'), ...vatRemitted.entries], vatRemitted.count);
 
-    // DIRECT COSTS & OPEX (From Ledger)
-    const expenseRows: [string, string, string, ReturnType<typeof getCat>, string][] = [
-      ['5010', 'Direct Labor — Field Technicians & Staff Payroll', 'DIRECT_COST', directLabor, 'Payroll & staff salary disbursement'],
-      ['5020', 'Site Materials & Direct Consumables Consumed', 'DIRECT_COST', siteMaterials, 'Direct site material & goods procurement'],
-      ['5030', 'Site Diesel & Vehicle Fuel Consumed', 'DIRECT_COST', fuelExpense, 'Fuel & diesel purchase'],
-      ['5040', 'Subcontractor & Project Reimbursable Expenses', 'DIRECT_COST', reimbursableExp, 'Re-embursable project expense'],
-      ['5050', 'Equipment Mobilization & Local Transport Cost', 'DIRECT_COST', localTransport, 'Local transport & transit'],
-      ['5060', 'Dewatering Equipment Running Maintenance & Repairs', 'DIRECT_COST', machineMaint, 'Dewatering pump maintenance & repair'],
-      ['5120', 'Office Rent & Yard Maintenance', 'OPERATING_EXPENSE', premisesMaint, 'Office, yard & premises maintenance'],
-      ['5130', 'Utilities & Communications', 'OPERATING_EXPENSE', utilitiesExp, 'Power, telecom & internet service'],
-      ['5140', 'Motor Vehicles & Heavy Logistics Trucks Running', 'OPERATING_EXPENSE', logisticsExp, 'Truck & fleet logistics maintenance'],
-      ['5150', 'Legal, Audit & Professional Fees', 'OPERATING_EXPENSE', professionalExp, 'Professional, legal & audit fee'],
-      ['5160', 'Bank Charges & Financing Interest Expense', 'OPERATING_EXPENSE', financeExp, 'Interest expense & bank charge'],
-      ['5170', 'General Administration & Operating Overhead', 'OPERATING_EXPENSE', overheadExp, 'Admin, CSR, medical & overhead'],
-    ];
-    expenseRows.forEach(([code, name, cat, data, desc]) =>
-      addRow(code, name, 'EXPENSE', cat, data.sum, 0, `${data.count} ${desc} vouchers in Ledger`, data.entries, data.count));
+    // DIRECT COSTS & OPEX (From Ledger — dynamically mapped via Chart of Accounts & Variables allocations)
+    const activeCoaList = (payrollVariables?.chartOfAccounts && payrollVariables.chartOfAccounts.length > 0)
+      ? payrollVariables.chartOfAccounts
+      : DCEL_CHART_OF_ACCOUNTS;
+    const activeCoaMap = { ...DEFAULT_CATEGORY_COA_MAP, ...(payrollVariables?.categoryCoaMap || {}) };
+    const expenseCoaAccounts = activeCoaList.filter(a => a.type === 'EXPENSE');
+
+    expenseCoaAccounts.forEach(acc => {
+      const matching = inPeriodLedger.filter(e => resolveCategoryAccountCode(e.category || '', activeCoaMap) === acc.code);
+      const sum = matching.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const entries = matching.map(e => ledgerToEntry(e, 'debit'));
+      const mappedCatNames = Array.from(new Set(matching.map(e => e.category).filter(Boolean)));
+      const desc = mappedCatNames.length > 0
+        ? `${matching.length} voucher(s) across: ${mappedCatNames.join(', ')}`
+        : `${matching.length} ${acc.name} vouchers in Ledger`;
+      addRow(acc.code, acc.name, 'EXPENSE', acc.category, sum, 0, desc, entries, matching.length);
+    });
+
+    // Any unallocated expense categories not mapped to 1300/2100 or an existing EXPENSE CoA
+    const knownCodes = new Set(activeCoaList.map(a => a.code));
+    const unallocatedLedger = inPeriodLedger.filter(e => {
+      const code = resolveCategoryAccountCode(e.category || '', activeCoaMap);
+      return !code || !knownCodes.has(code);
+    });
+    if (unallocatedLedger.length > 0) {
+      const unallocSum = unallocatedLedger.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const unallocCats = Array.from(new Set(unallocatedLedger.map(e => e.category || 'Uncategorized')));
+      addRow(
+        '5999',
+        'Unallocated / Suspense Operating Expenses',
+        'EXPENSE',
+        'OPERATING_EXPENSE',
+        unallocSum,
+        0,
+        `${unallocatedLedger.length} voucher(s) in unallocated categories (${unallocCats.join(', ')}) — allocate in Variables`,
+        unallocatedLedger.map(e => ledgerToEntry(e, 'debit')),
+        unallocatedLedger.length
+      );
+    }
 
     // REVENUE (From Billed Invoices)
     addRow('4000', 'Revenue — Dewatering Equipment Rental Fleet', 'INCOME', 'REVENUE',
@@ -462,7 +486,7 @@ export function TrialBalanceReport({
       hasPriorData,
       hasPriorLedger,
     };
-  }, [invoices, payments, ledgerEntries, vendorInvoices, vendorInvoicePayments, sites, filterYears, filterMonths, filterClient, includeBF]);
+  }, [invoices, payments, ledgerEntries, vendorInvoices, vendorInvoicePayments, sites, filterYears, filterMonths, filterClient, includeBF, payrollVariables]);
 
   // Filtered rows by search term and account classification
   const displayRows = useMemo(() => {

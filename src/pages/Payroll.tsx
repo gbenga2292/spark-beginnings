@@ -292,7 +292,10 @@ export function Payroll() {
         })
         .map((emp) => {
           let whtRateToStore = 0;
-          const standardSalary = emp.monthlySalaries[mKey] || 0;
+          const yearComp = emp.yearlyCompensation?.[String(year)];
+          const empSalariesForYear = yearComp?.monthlySalaries || emp.monthlySalaries;
+          const empRentForYear = yearComp?.rent !== undefined ? yearComp.rent : (emp.rent || 0);
+          const standardSalary = empSalariesForYear[mKey] || 0;
 
           const defaultDays = emp.staffType === 'FIELD' ? 6 : 5;
           // Use workDaysPerWeek from the departments table (set in Variables page) as the authoritative source
@@ -409,7 +412,7 @@ export function Payroll() {
             const annualGross = (salary * 12) + overtime;
             const pensionAmt = hasPension ? (pensionSum * 12) * (payrollVariables.employeePensionRate / 100) : 0;
             const extraCRA = tv.extraConditions.filter(c => c.enabled).reduce((s, c) => s + c.amount, 0);
-            const rentRelief = Math.min((emp.rent || 0) * (tv.rentReliefRate ?? 0.20), 500000);
+            const rentRelief = Math.min(empRentForYear * (tv.rentReliefRate ?? 0.20), 500000);
             const cra = tv.craBase + rentRelief + pensionAmt + extraCRA;
             const annualTaxable = Math.max(annualGross - cra, 0);
             // Old Excel Logic Translation

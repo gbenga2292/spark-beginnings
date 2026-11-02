@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, memo, useCallback, startTransition } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
@@ -423,8 +424,15 @@ export function Attendance() {
       current = departments.find(d => d.id === current!.parentDepartmentId);
     }
   }, [departments]);
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('entry');
+  const [activeTab, setActiveTab] = useState<'entry' | 'database' | 'machines'>(() => {
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab === 'machines' || urlTab === 'database' || urlTab === 'entry') return urlTab;
+    return 'entry';
+  });
   const [staffTypeFilter, setStaffTypeFilter] = useState<'OFFICE' | 'FIELD'>('FIELD');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -461,7 +469,23 @@ export function Attendance() {
   };
 
   const [hideInactiveMachineSites, setHideInactiveMachineSites] = useState(false);
-  const [machineSubTab, setMachineSubTab] = useState<'register' | 'machinedb' | 'machineanalytics'>('register');
+  const [machineSubTab, setMachineSubTab] = useState<'register' | 'machinedb' | 'machineanalytics'>(() => {
+    const urlSubTab = new URLSearchParams(window.location.search).get('subtab');
+    if (urlSubTab === 'register' || urlSubTab === 'machinedb' || urlSubTab === 'machineanalytics') return urlSubTab;
+    return 'register';
+  });
+
+  // Sync tab with URL search params or route state
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') || (location.state as any)?.tab;
+    if (tabParam && (tabParam === 'entry' || tabParam === 'database' || tabParam === 'machines')) {
+      setActiveTab(tabParam as any);
+    }
+    const subTabParam = searchParams.get('subtab') || (location.state as any)?.subtab;
+    if (subTabParam && (subTabParam === 'register' || subTabParam === 'machinedb' || subTabParam === 'machineanalytics')) {
+      setMachineSubTab(subTabParam as any);
+    }
+  }, [searchParams, location.state]);
 
   const groupedMachineLogs = useMemo(() => {
     const groups: Record<string, {

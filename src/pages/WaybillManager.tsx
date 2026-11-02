@@ -23,6 +23,10 @@ import { useSetPageTitle, useAutoCollapseSidebar } from '@/src/contexts/PageCont
 import { useAppStore } from '../store/appStore';
 import { useUserStore } from '../store/userStore';
 import { isInternalSite } from '@/src/lib/siteUtils';
+import {
+  ReturnDamageBatchDialog,
+  ReturnWaybillDamageInfo,
+} from '@/src/components/damages/ReturnDamageBatchDialog';
 
 function WaybillManagerHeader({ onCreate, activeTab }: { onCreate: () => void, activeTab: 'waybill' | 'return' }) {
   useSetPageTitle(
@@ -65,6 +69,7 @@ export function WaybillManager() {
   const [activeTab, setActiveTab] = useState<'waybill' | 'return'>('waybill');
   const [waybillToProcess, setWaybillToProcess] = useState<Waybill | null>(null);
   const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
+  const [damageBatchInfo, setDamageBatchInfo] = useState<ReturnWaybillDamageInfo | null>(null);
 
   const outgoingWaybills = activeWaybills.filter(w => w.type === 'waybill');
   const incomingReturns = activeWaybills.filter(w => w.type === 'return');
@@ -198,7 +203,29 @@ export function WaybillManager() {
   const handleCompleteReturn = () => {
     if (waybillToProcess) {
       updateWaybillStatus(waybillToProcess.id, 'return_completed', sentDate, returnConditions);
+      const targetWb = waybillToProcess;
+      const targetConditions = returnConditions;
       setWaybillToProcess(null);
+
+      const damaged = targetWb.items
+        .filter((i) => (targetConditions[i.assetId]?.damaged || 0) > 0)
+        .map((i) => ({
+          assetId: i.assetId,
+          assetName: i.assetName,
+          quantity: targetConditions[i.assetId].damaged,
+        }));
+
+      if (damaged.length > 0) {
+        const siteName = sites.find((s) => s.id === targetWb.siteId)?.name || targetWb.siteName || '';
+        setDamageBatchInfo({
+          waybillId: targetWb.id,
+          waybillRef: `REF-${targetWb.id.substring(0, 8).toUpperCase()}`,
+          siteId: targetWb.siteId || null,
+          siteName,
+          date: sentDate,
+          damagedItems: damaged,
+        });
+      }
     }
   };
 
@@ -678,6 +705,17 @@ export function WaybillManager() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {damageBatchInfo && (
+        <ReturnDamageBatchDialog
+          open={!!damageBatchInfo}
+          onOpenChange={(open) => {
+            if (!open) setDamageBatchInfo(null);
+          }}
+          info={damageBatchInfo}
+          onSuccess={() => setDamageBatchInfo(null)}
+        />
       )}
     </div>
   );

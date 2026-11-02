@@ -2240,8 +2240,16 @@ function MachineReconCard() {
             </span>
           )}
           <button
+            onClick={() => navigate('/attendance?tab=machines&subtab=register')}
+            className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors border border-amber-500/20 hover:border-amber-500/30"
+            title="Open Daily Register (Machines Tab)"
+          >
+            <ClipboardList className="h-3.5 w-3.5" />
+            <span>Log Register</span>
+          </button>
+          <button
             onClick={() => navigate('/operations/machines')}
-            className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+            className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors ml-1"
           >
             View all <ArrowRight className="h-3 w-3" />
           </button>
@@ -2276,13 +2284,21 @@ function MachineReconCard() {
 
       {/* Stalled site alert */}
       {recon.stalledSites.length > 0 && (
-        <div className="flex items-start gap-2 px-4 py-2 bg-amber-500/6 border-b border-amber-500/20">
-          <Hourglass className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-[11px] text-amber-400">
-            <span className="font-semibold">{recon.stalledSites.length} site{recon.stalledSites.length > 1 ? 's' : ''}</span> with no logged pump hours in 3+ days:{' '}
-            {recon.stalledSites.slice(0, 2).map(s => s.siteName).join(', ')}
-            {recon.stalledSites.length > 2 && ` +${recon.stalledSites.length - 2} more`}
-          </p>
+        <div className="flex items-start justify-between gap-2 px-4 py-2 bg-amber-500/6 border-b border-amber-500/20">
+          <div className="flex items-start gap-2">
+            <Hourglass className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-400">
+              <span className="font-semibold">{recon.stalledSites.length} site{recon.stalledSites.length > 1 ? 's' : ''}</span> with no logged pump hours in 3+ days:{' '}
+              {recon.stalledSites.slice(0, 2).map(s => s.siteName).join(', ')}
+              {recon.stalledSites.length > 2 && ` +${recon.stalledSites.length - 2} more`}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/attendance?tab=machines&subtab=register')}
+            className="text-[10px] font-semibold text-amber-500 hover:text-amber-400 underline shrink-0 mt-0.5 flex items-center gap-0.5"
+          >
+            Log now <ArrowRight className="h-2.5 w-2.5" />
+          </button>
         </div>
       )}
 

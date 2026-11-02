@@ -35,6 +35,7 @@ import { RevenueByStreamReport } from '@/src/components/financial/RevenueByStrea
 import { BalanceSheetReport } from '@/src/components/financial/BalanceSheetReport';
 import { TrialBalanceReport } from '@/src/components/financial/TrialBalanceReport';
 import { CompanyAccountStatement } from '@/src/components/financial/CompanyAccountStatement';
+import { LedgerSummaryReport } from '@/src/components/financial/LedgerSummaryReport';
 import { cn } from '@/src/lib/utils';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#0284c7', '#0d9488'];
@@ -333,6 +334,8 @@ export function FinancialReports() {
   const [fullScreenTable, setFullScreenTable] = useState<'ledger' | 'payroll' | 'ledger-breakdown' | null>(null);
   const [showVatForensics, setShowVatForensics] = useState(false);
 
+  const fetchLedgerYearIfNeeded = useAppStore(state => state.fetchLedgerYearIfNeeded);
+
   useEffect(() => {
     if (rawInvoices.length === 0) {
       fetchInvoicesData()
@@ -355,7 +358,13 @@ export function FinancialReports() {
         })
         .catch(console.error);
     }
-  }, [rawInvoices.length, ledgerEntries.length, employees.length]);
+
+    // Proactively load prior year 2025 ledger for accurate Balance Sheet & Trial Balance brought forward
+    fetchLedgerYearIfNeeded(2025).catch(console.error);
+    if (filterYear !== 'All' && !isNaN(Number(filterYear))) {
+      fetchLedgerYearIfNeeded(Number(filterYear)).catch(console.error);
+    }
+  }, [rawInvoices.length, ledgerEntries.length, employees.length, filterYear, fetchLedgerYearIfNeeded]);
 
 
   const toggleFullScreen = async (tableName: 'ledger' | 'payroll' | 'ledger-breakdown') => {
@@ -619,8 +628,14 @@ export function FinancialReports() {
         grossPay += (r.salary + r.overtime);
         employeePension += r.pension;
         loansAmount += r.loanRepayment;
-        paye += r.paye;
-        wht += (r.withholdingTax || 0);
+        // withholdingTax is a boolean flag on PayrollRecord, NOT an amount.
+        // For NON-EMPLOYEE consultants their paye field holds the WHT amount.
+        // For regular employees their paye field holds PAYE (income tax).
+        if (r.withholdingTax && r.staffType === 'NON-EMPLOYEE') {
+          wht += r.paye; // actual WHT amount
+        } else {
+          paye += r.paye; // regular PAYE
+        }
       });
       const totalPayout = grossPay - (employeePension + loansAmount + paye + wht);
 
@@ -2661,200 +2676,11 @@ export function FinancialReports() {
       {mainTab === 'site-summary' ? (
         <SiteSummary filterYears={filterYear === 'All' ? ['All'] : selectedYears} filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} />
       ) : mainTab === 'ledger-summary' ? (
-        /* ─────────────────────────────────────────────────────────────
-           LEDGER SUMMARY TAB — monthly breakdown of ledger expenses
-           ───────────────────────────────────────────────────────────── */
-        (() => {
-          const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-          const MONTH_KEYS  = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-
-          // Available years from ledger entries
-          const ledgerYears = Array.from(new Set(ledgerEntries.map(e => e.date?.substring(0, 4)).filter(Boolean))).sort().reverse();
-
-          const filteredLedger = ledgerEntries.filter(e => {
-            if (!e.date) return false;
-            if (filterYear !== 'All' && !e.date.startsWith(filterYear)) return false;
-            // Handle month filtering
-            if (filterMonth !== 'All') {
-               const d = new Date(e.date);
-               if (!isNaN(d.getTime()) && String(d.getMonth() + 1) !== filterMonth) return false;
-            }
-            if (filterClient !== 'All') {
-               // Determine client for ledger entry
-               let entryClient = '';
-               if (ledgerSummaryView === 'site') {
-                 entryClient = sites.find(s => s.name === e.site)?.client || '';
-               } else if (ledgerSummaryView === 'client') {
-                 entryClient = e.client || '';
-               }
-               if (entryClient !== filterClient) return false;
-            }
-            return true;
-          });
-
-          // Build month → group → total map
-          const buildMonthlyBreakdown = (groupKey: (e: typeof filteredLedger[0]) => string) => {
-            const groups = new Map<string, Map<number, number>>();
-            filteredLedger.forEach(e => {
-              const d = new Date(e.date);
-              if (isNaN(d.getTime())) return;
-              const mth = d.getMonth(); // 0-11
-              const grp = groupKey(e) || '—';
-              if (!groups.has(grp)) groups.set(grp, new Map());
-              const mthMap = groups.get(grp)!;
-              mthMap.set(mth, (mthMap.get(mth) || 0) + (e.amount || 0));
-            });
-            return groups;
-          };
-
-          const dataMap = {
-            category: buildMonthlyBreakdown(e => e.category),
-            bank:     buildMonthlyBreakdown(e => e.bank),
-            client:   buildMonthlyBreakdown(e => e.client),
-            site:     buildMonthlyBreakdown(e => e.site),
-          }[ledgerSummaryView];
-
-          const groups = Array.from(dataMap.keys()).sort();
-          const totalsPerGroup = groups.map(g => Array.from(dataMap.get(g)!.values()).reduce((a, b) => a + b, 0));
-          const grandTotal = totalsPerGroup.reduce((a, b) => a + b, 0);
-
-          return (
-            <div className="space-y-6">
-              {/* Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-md border border-slate-200">
-                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                  {(['category', 'bank', 'client', 'site'] as const).map(v => (
-                    <button key={v} onClick={() => setLedgerSummaryView(v)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-all ${
-                        ledgerSummaryView === v ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-slate-700'
-                      }`}>
-                      {v}
-                    </button>
-                  ))}
-                </div>
-                <div className="ml-auto text-sm text-slate-500">
-                  <span className="font-bold text-slate-900">₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> total
-                </div>
-              </div>
-
-              {/* Monthly breakdown table */}
-              <Card className={`border-slate-200 rounded-md overflow-hidden ${fullScreenTable === 'ledger-breakdown' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
-                <CardHeader className={`bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between ${fullScreenTable === 'ledger-breakdown' ? 'hidden' : ''}`}>
-                  <CardTitle className="text-slate-800 text-base capitalize m-0">By {ledgerSummaryView} — Monthly Breakdown ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})</CardTitle>
-                  <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100" onClick={() => toggleFullScreen('ledger-breakdown')}>
-                    <Maximize2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Full Screen</span>
-                  </Button>
-                </CardHeader>
-                
-                {fullScreenTable === 'ledger-breakdown' && (
-                  <Button 
-                    variant="default" 
-                    size="icon" 
-                    className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
-                    onClick={() => toggleFullScreen('ledger-breakdown')}
-                    title="Exit Full Screen"
-                  >
-                    <Minimize2 className="h-5 w-5" />
-                  </Button>
-                )}
-
-                <CardContent className={`p-0 flex flex-col ${fullScreenTable === 'ledger-breakdown' ? 'flex-1 h-full min-h-0' : ''}`}>
-                  <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger-breakdown' ? 'flex-1 h-full min-h-0' : 'max-h-[60vh]'}`}>
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-900 text-white sticky top-0 z-20">
-                        <tr>
-                          <th className="py-2.5 px-4 text-left font-semibold capitalize sticky left-0 z-30 bg-slate-900">{ledgerSummaryView}</th>
-                          {MONTH_NAMES.map((m, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null; return (
-                            <th key={m} className="py-2.5 px-2 text-right font-semibold whitespace-nowrap">{m}</th>
-                                  ); })}
-
-                          <th className="py-2.5 px-4 text-right font-semibold">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groups.length === 0 ? (
-                          <tr><td colSpan={14} className="text-center py-12 text-slate-400 italic">No ledger entries for the selected period.</td></tr>
-                        ) : groups.map((grp, gi) => {
-                          const mthMap = dataMap.get(grp)!;
-                          const rowTotal = totalsPerGroup[gi];
-                          return (
-                            <tr key={grp} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${gi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className={`py-2 px-4 font-medium text-slate-700 whitespace-nowrap sticky left-0 z-10  border-r border-slate-100 ${gi % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{grp || '—'}</td>
-                              {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
-                                const val = mthMap.get(mi) || 0;
-                                return (
-                                  <td key={mi} className={`py-2 px-2 text-right tabular-nums text-xs ${
-                                    val > 0 ? 'text-slate-800 font-medium' : 'text-slate-300'
-                                  }`}>
-                                    {val > 0 ? val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-                                  </td>
-                                );
-                              })}
-                              <td className="py-2 px-4 text-right font-bold text-blue-600 whitespace-nowrap tabular-nums font-mono">
-                                ₦{rowTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {/* Grand total row */}
-                        {groups.length > 0 && (
-                          <tr className="bg-slate-100 hover:bg-slate-100 border-t-2 border-slate-300 font-bold relative z-10">
-                            <td className="py-2.5 px-4 text-slate-800 sticky left-0 z-20 bg-slate-100 border-r border-slate-200">TOTAL</td>
-                            {MONTH_NAMES.map((_, mi) => { if (filterMonth !== "All" && String(mi + 1) !== filterMonth) return null;
-                              const colTotal = filteredLedger
-                                .filter(e => { const d = new Date(e.date); return !isNaN(d.getTime()) && d.getMonth() === mi; })
-                                .reduce((sum, e) => sum + (e.amount || 0), 0);
-                              return (
-                                <td key={mi} className="py-2.5 px-2 text-right text-slate-800 tabular-nums font-mono text-xs">
-                                  {colTotal > 0 ? colTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
-                                </td>
-                              );
-                            })}
-                            <td className="py-2.5 px-4 text-right text-blue-700 whitespace-nowrap tabular-nums font-mono">
-                              ₦{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Per-group bar chart */}
-              {groups.length > 0 && (
-                <Card className="border-slate-200">
-                  <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4">
-                    <CardTitle className="text-slate-800 text-base">Top {Math.min(groups.length, 10)} by Total Spend</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-2">
-                      {groups
-                        .map((g, i) => ({ name: g, total: totalsPerGroup[i] }))
-                        .sort((a, b) => b.total - a.total)
-                        .slice(0, 10)
-                        .map(item => {
-                          const pct = grandTotal > 0 ? (item.total / grandTotal) * 100 : 0;
-                          return (
-                            <div key={item.name} className="flex items-center gap-3">
-                              <div className="w-32 md:w-48 text-xs font-medium text-slate-600 truncate shrink-0">{item.name || '—'}</div>
-                              <div className="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                                <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                              </div>
-                              <div className="text-right text-xs font-semibold text-slate-700 w-28 shrink-0 tabular-nums">
-                                ₦{item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-slate-400">({pct.toFixed(1)}%)</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          );
-        })()
+        <LedgerSummaryReport 
+          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
+          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
+          filterClient={filterClient} 
+        />
       ) : mainTab === 'expenses-vat' ? (
         /* ─────────────────────────────────────────────────────────────
            EXPENSES VAT TAB — Monthly report of vatable expense entries

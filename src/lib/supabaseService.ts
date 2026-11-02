@@ -82,6 +82,9 @@ export function dbToEmployee(r: any): Employee {
     lineManager: r.line_manager || undefined,
     phone: r.phone || undefined,
     email: r.email || undefined,
+    address: r.address || r.onboarding_checklist?.verifiedAddress || undefined,
+    dateOfBirth: r.date_of_birth || undefined,
+    yearlyCompensation: r.yearly_compensation || undefined,
     payeeType: r.payee_type || undefined,
     typeOfPay: r.type_of_pay || undefined,
     startMonthOfPay: r.start_month_of_pay || undefined,
@@ -841,6 +844,9 @@ function employeeToDb(e: Employee) {
     onboarding_archived: e.onboardingArchived ?? false,
     phone: e.phone || null,
     email: e.email || null,
+    address: e.address || null,
+    date_of_birth: e.dateOfBirth || null,
+    yearly_compensation: e.yearlyCompensation || {},
     onboarding_notes: e.onboardingNotes || null,
     offboarding_remarks: e.offboardingRemarks || null,
   };
@@ -1951,6 +1957,9 @@ export const db = {
     if (e.lineManager !== undefined) update.line_manager = e.lineManager;
     if (e.phone !== undefined) update.phone = e.phone;
     if (e.email !== undefined) update.email = e.email;
+    if (e.address !== undefined) update.address = e.address;
+    if (e.dateOfBirth !== undefined) update.date_of_birth = e.dateOfBirth;
+    if (e.yearlyCompensation !== undefined) update.yearly_compensation = e.yearlyCompensation;
     if (e.payeeType !== undefined) update.payee_type = e.payeeType;
     if (e.typeOfPay !== undefined) update.type_of_pay = e.typeOfPay;
     if (e.startMonthOfPay !== undefined) update.start_month_of_pay = e.startMonthOfPay;

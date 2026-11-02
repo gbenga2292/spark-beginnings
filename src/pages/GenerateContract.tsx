@@ -189,7 +189,7 @@ export function GenerateContract() {
                       offerDate: formatDisplayDate(Date.now()),
                       candidateTitle: 'Mr/Ms.',
                       candidateName: `${found.firstname} ${found.surname}`,
-                      candidateAddress: 'Please provide exact address...',
+                      candidateAddress: found.address || found.onboardingChecklist?.verifiedAddress || 'Please provide exact address...',
                       salutation: `Dear ${found.firstname.split(' ')[0]},`,
                       jobTitle: found.position,
                       introText: `Sequel to your interview and subsequent assessments we are pleased to offer you the position of ${found.position} with our organisation. Upon review of your qualifications and skills, we believe your skills and experience make you an excellent fit for our team.\n\nHowever, you should note with your new employment comes responsibility and it is expected that you discharge your duties accordingly. The success of the business must be paramount in your mind and while under employment, you are expected to continually find ways to advance the growth of the business.\n\nYou will be expected to abide by all rules and guidelines as well observe the necessary codes of conduct that have been put in place by your employers.`,

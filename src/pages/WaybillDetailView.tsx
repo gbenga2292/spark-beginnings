@@ -15,6 +15,10 @@ import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { jsPDF } from 'jspdf';
 import logoSrc from '@/logo/logo-2.png';
 import { PdfViewer } from '@/src/components/PdfViewer';
+import {
+  ReturnDamageBatchDialog,
+  ReturnWaybillDamageInfo,
+} from '@/src/components/damages/ReturnDamageBatchDialog';
 
 interface WaybillDetailViewProps {
   waybill: Waybill;
@@ -61,6 +65,7 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
   );
   const [returnConditions, setReturnConditions] = useState<Record<string, { good: number, damaged: number, missing: number }>>({});
   const [signatureBase64, setSignatureBase64] = useState<string>('');
+  const [damageBatchInfo, setDamageBatchInfo] = useState<ReturnWaybillDamageInfo | null>(null);
 
   useEffect(() => {
     if (waybill.signature) {
@@ -248,7 +253,27 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
   const handleMarkReturnCompleted = () => {
     updateWaybillStatus(waybill.id, 'return_completed', sentDate, returnConditions);
     setShowDateDialog(false);
-    onClose();
+
+    const damaged = waybill.items
+      .filter((i) => (returnConditions[i.assetId]?.damaged || 0) > 0)
+      .map((i) => ({
+        assetId: i.assetId,
+        assetName: i.assetName,
+        quantity: returnConditions[i.assetId].damaged,
+      }));
+
+    if (damaged.length > 0) {
+      setDamageBatchInfo({
+        waybillId: waybill.id,
+        waybillRef: `REF-${waybill.id.substring(0, 8).toUpperCase()}`,
+        siteId: waybill.siteId || null,
+        siteName: waybill.siteName || '',
+        date: sentDate,
+        damagedItems: damaged,
+      });
+    } else {
+      onClose();
+    }
   };
 
   // ── Page header ──────────────────────────────────────────────────────────────
@@ -597,6 +622,23 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {damageBatchInfo && (
+        <ReturnDamageBatchDialog
+          open={!!damageBatchInfo}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDamageBatchInfo(null);
+              onClose();
+            }
+          }}
+          info={damageBatchInfo}
+          onSuccess={() => {
+            setDamageBatchInfo(null);
+            onClose();
+          }}
+        />
       )}
     </>
   );

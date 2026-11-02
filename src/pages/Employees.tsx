@@ -132,6 +132,10 @@ export function Employees() {
   }, [filteredEmployees, page, pageSize]);
   const totalPages = Math.ceil(filteredEmployees.length / pageSize);
 
+  const currentYear = new Date().getFullYear();
+  const [compensationYear, setCompensationYear] = useState<number>(currentYear);
+  const [viewCompensationYear, setViewCompensationYear] = useState<number>(currentYear);
+
   const [formData, setFormData] = useState<Partial<Employee>>({
     staffType: 'OFFICE',
     level: 10,
@@ -264,18 +268,33 @@ export function Employees() {
       }
     }
 
+    const emptyMatrix: MonthlySalary = {
+      jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
+      jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
+    };
+    const curYearComp = formData.yearlyCompensation?.[String(currentYear)];
+    const primarySalaries = curYearComp?.monthlySalaries || formData.monthlySalaries || emptyMatrix;
+    const primaryRent = curYearComp?.rent !== undefined ? curYearComp.rent : (formData.rent || 0);
+    const finalYearlyCompensation = {
+      ...(formData.yearlyCompensation || {}),
+      [String(currentYear)]: {
+        monthlySalaries: primarySalaries,
+        rent: primaryRent
+      }
+    };
+
     const newEmployee: Employee = {
       ...(formData as Employee),
       id: generateId(),
       employeeCode,
       status: finalStatus,
-      monthlySalaries: formData.monthlySalaries || {
-        jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
-        jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
-      },
+      monthlySalaries: primarySalaries,
       onboardingTasks: (formData as any).onboardingTasks || [],
       excludeFromOnboarding: formData.excludeFromOnboarding || false,
-      rent: formData.rent || 0,
+      rent: primaryRent,
+      yearlyCompensation: finalYearlyCompensation,
+      address: formData.address || '',
+      dateOfBirth: formData.dateOfBirth || '',
       lashmaPolicyNumber: formData.lashmaPolicyNumber || '',
       lashmaRegistrationDate: formData.lashmaRegistrationDate || '',
       lashmaExpiryDate: formData.lashmaExpiryDate || '',
@@ -337,7 +356,24 @@ export function Employees() {
 
   const handleEdit = (employee: Employee) => {
     setEditingEmployeeId(employee.id);
-    setFormData({ ...employee });
+    setCompensationYear(currentYear);
+    const existingYearly = employee.yearlyCompensation || {};
+    const curYearStr = String(currentYear);
+    const initializedYearly = {
+      ...existingYearly,
+      [curYearStr]: existingYearly[curYearStr] || {
+        monthlySalaries: employee.monthlySalaries || {
+          jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0,
+          jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0
+        },
+        rent: employee.rent || 0
+      }
+    };
+    setFormData({
+      ...employee,
+      address: employee.address || employee.onboardingChecklist?.verifiedAddress || '',
+      yearlyCompensation: initializedYearly
+    });
     setIsEditing(true);
     setOpenMenuId(null);
     // Not yet dirty — user hasn't changed anything
@@ -399,7 +435,15 @@ export function Employees() {
       }
     }
 
-    const updateData = { ...formData, status: finalStatus };
+    const curYearComp = formData.yearlyCompensation?.[String(currentYear)];
+    const updateData: Partial<Employee> = {
+      ...formData,
+      status: finalStatus,
+      ...(curYearComp ? {
+        monthlySalaries: curYearComp.monthlySalaries,
+        rent: curYearComp.rent,
+      } : {})
+    };
 
     // Sync pension, paye, and LASHMA fields back into the onboarding checklist
     // so both the Onboarding page and Employee Detail page stay in sync.
@@ -422,6 +466,9 @@ export function Employees() {
             }),
             ...(formData.lashmaExpiryDate !== undefined && {
               lashmaExpiryDate: formData.lashmaExpiryDate,
+            }),
+            ...(formData.address !== undefined && {
+              verifiedAddress: formData.address,
             }),
           }
         : undefined;
@@ -512,7 +559,7 @@ export function Employees() {
       } else {
         headers = [
           'id', 'employeeCode', 'surname', 'firstname', 'department', 'staffType', 'level', 'position', 'status',
-          'yearlyLeave', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber',
+          'yearlyLeave', 'dateOfBirth', 'address', 'startDate', 'endDate', 'bankName', 'accountNo', 'taxId', 'pensionNumber', 'lashmaPolicyNumber',
           'lashmaRegistrationDate', 'lashmaExpiryDate', 'payeTax', 'subjectToPension', 'withholdingTax', 'excludeFromOnboarding', 'rent',
           'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
         ];
@@ -546,6 +593,8 @@ export function Employees() {
             extractCSV(emp.position),
             extractCSV(emp.status),
             extractCSV(emp.yearlyLeave),
+            extractCSV(emp.dateOfBirth ? formatDisplayDate(emp.dateOfBirth) : ''),
+            extractCSV(emp.address || emp.onboardingChecklist?.verifiedAddress || ''),
             extractCSV(formatDisplayDate(emp.startDate) || ''),
             extractCSV(formatDisplayDate(emp.endDate) || ''),
             extractCSV(emp.bankName || ''),
@@ -686,6 +735,8 @@ export function Employees() {
           position: getIdx(['position', 'title']),
           status: getIdx(['status']),
           yearlyLeave: getIdx(['yearlyLeave', 'yearly_leave', 'leave']),
+          dateOfBirth: getIdx(['dateOfBirth', 'date_of_birth', 'dob', 'birthDate']),
+          address: getIdx(['address', 'residentialAddress']),
           startDate: getIdx(['startDate', 'start_date', 'joined']),
           endDate: getIdx(['endDate', 'end_date', 'terminated']),
           bankName: getIdx(['bankName', 'bank']),
@@ -745,6 +796,8 @@ export function Employees() {
             position: val(idxMap.position), 
             status: (val(idxMap.status) || 'Active') as any, 
             yearlyLeave: parseInt(val(idxMap.yearlyLeave)) || 0,
+            dateOfBirth: normalizeDate(val(idxMap.dateOfBirth)),
+            address: val(idxMap.address),
             startDate: normalizedStartDate, 
             endDate: (() => {
               if (normalizedEndDate && normalizedStartDate) {
@@ -817,6 +870,34 @@ export function Employees() {
     };
     reader.readAsText(file);
   };
+
+  const yearStr = String(compensationYear);
+  const activeYearComp = formData.yearlyCompensation?.[yearStr];
+  const activeYearSalaries: MonthlySalary = activeYearComp?.monthlySalaries || (
+    compensationYear === currentYear
+      ? (formData.monthlySalaries || { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 })
+      : { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 }
+  );
+  const activeYearRent: number = activeYearComp?.rent !== undefined
+    ? activeYearComp.rent
+    : (compensationYear === currentYear ? (formData.rent || 0) : 0);
+
+  const updateYearCompensation = (nextSalaries: MonthlySalary, nextRent: number) => {
+    const updatedYearly = {
+      ...(formData.yearlyCompensation || {}),
+      [yearStr]: {
+        monthlySalaries: nextSalaries,
+        rent: nextRent,
+      },
+    };
+    setFormData({
+      ...formData,
+      yearlyCompensation: updatedYearly,
+      ...(compensationYear === currentYear ? { monthlySalaries: nextSalaries, rent: nextRent } : {}),
+    });
+  };
+
+  const compensationYearsList = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
 
   // Render Employee Form (Add or Edit)
   const renderEmployeeForm = (isEdit: boolean) => (
@@ -948,6 +1029,59 @@ export function Employees() {
                   <Input type="email" value={formData.email || ''} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="e.g. john@company.com" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
                 </div>
                 <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Date of Birth (DD/MM/YYYY)</label>
+                    {formData.dateOfBirth && (
+                      <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">
+                        {formatDisplayDate(formData.dateOfBirth)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="DD/MM/YYYY"
+                      value={
+                        formData.dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(formData.dateOfBirth)
+                          ? formatDisplayDate(formData.dateOfBirth)
+                          : (formData.dateOfBirth || '')
+                      }
+                      onChange={e => {
+                        const raw = e.target.value;
+                        // Auto-format digits into DD/MM/YYYY if typing numbers
+                        const digits = raw.replace(/\D/g, '').slice(0, 8);
+                        let formatted = raw;
+                        if (/^[\d/]*$/.test(raw)) {
+                          if (digits.length <= 2) formatted = digits;
+                          else if (digits.length <= 4) formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                          else formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+                        }
+                        // If complete DD/MM/YYYY, store normalized YYYY-MM-DD or keep raw while typing
+                        if (/^\d{2}\/\d{2}\/\d{4}$/.test(formatted)) {
+                          const norm = normalizeDate(formatted);
+                          setFormData({ ...formData, dateOfBirth: norm || formatted });
+                        } else {
+                          setFormData({ ...formData, dateOfBirth: formatted });
+                        }
+                      }}
+                      className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700"
+                    />
+                    <div className="relative shrink-0">
+                      <Input
+                        type="date"
+                        value={normalizeDate(formData.dateOfBirth)}
+                        onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                        className="w-10 px-2 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 cursor-pointer"
+                        title="Pick Date of Birth"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Residential Address</label>
+                  <Input value={formData.address || ''} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="e.g. 12 Marina Road, Lagos Island, Lagos" className="bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
+                </div>
+                <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Status</label>
                   <select 
                     className={`flex h-10 w-full rounded-md border border-slate-200 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none ${normalizeDate(formData.endDate) ? 'opacity-70 cursor-not-allowed' : ''}`} 
@@ -985,24 +1119,52 @@ export function Employees() {
 
           {canSeeSalary && (
             <Card className=" border-slate-200">
-              <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-row items-center justify-between">
+              <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <CardTitle className="text-slate-800">Monthly Salary Matrix (₦)</CardTitle>
-                  <CardDescription className="mt-1">Define gross monthly salary dynamically. Subject to revision.</CardDescription>
+                  <div className="flex items-center gap-3">
+                    <CardTitle className="text-slate-800">Monthly Salary Matrix — {compensationYear} (₦)</CardTitle>
+                    <select
+                      value={compensationYear}
+                      onChange={e => setCompensationYear(Number(e.target.value))}
+                      className="h-8 rounded-md border border-blue-200 bg-blue-50/80 dark:bg-slate-800 px-2.5 text-xs font-bold text-blue-700 dark:text-blue-300 focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
+                    >
+                      {compensationYearsList.map(yr => (
+                        <option key={yr} value={yr}>
+                          {yr} {yr === currentYear ? '(Current)' : yr === currentYear - 1 ? '(Last Year)' : yr === currentYear + 1 ? '(Next Year)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <CardDescription className="mt-1">Define gross monthly salary & rent dynamically per year. Switching years preserves historical and future records.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 " onClick={() => {
-                  const janVal = formData.monthlySalaries?.jan || 0;
-                  setFormData({
-                    ...formData,
-                    monthlySalaries: {
+                <div className="flex flex-wrap items-center gap-2">
+                  {formData.yearlyCompensation?.[String(compensationYear - 1)] && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-white dark:bg-slate-800 dark:text-slate-200 text-xs"
+                      onClick={() => {
+                        const prevComp = formData.yearlyCompensation?.[String(compensationYear - 1)];
+                        if (prevComp) {
+                          updateYearCompensation({ ...prevComp.monthlySalaries }, prevComp.rent || 0);
+                          toast.success(`Copied ${compensationYear - 1} salary matrix and rent to ${compensationYear}.`);
+                        }
+                      }}
+                    >
+                      Copy from {compensationYear - 1}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="bg-white dark:bg-slate-800 dark:text-slate-200 " onClick={() => {
+                    const janVal = activeYearSalaries.jan || 0;
+                    updateYearCompensation({
                       jan: janVal, feb: janVal, mar: janVal, apr: janVal,
                       may: janVal, jun: janVal, jul: janVal, aug: janVal,
                       sep: janVal, oct: janVal, nov: janVal, dec: janVal
-                    }
-                  });
-                }}>
-                  Copy Jan to All
-                </Button>
+                    }, activeYearRent);
+                  }}>
+                    Copy Jan to All
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1011,7 +1173,15 @@ export function Employees() {
                       <label className="text-xs font-bold uppercase text-slate-500">{month}</label>
                       <div className="relative">
                         <span className="absolute left-3 top-2 text-slate-400 font-medium">₦</span>
-                        <Input type="number" value={formData.monthlySalaries?.[month as keyof MonthlySalary] || ''} onChange={e => setFormData({ ...formData, monthlySalaries: { ...formData.monthlySalaries!, [month]: parseFloat(e.target.value) || 0 } })} className="font-mono text-sm pl-7 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
+                        <Input
+                          type="number"
+                          value={activeYearSalaries[month as keyof MonthlySalary] || ''}
+                          onChange={e => updateYearCompensation({
+                            ...activeYearSalaries,
+                            [month]: parseFloat(e.target.value) || 0
+                          }, activeYearRent)}
+                          className="font-mono text-sm pl-7 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700"
+                        />
                       </div>
                     </div>
                   ))}
@@ -1176,9 +1346,27 @@ export function Employees() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent (₦)</label>
-                    <Input type="number" value={formData.rent || 0} onChange={e => setFormData({ ...formData, rent: Number(e.target.value) })} className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700" />
+                  <div className="space-y-2 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rent ({compensationYear}) (₦)</label>
+                      <select
+                        value={compensationYear}
+                        onChange={e => setCompensationYear(Number(e.target.value))}
+                        className="h-6 rounded border border-slate-200 bg-slate-100 dark:bg-slate-800 px-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+                        title="Switch year for Rent & Salary Matrix"
+                      >
+                        {compensationYearsList.map(yr => (
+                          <option key={yr} value={yr}>{yr}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <Input
+                      type="number"
+                      value={activeYearRent}
+                      onChange={e => updateYearCompensation(activeYearSalaries, Number(e.target.value) || 0)}
+                      className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700"
+                    />
+                    <p className="text-[10px] text-slate-400">Annual rent for {compensationYear} (used for PAYE rent relief in {compensationYear}).</p>
                   </div>
                 </div>
               </div>
@@ -1223,7 +1411,10 @@ export function Employees() {
   const renderViewModal = () => {
     if (!viewingEmployee) return null;
     const emp = viewingEmployee;
-    const totalSalary = Object.values(emp.monthlySalaries).reduce((a: number, b: number) => a + b, 0);
+    const viewYearComp = emp.yearlyCompensation?.[String(viewCompensationYear)];
+    const viewSalaries = viewYearComp?.monthlySalaries || (viewCompensationYear === currentYear ? emp.monthlySalaries : { jan: 0, feb: 0, mar: 0, apr: 0, may: 0, jun: 0, jul: 0, aug: 0, sep: 0, oct: 0, nov: 0, dec: 0 });
+    const viewRent = viewYearComp?.rent !== undefined ? viewYearComp.rent : (viewCompensationYear === currentYear ? (emp.rent || 0) : 0);
+    const totalSalary = Object.values(viewSalaries).reduce((a: number, b: number) => a + b, 0);
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1310,8 +1501,10 @@ export function Employees() {
                       <div className="flex justify-between"><span className="text-slate-500">Start Date:</span><span>{formatDisplayDate(emp.startDate) || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">End Date:</span><span>{formatDisplayDate(emp.endDate) || 'N/A'}</span></div>
                       <div className="flex justify-between"><span className="text-slate-500">Yearly Leave:</span><span>{emp.yearlyLeave} days</span></div>
+                      {emp.dateOfBirth && <div className="flex justify-between"><span className="text-slate-500">Date of Birth:</span><span className="font-mono">{formatDisplayDate(emp.dateOfBirth)}</span></div>}
                       {emp.phone && <div className="flex justify-between"><span className="text-slate-500">Phone:</span><span className="font-mono">{emp.phone}</span></div>}
                       {emp.email && <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-blue-600">{emp.email}</span></div>}
+                      {(emp.address || emp.onboardingChecklist?.verifiedAddress) && <div className="flex justify-between gap-4"><span className="text-slate-500 shrink-0">Address:</span><span className="text-right">{emp.address || emp.onboardingChecklist?.verifiedAddress}</span></div>}
                     </div>
                   </div>
 
@@ -1334,11 +1527,22 @@ export function Employees() {
 
                 {canSeeSalary && (
                   <div className="mt-6">
-                    <h4 className="text-sm font-semibold text-slate-500 uppercase mb-3">Salary Information</h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-slate-500 uppercase">Salary & Rent Information ({viewCompensationYear})</h4>
+                      <select
+                        value={viewCompensationYear}
+                        onChange={e => setViewCompensationYear(Number(e.target.value))}
+                        className="h-7 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                      >
+                        {compensationYearsList.map(yr => (
+                          <option key={yr} value={yr}>{yr}</option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm mb-4">
                         {['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'].map((month) => {
-                          const amount = (emp.monthlySalaries as any)[month] || 0;
+                          const amount = (viewSalaries as any)[month] || 0;
                           return (
                             <div key={month} className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-700 sm:border-0 last:border-0">
                               <span className="text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider">{month}:</span>
@@ -1350,10 +1554,18 @@ export function Employees() {
                         })}
                       </div>
                       <div className="border-t border-slate-200 dark:border-slate-700 pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                        <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest">Annual Total</span>
-                        <span className="text-2xl font-black text-blue-600 dark:text-blue-400">
-                          ₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
+                        <div>
+                          <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest block">Annual Rent ({viewCompensationYear})</span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200 text-sm">
+                            ₦{viewRent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="sm:text-right">
+                          <span className="font-bold text-slate-600 dark:text-slate-400 uppercase text-xs tracking-widest block">Annual Salary Total ({viewCompensationYear})</span>
+                          <span className="text-2xl font-black text-blue-600 dark:text-blue-400">
+                            ₦{totalSalary.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

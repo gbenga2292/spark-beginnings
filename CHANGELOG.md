@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-10-29
+
+### Operations, Fleet & Dashboard Navigation
+- **Machine Fleet Direct Register Navigation:**
+  - Added dedicated **"Log Register"** shortcut button directly within the Dashboard Machine Fleet widget header for instant single-click dispatch to `/attendance?tab=machines&subtab=register`.
+  - Added direct **"Log now →"** link on the stalled site warning banner for immediate pump hour logging.
+  - Enhanced [Attendance.tsx](file:///c:/Users/USER/Desktop/assign/spark-beginnings/src/pages/Attendance.tsx) with dynamic URL parameter (`?tab=machines&subtab=register`) and route state synchronization, enabling deep-linked tab navigation across the application.
+
+### Financial Reporting & Historical Ledger Ingestion
+- **Multi-Year Expense Comparison Canvas:**
+  - Added multi-year comparative analytics canvas in Ledger Summary allowing year-over-year operational expense comparison by category, client, and project site.
+- **2025 Ledger Reconciliation & Record Extraction:**
+  - Extracted and processed all 1,349 voucher line items from the 2025 DCEL historical ledger into the database.
+
+### Payroll & Compliance Calculations
+- **Statutory Withholding Tax (WHT) Correction:**
+  - Corrected Withholding Tax computation across payroll reports to dynamically reflect statutory rates and accurate historical deductions across operating months.
+
+---
+
 ## [2.1.9] - 2026-10-28
 
 ### Financial Module & Reconciliation Overhaul

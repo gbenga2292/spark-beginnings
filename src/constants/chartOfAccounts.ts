@@ -53,7 +53,7 @@ export const DCEL_CHART_OF_ACCOUNTS: ChartAccount[] = [
   { code: '5050', name: 'Equipment Mobilization & Transport Cost', type: 'EXPENSE', category: 'DIRECT_COST' },
   { code: '5060', name: 'Equipment Running Maintenance on Site', type: 'EXPENSE', category: 'DIRECT_COST' },
 
-  // ─── 5100 - 5160: OPERATING EXPENSES (OPEX) ───
+  // ─── 5100 - 5170: OPERATING EXPENSES (OPEX) ───
   { code: '5100', name: 'Depreciation Expense — Equipment & Machinery', type: 'EXPENSE', category: 'OPERATING_EXPENSE' },
   { code: '5110', name: 'Administrative Salaries & Staff Welfare', type: 'EXPENSE', category: 'OPERATING_EXPENSE' },
   { code: '5120', name: 'Office Rent & Yard Lease', type: 'EXPENSE', category: 'OPERATING_EXPENSE' },
@@ -63,3 +63,72 @@ export const DCEL_CHART_OF_ACCOUNTS: ChartAccount[] = [
   { code: '5160', name: 'Bank Charges & Transaction Fees', type: 'EXPENSE', category: 'OPERATING_EXPENSE' },
   { code: '5170', name: 'General Administration & Operating Overhead', type: 'EXPENSE', category: 'OPERATING_EXPENSE' },
 ];
+
+export const DEFAULT_CATEGORY_COA_MAP: Record<string, string> = {
+  // Direct Costs (5000 - 5060)
+  'payroll expenses': '5010',
+  'salary': '5010',
+  'direct cost': '5020',
+  'cost of goods': '5000',
+  'petrol (vehicle)': '5030',
+  'office consumables:petrol': '5030',
+  'office consumables:diesel': '5030',
+  'diesel': '5030',
+  're-embursable expense': '5040',
+  'reimbursable expense': '5040',
+  'local transport': '5050',
+  'machine maintenance': '5060',
+  'repairs and maintenance': '5060',
+  'tools and small equipment': '5060',
+
+  // Operating Expenses (5100 - 5170)
+  'welfare': '5110',
+  'medical': '5110',
+  'premises maintenance': '5120',
+  'office maintenance': '5120',
+  'office consumables': '5120',
+  'office supplies': '5120',
+  'premises service charge': '5120',
+  'client rent': '5120',
+  'internet and subs': '5130',
+  'power and electricity': '5130',
+  'telephone expense': '5130',
+  'auto truck maintenance': '5140',
+  'motor vehicle maintenance': '5140',
+  'professional fees': '5150',
+  'interest expense': '5160',
+  'bank service charges': '5160',
+  'directors expense': '5170',
+  'fines': '5170',
+  'corporate social responsibility': '5170',
+  'meals and entertainment': '5170',
+  'furnitures and fitting': '5170',
+  'business development': '5170',
+  'government/business/regulatory': '5170',
+
+  // Non-P&L Capital & Tax Accounts
+  'fixed assets': '1300',
+  'vat': '2100',
+};
+
+/**
+ * Resolves the Chart of Accounts code for a given Ledger Category name.
+ * Checks user-configured mappings first (case-insensitive), then falls back to DEFAULT_CATEGORY_COA_MAP.
+ */
+export function resolveCategoryAccountCode(
+  categoryName: string | undefined,
+  customMap?: Record<string, string>
+): string | undefined {
+  if (!categoryName) return undefined;
+  const trimmed = categoryName.trim();
+  if (!trimmed) return undefined;
+
+  if (customMap) {
+    if (customMap[trimmed]) return customMap[trimmed];
+    const lowerKey = Object.keys(customMap).find(k => k.toLowerCase() === trimmed.toLowerCase());
+    if (lowerKey && customMap[lowerKey]) return customMap[lowerKey];
+  }
+
+  return DEFAULT_CATEGORY_COA_MAP[trimmed.toLowerCase()];
+}
+
