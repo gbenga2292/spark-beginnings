@@ -243,7 +243,7 @@ export function useActiveSiteInvoices() {
       const invoiceDetails: ActiveSiteInvoiceDetail[] = [];
 
       allSiteInvoices.forEach(inv => {
-        const startDateStr = normalizeDate(inv.date || inv.dueDate || '');
+        const startDateStr = normalizeDate(inv.pumpStartDate || inv.date || inv.dueDate || '');
         const duration = Number(inv.duration) || 0;
         if (!startDateStr || duration <= 0) return;
 

@@ -1,8 +1,11 @@
+export type AccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+export type AccountCategory = 'CURRENT_ASSET' | 'NON_CURRENT_ASSET' | 'FIXED_ASSET' | 'CURRENT_LIABILITY' | 'EQUITY' | 'REVENUE' | 'DIRECT_COST' | 'OPERATING_EXPENSE';
+
 export interface ChartAccount {
   code: string;
   name: string;
   type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
-  category: 'CURRENT_ASSET' | 'NON_CURRENT_ASSET' | 'CURRENT_LIABILITY' | 'EQUITY' | 'REVENUE' | 'DIRECT_COST' | 'OPERATING_EXPENSE';
+  category: AccountCategory;
   description?: string;
 }
 

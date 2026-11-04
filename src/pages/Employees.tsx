@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -1066,14 +1066,25 @@ export function Employees() {
                       }}
                       className="font-mono bg-slate-50 dark:bg-slate-800 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-700"
                     />
+                    {/* Hidden native date input — calendar icon button triggers showPicker */}
                     <div className="relative shrink-0">
-                      <Input
+                      <input
                         type="date"
-                        value={normalizeDate(formData.dateOfBirth)}
+                        id="dob-date-picker"
+                        value={normalizeDate(formData.dateOfBirth) || ''}
                         onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                        className="w-10 px-2 bg-slate-50 dark:bg-slate-800 dark:text-slate-100 cursor-pointer"
-                        title="Pick Date of Birth"
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        tabIndex={-1}
+                        aria-hidden="true"
                       />
+                      <button
+                        type="button"
+                        title="Pick Date of Birth"
+                        onClick={() => (document.getElementById('dob-date-picker') as HTMLInputElement)?.showPicker?.()}
+                        className="flex items-center justify-center w-10 h-10 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-500 dark:text-slate-400"
+                      >
+                        <CalendarIcon className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>

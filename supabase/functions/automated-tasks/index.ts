@@ -110,30 +110,57 @@ serve(async (req) => {
       if (alreadyExists) continue;
 
       let targetAssigneeId = '';
-      let targetCreatorId = '';
+      let targetCreatorId = hrUsers.length > 0 ? hrUsers[0].id : '';
 
-      if (hrUsers.length > 0) {
-          targetAssigneeId = hrUsers.map((u: any) => u.id).join(',');
-          targetCreatorId = hrUsers[0].id;
-      } else if (emp.line_manager) {
-          const managerUser = (users || []).find((u: any) => u.id === emp.line_manager);
-          if (managerUser) {
-              targetAssigneeId = managerUser.id;
-              targetCreatorId = managerUser.id;
-          }
+      // 1. Department-level assignee override from app_settings hr_variables
+      const deptAssignees = (hrVariables.probationDepartmentAssignees as Record<string, string>) || {};
+      const empDept = (emp.department || '').trim();
+      const matchedDeptKey = Object.keys(deptAssignees).find(k => k.trim().toLowerCase() === empDept.toLowerCase());
+      const designatedDeptUserId = matchedDeptKey ? deptAssignees[matchedDeptKey] : '';
+
+      if (designatedDeptUserId) {
+        const designatedUser = (users || []).find((u: any) => u.id === designatedDeptUserId);
+        if (designatedUser) {
+          targetAssigneeId = designatedUser.id;
+          if (!targetCreatorId) targetCreatorId = designatedUser.id;
+        }
       }
 
+      // 2. Global default probation assignee from app_settings hr_variables
+      if (!targetAssigneeId && hrVariables.defaultProbationAssigneeId) {
+        const defaultUser = (users || []).find((u: any) => u.id === hrVariables.defaultProbationAssigneeId);
+        if (defaultUser) {
+          targetAssigneeId = defaultUser.id;
+          if (!targetCreatorId) targetCreatorId = defaultUser.id;
+        }
+      }
+
+      // 3. Fallback to Line Manager
+      if (!targetAssigneeId && emp.line_manager) {
+        const managerUser = (users || []).find((u: any) => u.id === emp.line_manager);
+        if (managerUser) {
+          targetAssigneeId = managerUser.id;
+          if (!targetCreatorId) targetCreatorId = managerUser.id;
+        }
+      }
+
+      // 4. Fallback to HR Users
+      if (!targetAssigneeId && hrUsers.length > 0) {
+        targetAssigneeId = hrUsers.map((u: any) => u.id).join(',');
+        targetCreatorId = hrUsers[0].id;
+      }
+
+      // 5. Final fallback to top seniority
       if (!targetAssigneeId) {
-          // Fallback to top seniority
-          const usersWithLevel = (users || []).map((u: any) => {
-              const eRec = (employees || []).find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
-              return { id: u.id, level: (eRec && eRec.level !== undefined) ? eRec.level : 999 };
-          }).sort((a: any, b: any) => a.level - b.level);
-          
-          if (usersWithLevel.length > 0) {
-            targetAssigneeId = usersWithLevel[0].id;
-            targetCreatorId = usersWithLevel[0].id;
-          }
+        const usersWithLevel = (users || []).map((u: any) => {
+            const eRec = (employees || []).find(e => e.email?.toLowerCase() === u.email?.toLowerCase());
+            return { id: u.id, level: (eRec && eRec.level !== undefined) ? eRec.level : 999 };
+        }).sort((a: any, b: any) => a.level - b.level);
+        
+        if (usersWithLevel.length > 0) {
+          targetAssigneeId = usersWithLevel[0].id;
+          if (!targetCreatorId) targetCreatorId = usersWithLevel[0].id;
+        }
       }
 
       // Create Task

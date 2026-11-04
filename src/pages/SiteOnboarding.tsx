@@ -688,10 +688,16 @@ export function SiteOnboarding() {
     if (!clients.includes(form.clientName)) addClient(form.clientName);
     
     const activeSiteId = generateId();
+    const rawBuilt = form.phase1?.whatIsBeingBuilt || '';
+    const detectedProjectType = rawBuilt.toLowerCase().includes('waterproof') || (form.clientName || '').toLowerCase().includes('first bank')
+      ? 'WATERPROOFING'
+      : (rawBuilt || 'DEWATERING').trim().toUpperCase();
+
     addSite({
       id: activeSiteId,
       name: form.siteName,
       client: form.clientName,
+      projectType: detectedProjectType,
       status: 'Active',
       vat: (() => { const ts = (form.phase4.clientTaxStatus as string) || ''; return ts === 'Add' ? 'Add' : ts === 'Yes' ? 'Yes' : 'No'; })() as 'Yes' | 'No' | 'Add',
       startDate: form.phase1.timelineStartDate || new Date().toISOString().split('T')[0],

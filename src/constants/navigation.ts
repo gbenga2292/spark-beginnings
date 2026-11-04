@@ -1,4 +1,4 @@
-import {
+﻿import {
   LayoutDashboard,
   Users,
   CalendarClock,
@@ -214,6 +214,19 @@ export const navigation: NavCategory[] = [
       { name: 'Payroll', href: '/payroll', icon: Wallet, privKey: 'payroll', privField: 'canView' },
       { name: 'Non-Employee Directory', href: '/beneficiaries', icon: Users, privKey: 'beneficiaries', privField: 'canView' },
       { name: 'Ledger', href: '/ledger', icon: BookOpen, privKey: 'ledger', privField: 'canView' },
+      {
+        name: 'Petty Cash',
+        href: '/petty-cash',
+        icon: Wallet,
+        privKey: 'pettyCash',
+        privField: 'canView',
+        visible: (user: any) =>
+          Boolean(
+            user?.privileges?.users?.canManage ||
+            user?.privileges?.pettyCash?.canView ||
+            (!user?.privileges?.pettyCash && user?.privileges?.ledger?.canView)
+          ),
+      },
       { name: 'Bank AI Import', href: '/bank-import', icon: Sparkles, privKey: 'bankImport', privField: 'canView' },
       {
         name: 'Vendor Invoices',
@@ -286,7 +299,11 @@ export function getVisibleNavItems(items: NavItem[], currentUser: any): NavItem[
     if (item.visible) return item.visible(currentUser);
     if (item.privKey === 'custom') return false;
 
-    const pagePriv = (currentUser.privileges as any)?.[item.privKey] as Record<string, boolean> | undefined;
+    let pagePriv = (currentUser.privileges as any)?.[item.privKey] as Record<string, boolean> | undefined;
+    if (!pagePriv) {
+      if (item.privKey === 'pettyCash') pagePriv = currentUser.privileges?.ledger;
+      if (item.privKey === 'profitAndLoss') pagePriv = currentUser.privileges?.profitAndLoss || currentUser.privileges?.ledger || currentUser.privileges?.financialReports;
+    }
     if (item.privField !== 'canView' && pagePriv?.['canView'] !== true) return false;
     return pagePriv?.[item.privField] === true;
   });

@@ -11,8 +11,17 @@ import {
   Wallet, 
   Landmark, 
   ArrowUpDown,
-  History
+  History,
+  PieChart,
+  X,
+  Check
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/src/components/ui/dialog';
 import { useAppStore } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import * as XLSX from 'xlsx';
@@ -62,6 +71,7 @@ export function CompanyAccountStatement({
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<'all' | 'credit' | 'debit'>('all');
   const [includeBF, setIncludeBF] = useIncludeBroughtForward();
   const [drill, setDrill] = useState<DrillState | null>(null);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
 
   // Dynamic Company info
   const [companyInfo, setCompanyInfo] = useState({
@@ -414,276 +424,229 @@ export function CompanyAccountStatement({
   };
 
   return (
-    <div className="space-y-6">
-      {/* ── Statement Container ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm shadow-xs p-6 sm:p-8">
-        
-        {/* Header */}
-        <div className="border-b border-slate-300 dark:border-slate-700 pb-5 mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs uppercase tracking-widest font-mono text-slate-700 dark:text-slate-300 font-bold">
-                  {companyInfo.name}
-                </span>
-                {companyInfo.regNumber && (
-                  <span className="text-[10px] font-mono text-slate-400 font-medium">
-                    · {companyInfo.regNumber}
-                  </span>
-                )}
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight mt-1">
-                Company Account Statement
-              </h2>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 font-mono mt-1">
-                <span>
-                  Account: {selectedBank === 'All' ? 'Consolidated Bank Accounts' : selectedBank}
-                </span>
-                <span>· Period: {filterYears.length > 0 && !filterYears.includes('All') ? filterYears.join(', ') : 'All Time'}</span>
-                {filterMonths.length > 0 && !filterMonths.includes('All') && <span>· Months: {filterMonths.join(', ')}</span>}
-                {filterClient && filterClient !== 'All' && <span>· Client: {filterClient}</span>}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportStatement}
-                className="h-8 text-xs font-semibold border-slate-300 dark:border-slate-700 gap-1.5 rounded-sm"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export Statement</span>
-              </Button>
-            </div>
+    <div className="space-y-2 animate-in fade-in duration-150">
+      {/* ── Top Mode & Action Bar (Minimalist Single-Row Strip) ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm p-1.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 shadow-2xs">
+        {/* Left: View Identifier, Bank Selector & Type Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View Pill */}
+          <div className="inline-flex rounded-sm bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 h-7 items-center">
+            <span className="px-2 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs flex items-center gap-1.5">
+              <Landmark className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+              <span>Account Statement</span>
+            </span>
           </div>
-        </div>
 
-        {/* ── Top Financial Metric Cards (5-Card Comprehensive Bank Statement Style) ── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-          {/* Opening Balance (B/F) */}
-          <Card className="border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 rounded-sm shadow-xs">
-            <CardContent className="p-3.5 flex flex-col justify-between">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Opening Balance (B/F)</span>
-                <div className="p-1 rounded-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                  <History className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="font-mono text-base sm:text-lg font-bold text-slate-800 dark:text-slate-200 tabular-nums">
-                ₦{summaryTotals.openingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[9px] text-slate-400 font-mono mt-0.5">{includeBF ? 'Prior Year Balance' : 'B/F excluded'}</span>
-            </CardContent>
-          </Card>
+          {/* Bank Selector */}
+          <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-2 h-7 text-[11px]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">Bank:</span>
+            <select
+              value={selectedBank}
+              onChange={(e) => setSelectedBank(e.target.value)}
+              className="bg-transparent font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer max-w-[170px] truncate"
+            >
+              <option value="All">All Bank Accounts (Consolidated)</option>
+              {availableBanks.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {/* Total Money In (Credit) */}
-          <Card className="border-slate-200 dark:border-slate-800 bg-emerald-50/30 dark:bg-emerald-950/20 border-emerald-200/60 rounded-sm shadow-xs">
-            <CardContent className="p-3.5 flex flex-col justify-between">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-mono">Money In (Collections)</span>
-                <div className="p-1 rounded-xs bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
-                  <ArrowDownLeft className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="font-mono text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                +₦{summaryTotals.totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[9px] text-emerald-600/80 font-mono mt-0.5">{summaryTotals.creditCount} Client Payments</span>
-            </CardContent>
-          </Card>
-
-          {/* Total Money Out (Debit) */}
-          <Card className="border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 rounded-sm shadow-xs">
-            <CardContent className="p-3.5 flex flex-col justify-between">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Money Out (Debits)</span>
-                <div className="p-1 rounded-xs bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400">
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="font-mono text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 tabular-nums">
-                -₦{summaryTotals.totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[9px] text-slate-400 font-mono mt-0.5">{summaryTotals.debitCount} Ledger Vouchers</span>
-            </CardContent>
-          </Card>
-
-          {/* Net Flow */}
-          <Card className="border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 rounded-sm shadow-xs">
-            <CardContent className="p-3.5 flex flex-col justify-between">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Net Period Movement</span>
-                <div className="p-1 rounded-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                  <ArrowUpDown className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className={cn("font-mono text-base sm:text-lg font-bold tabular-nums", summaryTotals.netChange >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                {summaryTotals.netChange >= 0 ? '+' : '-'}₦{Math.abs(summaryTotals.netChange).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[9px] text-slate-400 font-mono mt-0.5">Collections less Vouchers</span>
-            </CardContent>
-          </Card>
-
-          {/* Closing Running Balance */}
-          <Card className="border-slate-900 dark:border-slate-100 bg-slate-900 dark:bg-slate-800 text-white rounded-sm shadow-xs col-span-2 md:col-span-1">
-            <CardContent className="p-3.5 flex flex-col justify-between">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 font-mono">Closing Cash Position</span>
-                <div className="p-1 rounded-xs bg-white/10 text-white">
-                  <Wallet className="w-3.5 h-3.5" />
-                </div>
-              </div>
-              <div className="font-mono text-base sm:text-lg font-bold text-white tabular-nums">
-                ₦{summaryTotals.closingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <span className="text-[9px] text-slate-400 font-mono mt-0.5">Reconciled Corporate Bank Balance</span>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ── Filters & Controls Bar ── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-sm">
-          {/* Bank Selector & Transaction Type Filter */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <Landmark className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Bank:</span>
-              <select
-                value={selectedBank}
-                onChange={e => setSelectedBank(e.target.value)}
-                className="text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-sm px-2.5 py-1 font-semibold text-slate-800 dark:text-slate-200"
-              >
-                <option value="All">All Bank Accounts (Consolidated)</option>
-                {availableBanks.map(b => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1 hidden sm:block" />
-
-            <div className="flex border border-slate-200 dark:border-slate-700 rounded-sm overflow-hidden p-0.5 bg-white dark:bg-slate-900">
-              <button
-                type="button"
-                onClick={() => setTransactionTypeFilter('all')}
-                className={cn(
-                  "px-2.5 py-0.5 text-xs font-semibold rounded-xs transition-colors",
-                  transactionTypeFilter === 'all' ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "text-slate-500 hover:text-slate-800"
-                )}
-              >
-                All ({summaryTotals.txCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTransactionTypeFilter('credit')}
-                className={cn(
-                  "px-2.5 py-0.5 text-xs font-semibold rounded-xs transition-colors",
-                  transactionTypeFilter === 'credit' ? "bg-emerald-600 text-white" : "text-slate-500 hover:text-emerald-600"
-                )}
-              >
-                Deposits / Money In ({summaryTotals.creditCount})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTransactionTypeFilter('debit')}
-                className={cn(
-                  "px-2.5 py-0.5 text-xs font-semibold rounded-xs transition-colors",
-                  transactionTypeFilter === 'debit' ? "bg-slate-800 text-white" : "text-slate-500 hover:text-slate-800"
-                )}
-              >
-                Expenses (Debits) ({summaryTotals.debitCount})
-              </button>
-            </div>
-
-            <label
-              htmlFor="stmt-include-bf"
+          {/* Transaction Type Filter Pills */}
+          <div className="inline-flex rounded-sm bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 h-7 items-center">
+            <button
+              type="button"
+              onClick={() => setTransactionTypeFilter('all')}
               className={cn(
-                "flex items-center gap-1.5 text-xs font-semibold cursor-pointer select-none px-2.5 py-1 rounded-sm border",
-                includeBF
-                  ? "border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100"
-                  : "border-slate-300 dark:border-slate-700 text-slate-500"
+                'px-1.5 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors',
+                transactionTypeFilter === 'all'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               )}
             >
-              <input
-                id="stmt-include-bf"
-                type="checkbox"
-                checked={includeBF}
-                onChange={e => setIncludeBF(e.target.checked)}
-                className="accent-slate-900"
-              />
-              <History className="w-3.5 h-3.5" />
-              Include Balance B/F
-            </label>
-          </div>
-
-          {/* Search Input */}
-          <div className="relative w-full md:w-72">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <Input
-              type="text"
-              placeholder="Search ref, client, payee, site, description..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="h-8 pl-8 text-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 rounded-sm"
-            />
+              All ({summaryTotals.txCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTransactionTypeFilter('credit')}
+              className={cn(
+                'px-1.5 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors',
+                transactionTypeFilter === 'credit'
+                  ? 'bg-emerald-600 text-white shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              )}
+            >
+              Money In ({summaryTotals.creditCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTransactionTypeFilter('debit')}
+              className={cn(
+                'px-1.5 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors',
+                transactionTypeFilter === 'debit'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              )}
+            >
+              Money Out ({summaryTotals.debitCount})
+            </button>
           </div>
         </div>
 
-        {/* ── Transaction Ledger Table (Chronological Bank Statement) ── */}
+        {/* Right Toolbar Controls (Search, Balance B/F, Summary Modal, Excel) */}
+        <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
+          {/* Compact Search Input */}
+          <div className="relative">
+            <Search className="h-3 w-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search statement..."
+              className="h-7 w-28 xl:w-40 pl-6 pr-5 text-[11px] rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Balance B/F Toggle */}
+          <button
+            type="button"
+            onClick={() => setIncludeBF(!includeBF)}
+            title="Toggle Inclusion of Prior-Year Balance Brought Forward"
+            className={cn(
+              'h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border transition-colors',
+              includeBF
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-2xs'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+            )}
+          >
+            <History className="h-3 w-3 text-slate-400" />
+            <span>{includeBF ? 'B/F Included' : 'B/F Excluded'}</span>
+          </button>
+
+          {/* Summary Modal Trigger Button */}
+          <button
+            type="button"
+            onClick={() => setSummaryModalOpen(true)}
+            title="View Account Statement Cashflow Breakdown"
+            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <PieChart className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span>Summary</span>
+          </button>
+
+          {/* Export Statement to Excel */}
+          <button
+            type="button"
+            onClick={handleExportStatement}
+            title="Export Account Statement to Excel (.xlsx)"
+            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Excel</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Metadata Strip (Clean Excel Style) ── */}
+      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-sm px-3 py-1.5 flex flex-wrap items-center justify-between text-[11px] font-mono text-slate-600 dark:text-slate-300 gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+            {companyInfo.name}
+          </span>
+          {companyInfo.regNumber && <span>· {companyInfo.regNumber}</span>}
+          <span>· Account: {selectedBank === 'All' ? 'Consolidated Bank Accounts' : selectedBank}</span>
+          <span>· Period: Years [{filterYears.join(', ')}] | Months [{filterMonths.join(', ')}]</span>
+          {filterClient && filterClient !== 'All' && <span>· Client: {filterClient}</span>}
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-emerald-600 font-semibold">
+            In: +₦{summaryTotals.totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <span className="text-slate-800 dark:text-slate-200 font-semibold">
+            Out: -₦{summaryTotals.totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <span className="font-bold text-slate-900 dark:text-white">
+            Closing: ₦{summaryTotals.closingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Transaction Ledger Table (Chronological Bank Statement) ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs min-w-[950px]">
+          <table className="w-full text-left border-collapse text-[12px] min-w-[900px]">
             <thead>
-              <tr className="border-b-2 border-slate-900 dark:border-slate-100 font-bold uppercase tracking-wider text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800">
-                <th className="py-2.5 px-3 w-24">Date</th>
-                <th className="py-2.5 px-2 w-28 font-mono">Ref / Voucher</th>
-                <th className="py-2.5 px-3">Narration & Particulars</th>
-                <th className="py-2.5 px-2">Account / Bank</th>
-                <th className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">Money Out (Debit ₦)</th>
-                <th className="py-2.5 px-3 text-right font-mono text-emerald-700 dark:text-emerald-400">Money In (Credit ₦)</th>
-                <th className="py-2.5 px-3 text-right font-mono font-black text-slate-900 dark:text-slate-100 w-36">Running Balance (₦)</th>
+              <tr className="bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold tracking-wider text-slate-600 dark:text-slate-300">
+                <th className="py-1.5 px-3 w-24">Date</th>
+                <th className="py-1.5 px-2 w-28 font-mono">Ref / Voucher</th>
+                <th className="py-1.5 px-3">Narration &amp; Particulars</th>
+                <th className="py-1.5 px-2 w-32">Account / Bank</th>
+                <th className="py-1.5 px-3 text-right font-mono font-bold w-36 text-slate-900 dark:text-slate-100">
+                  Money Out (₦)
+                </th>
+                <th className="py-1.5 px-3 text-right font-mono font-bold w-36 text-emerald-700 dark:text-emerald-400">
+                  Money In (₦)
+                </th>
+                <th className="py-1.5 px-4 text-right font-mono font-black text-slate-900 dark:text-slate-100 w-40">
+                  Running Balance (₦)
+                </th>
               </tr>
             </thead>
-
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {/* Prior Year Balance Brought Forward row if applicable */}
               {calculatedOpeningBalance !== 0 && transactionTypeFilter === 'all' && !searchTerm && (
                 <tr
                   id="stmt-row-bf"
                   title="Click to view the prior-period records behind this balance"
-                  onClick={() => setDrill({
-                    key: 'bf',
-                    title: 'Balance Brought Forward',
-                    subtitle: `Prior-period collections less vouchers paid · ${selectedBank === 'All' ? 'All banks' : selectedBank} · Net ₦${calculatedOpeningBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                    entries: bfEntries,
-                  })}
-                  className="bg-slate-50/80 dark:bg-slate-800/60 font-semibold border-b border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={() =>
+                    setDrill({
+                      key: 'bf',
+                      title: 'Balance Brought Forward',
+                      subtitle: `Prior-period collections less vouchers paid · ${selectedBank === 'All' ? 'All banks' : selectedBank} · Net ₦${calculatedOpeningBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                      entries: bfEntries,
+                    })
+                  }
+                  className="bg-slate-50/80 dark:bg-slate-800/60 font-semibold border-b border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
-                  <td className="py-2.5 px-3 whitespace-nowrap font-mono text-slate-500">
+                  <td className="py-1.5 px-3 whitespace-nowrap font-mono text-slate-500 text-[11px]">
                     01/01/{filterYears[0] || '2026'}
                   </td>
-                  <td className="py-2.5 px-2 font-mono text-slate-500 underline decoration-dotted underline-offset-2">
+                  <td className="py-1.5 px-2 font-mono text-slate-500 underline decoration-dotted underline-offset-2 text-[11px]">
                     B/F-0001
                   </td>
-                  <td className="py-2.5 px-3">
-                    <div className="font-bold text-slate-800 dark:text-slate-200">
-                      Balance Brought Forward (Prior Year Collections)
+                  <td className="py-1.5 px-3">
+                    <div className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">
+                      Balance Brought Forward (Prior Year Surplus)
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono">
-                      Net prior-period collections less vouchers paid · {bfEntries.length} records
+                      Net prior collections less vouchers paid · {bfEntries.length} records
                     </div>
                   </td>
-                  <td className="py-2.5 px-2 text-slate-500 text-[11px]">
+                  <td className="py-1.5 px-2 text-slate-500 text-[11px]">
                     {selectedBank === 'All' ? 'Consolidated Bank Float' : selectedBank}
                   </td>
-                  <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-slate-100 font-bold">
-                    {calculatedOpeningBalance < 0 ? `-₦${Math.abs(calculatedOpeningBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                  <td className="py-1.5 px-3 text-right font-mono tabular-nums text-slate-900 dark:text-slate-100 font-bold">
+                    {calculatedOpeningBalance < 0
+                      ? `-₦${Math.abs(calculatedOpeningBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'}
                   </td>
-                  <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                    {calculatedOpeningBalance > 0 ? `+₦${calculatedOpeningBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                  <td className="py-1.5 px-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-bold">
+                    {calculatedOpeningBalance > 0
+                      ? `+₦${calculatedOpeningBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '—'}
                   </td>
-                  <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                  <td className="py-1.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                     ₦{calculatedOpeningBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
@@ -691,74 +654,73 @@ export function CompanyAccountStatement({
 
               {displayTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 italic">
+                  <td colSpan={7} className="py-8 text-center text-slate-400 italic text-[11px]">
                     No transactions match the selected account and filters.
                   </td>
                 </tr>
               ) : (
-                displayTransactions.map((tx) => (
-                  <tr 
+                displayTransactions.map((tx, idx) => (
+                  <tr
                     key={tx.id}
                     id={`stmt-row-${tx.id}`}
                     title="Click to view full voucher content"
-                    onClick={() => setDrill({
-                      key: tx.id,
-                      title: `${tx.type === 'credit' ? 'Receipt' : 'Voucher'} ${tx.refNo}`,
-                      subtitle: `${tx.displayDate} · ${tx.accountBank} · ${tx.category}`,
-                      entries: [{
-                        id: tx.id,
-                        date: tx.date,
-                        ref: tx.refNo,
-                        description: tx.description,
-                        party: tx.party,
-                        site: tx.siteName,
-                        category: tx.category,
-                        bank: tx.accountBank,
-                        amount: tx.amount,
-                        side: tx.type,
-                        details: tx.source,
-                      }],
-                    })}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                    onClick={() =>
+                      setDrill({
+                        key: tx.id,
+                        title: `${tx.type === 'credit' ? 'Receipt' : 'Voucher'} ${tx.refNo}`,
+                        subtitle: `${tx.displayDate} · ${tx.accountBank} · ${tx.category}`,
+                        entries: [
+                          {
+                            id: tx.id,
+                            date: tx.date,
+                            ref: tx.refNo,
+                            description: tx.description,
+                            party: tx.party,
+                            site: tx.siteName,
+                            category: tx.category,
+                            bank: tx.accountBank,
+                            amount: tx.amount,
+                            side: tx.type,
+                            details: tx.source,
+                          },
+                        ],
+                      })
+                    }
+                    className={cn(
+                      'hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition-colors cursor-pointer',
+                      idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-900/40'
+                    )}
                   >
-                    <td className="py-2 px-3 whitespace-nowrap font-mono text-slate-600 dark:text-slate-400">
+                    <td className="py-1.5 px-3 whitespace-nowrap font-mono text-slate-600 dark:text-slate-400 text-[11px]">
                       {tx.displayDate}
                     </td>
-                    <td className="py-2 px-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap underline decoration-dotted underline-offset-2">
+                    <td className="py-1.5 px-2 font-mono font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap underline decoration-dotted underline-offset-2 text-[11px]">
                       {tx.refNo}
                     </td>
-                    <td className="py-2 px-3">
-                      <div className="font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="py-1.5 px-3">
+                      <div className="font-semibold text-slate-900 dark:text-slate-100 text-[11px]">
                         {tx.description}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex flex-wrap gap-x-2">
+                      <div className="text-[10px] text-slate-400 font-mono flex flex-wrap gap-x-2">
                         <span>Party: {tx.party}</span>
                         <span>· Site: {tx.siteName}</span>
                         <span>· Category: {tx.category}</span>
                       </div>
                     </td>
-                    <td className="py-2 px-2 text-slate-600 dark:text-slate-400 text-[11px] whitespace-nowrap">
+                    <td className="py-1.5 px-2 text-slate-600 dark:text-slate-400 text-[11px] whitespace-nowrap">
                       {tx.accountBank}
                     </td>
-                    <td className="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
-                      {tx.debitAmount > 0 ? (
-                        <span className="text-slate-900 dark:text-slate-100 font-medium">
-                          -₦{tx.debitAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
+                    <td className="py-1.5 px-3 text-right font-mono tabular-nums text-slate-900 dark:text-slate-100 font-medium">
+                      {tx.debitAmount > 0
+                        ? `-₦${tx.debitAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : '—'}
                     </td>
-                    <td className="py-2 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                      {tx.creditAmount > 0 ? (
-                        <span>
-                          +₦{tx.creditAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
+                    <td className="py-1.5 px-3 text-right font-mono tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {tx.creditAmount > 0
+                        ? `+₦${tx.creditAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : '—'}
                     </td>
-                    <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                    <td className="py-1.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap tabular-nums">
                       ₦{tx.runningBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                   </tr>
@@ -766,17 +728,17 @@ export function CompanyAccountStatement({
               )}
 
               {/* Final Statement Closing Row */}
-              <tr className="border-t-2 border-b-4 border-double border-slate-900 dark:border-slate-100 font-black bg-slate-100 dark:bg-slate-800 text-xs">
-                <td colSpan={4} className="py-3 px-3 uppercase tracking-wider text-slate-900 dark:text-slate-100">
-                  CLOSING STATEMENT TOTALS & POSITION
+              <tr className="border-t-2 border-b-4 border-double border-slate-900 dark:border-slate-100 font-black bg-slate-100 dark:bg-slate-800 text-[12px]">
+                <td colSpan={4} className="py-2.5 px-3 uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                  CLOSING STATEMENT TOTALS &amp; POSITION
                 </td>
-                <td className="py-3 px-3 text-right font-mono text-slate-900 dark:text-slate-100">
+                <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-slate-100 tabular-nums">
                   -₦{summaryTotals.totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
-                <td className="py-3 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400">
+                <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
                   +₦{summaryTotals.totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
-                <td className="py-3 px-3 text-right font-mono text-sm text-slate-900 dark:text-slate-100">
+                <td className="py-2.5 px-4 text-right font-mono text-sm text-slate-900 dark:text-slate-100 tabular-nums">
                   ₦{summaryTotals.closingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>
@@ -785,11 +747,69 @@ export function CompanyAccountStatement({
         </div>
 
         {/* Footnote */}
-        <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 font-mono flex flex-col sm:flex-row justify-between gap-2">
+        <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 font-mono flex flex-wrap items-center justify-between gap-2">
           <span>* Progressive transaction ledger reconciled against client collections and registered expense vouchers.</span>
-          <span>{companyInfo.name} · Verified Cashflow & Account Statement</span>
+          <span>{companyInfo.name} · Verified Cashflow &amp; Account Statement</span>
         </div>
       </div>
+
+      {/* ── Summary & Breakdown Modal Dialog ── */}
+      <Dialog open={summaryModalOpen} onOpenChange={setSummaryModalOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-800">
+          <DialogHeader className="p-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
+                Account Statement Cashflow Breakdown
+              </DialogTitle>
+            </div>
+            <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+              {selectedBank === 'All' ? 'Consolidated Bank Accounts' : selectedBank} · Years [{filterYears.join(', ')}] | Months [{filterMonths.join(', ')}]
+            </p>
+          </DialogHeader>
+
+          <div className="p-4 space-y-3 text-[12px]">
+            {/* 5-Metric Breakdown */}
+            <div className="space-y-2 border border-slate-200 dark:border-slate-800 rounded-sm p-3 bg-slate-50/40 dark:bg-slate-900/40 font-mono">
+              <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-slate-600 dark:text-slate-400">Opening Balance (B/F):</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  ₦{summaryTotals.openingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-slate-600 dark:text-slate-400">Money In ({summaryTotals.creditCount} Collections):</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  +₦{summaryTotals.totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-slate-600 dark:text-slate-400">Money Out ({summaryTotals.debitCount} Expenses):</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  -₦{summaryTotals.totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-slate-600 dark:text-slate-400">Net Period Movement:</span>
+                <span className={cn('font-bold', summaryTotals.netChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+                  {summaryTotals.netChange >= 0 ? '+' : '-'}₦{Math.abs(summaryTotals.netChange).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t-2 border-slate-300 dark:border-slate-700 text-[13px] font-black">
+                <span className="uppercase text-slate-900 dark:text-white">Closing Cash Position:</span>
+                <span className="text-slate-900 dark:text-white">
+                  ₦{summaryTotals.closingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {drill && (
         <TransactionDrilldownDialog

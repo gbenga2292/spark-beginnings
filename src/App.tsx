@@ -55,6 +55,7 @@ const HmoManagement = lazy(() => import('./pages/HmoManagement').then(m => ({ de
 const PerformanceConduct = lazy(() => import('./pages/PerformanceConduct').then(m => ({ default: m.PerformanceConduct })));
 const Evaluations = lazy(() => import('./pages/Evaluations').then(m => ({ default: m.Evaluations })));
 const Ledger = lazy(() => import('./pages/Ledger').then(m => ({ default: m.Ledger })));
+const PettyCash = lazy(() => import('./pages/PettyCash').then(m => ({ default: m.PettyCash })));
 const BankImport = lazy(() => import('./pages/BankImport'));
 const Minute = lazy(() => import('./pages/Minute').then(m => ({ default: m.Minute })));
 const VendorInvoices = lazy(() => import('./pages/VendorInvoices').then(m => ({ default: m.VendorInvoices })));
@@ -229,7 +230,7 @@ function AppContent() {
           '/onboarding', '/leaves', '/salary-loans', '/hmo', '/evaluations', '/interviews',
           '/performance-conduct', '/operations', '/operations/assets', '/operations/waybills',
           '/operations/checkout', '/operations/maintenance', '/operations/vehicles', '/operations/sites',
-          '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/vendor-invoices',
+          '/client-accounts', '/payroll', '/beneficiaries', '/ledger', '/petty-cash', '/vendor-invoices',
           '/reports', '/financial-reports', '/tasks/reports', '/weekly-report', '/users',
           '/settings', '/activity-log', '/profile', '/operations/site-analytics', '/site-analytics',
           '/operations/site-requests', '/operations/damages'
@@ -298,6 +299,7 @@ function AppContent() {
             <Route path="interviews" element={<Page label="Interviews"><ProtectedRoute requiredModule="interviews"><InterviewManager /></ProtectedRoute></Page>} />
             <Route path="minutes" element={<Page label="Minute"><ProtectedRoute requiredModule="minute"><Minute /></ProtectedRoute></Page>} />
             <Route path="ledger" element={<Page label="Ledger"><ProtectedRoute requiredModule="ledger"><Ledger /></ProtectedRoute></Page>} />
+            <Route path="petty-cash" element={<Page label="Petty Cash"><ProtectedRoute requiredModule="ledger"><PettyCash /></ProtectedRoute></Page>} />
             <Route path="bank-import" element={<Page label="Bank AI Import"><ProtectedRoute requiredModule="bankImport"><BankImport /></ProtectedRoute></Page>} />
             <Route path="clients" element={<Navigate to="/sites" replace />} />
             

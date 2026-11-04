@@ -3,7 +3,8 @@ import {
   Clock, Link, RefreshCw, Calendar, TrendingUp,
   ChevronDown, ChevronUp, X, Plus, Info
 } from 'lucide-react';
-import { Invoice } from '@/src/store/appStore';
+import { Invoice, useAppStore } from '@/src/store/appStore';
+import { resolveEffectivePumpStartDate } from '@/src/lib/invoicePumpUtils';
 import { DailyMachineLog, OperationalDay } from '@/src/types/operations';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
@@ -40,13 +41,15 @@ function addDays(dateStr: string, days: number): string {
 }
 
 export function InvoiceRuntimeTracker({ invoice, onSyncDates }: InvoiceRuntimeTrackerProps) {
-  const { maintenanceAssets, dailyMachineLogs: allMachineLogs, sitePumpDates } = useOperations();
+  const { maintenanceAssets, dailyMachineLogs: allMachineLogs, sitePumpDates = [] } = useOperations();
+  const sites = useAppStore(state => state.sites);
   const [expanded, setExpanded] = useState(false);
   const [showLinkPanel, setShowLinkPanel] = useState(false);
 
   const linkedIds: string[] = invoice.linkedAssetIds ?? [];
   const invoiceDuration = invoice.duration ?? 0;
-  const invoiceStartDate = invoice.date ?? '';
+  const effectivePump = resolveEffectivePumpStartDate(invoice, sites, sitePumpDates);
+  const invoiceStartDate = effectivePump || invoice.startDate || invoice.date || '';
 
   const isAuxOnly = (Number(invoice.noOfMachine || 0) === 0) && (invoice.auxiliaryEquipment?.length || 0) > 0;
   const auxNames = useMemo(() => 

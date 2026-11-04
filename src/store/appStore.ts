@@ -153,12 +153,22 @@ export interface StaffMeritRecord {
 }
 
 export interface LedgerCategory { id: string; name: string; }
+export interface LedgerVendorBankAccount {
+  id?: string;
+  bankName: string;
+  accountNumber: string;
+  accountName?: string;
+  isPrimary?: boolean;
+}
 export interface LedgerVendor {
   id: string;
   name: string;
   tinNumber?: string;
   address?: string;
   phone?: string;
+  phones?: string[];
+  emails?: string[];
+  bankAccounts?: LedgerVendorBankAccount[];
   servicesRendered?: string;
   accountNumber?: string;
   bankName?: string;
@@ -204,6 +214,18 @@ export interface CompanyExpense {
   enteredBy: string;
   createdAt: string;
   status?: string;
+}
+
+export interface PettyCashEntry {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  paidFrom: string;
+  paidTo: string;
+  enteredBy: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 // ─── Vendor Invoice & Payments ───────────────────────────────────────────────
@@ -730,6 +752,7 @@ export interface PendingInvoice {
   damages: number;
   discount?: number;
   startDate: string;
+  pumpStartDate?: string;
   duration: number;
   endDate: string;
   rentalCost: number;
@@ -784,6 +807,8 @@ export interface Invoice {
   siteName: string;
   amount: number;
   date: string;
+  startDate?: string;
+  pumpStartDate?: string;
   dueDate: string;
   billingCycle: 'Weekly' | 'Bi-Weekly' | 'Monthly' | 'Custom';
   reminderDate: string;
@@ -1017,6 +1042,13 @@ interface AppState {
   syncLedgerCurrentYear: () => Promise<void>;
   companyExpenses: CompanyExpense[];
   pendingLedgerEntries: CompanyExpense[];
+  pettyCashEntries: PettyCashEntry[];
+  pettyCashBanks: string[];
+  addPettyCashEntry: (entry: PettyCashEntry) => void;
+  updatePettyCashEntry: (id: string, entry: Partial<PettyCashEntry>) => void;
+  deletePettyCashEntry: (id: string) => void;
+  setPettyCashEntries: (entries: PettyCashEntry[]) => void;
+  setPettyCashBanks: (banks: string[]) => void;
   vendorInvoices: VendorInvoice[];
   vendorInvoicePayments: VendorInvoicePayment[];
   staffMeritRecords: StaffMeritRecord[];
@@ -1231,6 +1263,8 @@ interface AppState {
     sanctionThresholds?: { action: string; points: number }[];
     payeeTypes?: string[];
     taskArchiveRetentionDays: number;
+    probationDepartmentAssignees?: Record<string, string>;
+    defaultProbationAssigneeId?: string;
   };
   updateHrVariables: (variables: Partial<AppState['hrVariables']>) => void;
   saveAllSettings: (payroll: AppState['payrollVariables'], paye: AppState['payeTaxVariables'], months: AppState['monthValues'], hr: AppState['hrVariables'], onboarding: AppState['onboardingTemplates']) => void;
@@ -1331,6 +1365,8 @@ export const useAppStore = create<AppState>()(
       ledgerSyncError: null,
       companyExpenses: [],
       pendingLedgerEntries: [],
+      pettyCashEntries: [],
+      pettyCashBanks: ['Petty Cash'],
       vendorInvoices: [],
       vendorInvoicePayments: [],
       budgetItems: [],
@@ -1397,7 +1433,9 @@ export const useAppStore = create<AppState>()(
           { action: 'Termination', points: -12 }
         ],
         payeeTypes: [],
-        taskArchiveRetentionDays: 30
+        taskArchiveRetentionDays: 30,
+        probationDepartmentAssignees: {},
+        defaultProbationAssigneeId: ''
       },
 
       // ── Actions with Supabase sync ──
@@ -1800,6 +1838,25 @@ export const useAppStore = create<AppState>()(
       addCompanyExpense: (expense) => { set(s => ({ companyExpenses: [...s.companyExpenses, expense] })); db.insertCompanyExpense(expense); },
       updateCompanyExpense: (id, expense) => { set(s => ({ companyExpenses: s.companyExpenses.map(c => c.id === id ? { ...c, ...expense } : c) })); db.updateCompanyExpense(id, expense); },
       deleteCompanyExpense: (id) => { set(s => ({ companyExpenses: s.companyExpenses.filter(c => c.id !== id) })); db.deleteCompanyExpense(id); },
+
+      // Petty Cash (Money In & Settings)
+      addPettyCashEntry: (entry) => {
+        set(s => ({ pettyCashEntries: [entry, ...s.pettyCashEntries] }));
+        db.insertPettyCashEntry(entry).catch(console.error);
+      },
+      updatePettyCashEntry: (id, entry) => {
+        set(s => ({ pettyCashEntries: s.pettyCashEntries.map(c => c.id === id ? { ...c, ...entry } : c) }));
+        db.updatePettyCashEntry(id, entry).catch(console.error);
+      },
+      deletePettyCashEntry: (id) => {
+        set(s => ({ pettyCashEntries: s.pettyCashEntries.filter(c => c.id !== id) }));
+        db.deletePettyCashEntry(id).catch(console.error);
+      },
+      setPettyCashEntries: (entries) => set({ pettyCashEntries: entries }),
+      setPettyCashBanks: (banks) => {
+        set({ pettyCashBanks: banks });
+        db.updateSettings({ pettyCashBanks: banks }).catch(console.error);
+      },
 
       setPendingLedgerEntries: (entries) => set({ pendingLedgerEntries: entries }),
       clearPendingLedgerEntries: () => set({ pendingLedgerEntries: [] }),

@@ -68,13 +68,48 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
   const [damageBatchInfo, setDamageBatchInfo] = useState<ReturnWaybillDamageInfo | null>(null);
 
   useEffect(() => {
-    if (waybill.signature) {
-      if (waybill.signature.startsWith('data:')) {
-        setSignatureBase64(waybill.signature);
-      } else {
+    let isMounted = true;
+
+    if (!waybill.signature) {
+      setSignatureBase64('');
+      return;
+    }
+
+    if (waybill.signature.startsWith('data:')) {
+      setSignatureBase64(waybill.signature);
+      return;
+    }
+
+    // Resolve URL (use localhost /dcel-media proxy when in dev / localhost to bypass CORS)
+    let targetUrl = waybill.signature;
+    if (
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+      targetUrl.startsWith('https://dewaterconstruct.com/dcel-media')
+    ) {
+      targetUrl = targetUrl.replace('https://dewaterconstruct.com/dcel-media', '/dcel-media');
+    }
+
+    // Attempt 1: Fetch as blob (cleanest across proxies and native environments)
+    fetch(targetUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (isMounted && typeof reader.result === 'string') {
+            setSignatureBase64(reader.result);
+          }
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch((err) => {
+        // Attempt 2: Image element canvas fallback
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
+          if (!isMounted) return;
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
           canvas.height = img.height;
@@ -83,20 +118,21 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
             ctx.drawImage(img, 0, 0);
             try {
               const dataURL = canvas.toDataURL('image/png');
-              setSignatureBase64(dataURL);
+              if (isMounted) setSignatureBase64(dataURL);
             } catch (e) {
-              console.error('Failed to convert signature URL to base64:', e);
+              console.warn('Canvas toDataURL failed (CORS restriction):', e);
             }
           }
         };
-        img.onerror = (err) => {
-          console.error('Failed to load signature image:', err);
+        img.onerror = () => {
+          // Silent fallback — prevents PDF generation failure
         };
-        img.src = waybill.signature;
-      }
-    } else {
-      setSignatureBase64('');
-    }
+        img.src = targetUrl;
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [waybill.signature]);
 
   const generatePdfDoc = () => {
@@ -167,13 +203,13 @@ export function WaybillDetailView({ waybill: propWaybill, onClose, onEdit }: Way
       }
     });
 
-    // Signature
-    const sig = signatureBase64 || waybill.signature;
+    // Signature (only embed if converted to data URI to avoid un-proxied XHR CORS failures)
+    const sig = (signatureBase64 && signatureBase64.startsWith('data:')) ? signatureBase64 : null;
     if (sig) {
       try {
         doc.addImage(sig, 'PNG', 20, 235, 45, 20);
       } catch (err) {
-        console.error('Error rendering signature in PDF:', err);
+        console.warn('Error rendering signature in PDF:', err);
       }
     }
 

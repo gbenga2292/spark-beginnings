@@ -1,5 +1,5 @@
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import InvoiceLogo from '../../logo/logo-2.png';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/src/components/task_ui/alert-dialog';
@@ -23,6 +23,7 @@ import { fetchInvoicesData } from '@/src/lib/supabaseService';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { getInvoiceSettlement, buildSettlementMap } from '@/src/lib/settlementUtils';
 import { InvoiceFormModal, MachineRow } from './InvoiceFormModal';
+import { resolveEffectivePumpStartDate } from '@/src/lib/invoicePumpUtils';
 
 
 export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: string; setFullPageContent?: (content: React.ReactNode) => void }) {
@@ -69,8 +70,12 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
   const [showFilters, setShowFilters] = useState(false);
   const ledgerBanks = useAppStore(state => state.ledgerBanks);
   const ledgerBeneficiaryBanks = useAppStore(state => state.ledgerBeneficiaryBanks);
-  const { dailyMachineLogs } = useOperations();
+  const { dailyMachineLogs, sitePumpDates = [] } = useOperations();
   
+  const getEffectivePumpStartDate = useCallback((inv: any) => {
+    return resolveEffectivePumpStartDate(inv, sites, sitePumpDates);
+  }, [sites, sitePumpDates]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [printInvoiceTarget, setPrintInvoiceTarget] = useState<Invoice | PendingInvoice | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -168,9 +173,20 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
     const siteId = realSite?.id;
 
     let startDate = normalizeDate(input.startDate || input.date);
+    let pumpStartDate = normalizeDate(input.pumpStartDate);
+    if (!pumpStartDate) {
+      const targetSiteId = siteId || realSite?.id;
+      if (targetSiteId) {
+        const matching = (sitePumpDates || []).filter(p => p.siteId === targetSiteId && p.pumpStartDate);
+        if (matching.length > 0) {
+          pumpStartDate = [...matching].sort((a, b) => (a.pumpStartDate || '').localeCompare(b.pumpStartDate || ''))[0].pumpStartDate;
+        }
+      }
+    }
+    const cycleStartDate = pumpStartDate || startDate;
     let endDate = '';
-    if (startDate && maxDuration > 0) {
-      const start = new Date(startDate);
+    if (cycleStartDate && maxDuration > 0) {
+      const start = new Date(cycleStartDate);
       if (!isNaN(start.getTime())) {
         if (input.countOffDays === false && siteId) {
           // Pre-index dailyMachineLogs by date for O(1) loop retrieval
@@ -356,7 +372,7 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
       dailyRentalCost: parseFloat(input.dailyRentalCost) || 0,
       noOfTechnician, techniciansDailyRate,
       dieselCostPerLtr, dailyUsage, mobDemob, installation, damages, discount,
-      startDate, endDate, rentalCost, auxiliaryCost, auxiliaryEquipment, dieselCost, techniciansCost,
+      startDate, pumpStartDate, endDate, rentalCost, auxiliaryCost, auxiliaryEquipment, dieselCost, techniciansCost,
       subtotalCost, totalCost, vat, totalCharge, vatInc,
       vatScope, vatableSections, vatableAmount, nonVatableAmount,
       totalExclusiveOfVat: totalCharge - vat,
@@ -1642,7 +1658,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                           <div className="font-medium text-slate-800">{inv.duration || 0} Days</div>
                           <div className="text-slate-500 text-xs">
                             {(() => {
-                              const startDate = normalizeDate(inv.startDate || inv.date);
+                              const effectivePump = getEffectivePumpStartDate(inv);
+                              const startDate = normalizeDate(effectivePump || inv.startDate || inv.date);
                               const maxDuration = inv.machineConfigs && inv.machineConfigs.length > 0 
                                 ? Math.max(...inv.machineConfigs.map((r: any) => parseFloat(r.duration) || 0))
                                 : (parseFloat(inv.duration) || 0);
@@ -2037,7 +2054,8 @@ export function Billing({ searchTerm = '', setFullPageContent }: { searchTerm?: 
                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Dates</p>
                         <div className="font-medium text-slate-600 flex flex-col gap-1 mt-0.5">
                           {(() => {
-                            const startDate = normalizeDate(inv.startDate || inv.date);
+                            const effectivePump = getEffectivePumpStartDate(inv);
+                            const startDate = normalizeDate(effectivePump || inv.startDate || inv.date);
                             const maxDuration = inv.machineConfigs && inv.machineConfigs.length > 0 
                               ? Math.max(...inv.machineConfigs.map((r: any) => parseFloat(r.duration) || 0))
                               : (parseFloat(inv.duration) || 0);
@@ -2661,7 +2679,8 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
       let pumpNum = 1;
       resolved.forEach((m) => {
         const unitCost  = m.rate * m.duration;
-        const dateRangeStr = formatDateRange(invoice.startDate || invoice.date, m.duration);
+        const effectiveStart = invoice.pumpStartDate || invoice.startDate || invoice.date;
+        const dateRangeStr = formatDateRange(effectiveStart, m.duration);
         const dateRangeSuffix = dateRangeStr ? ` ${dateRangeStr}` : '';
         list.push({
           id: generateId(),
@@ -2680,7 +2699,8 @@ export function InvoicePrintModal({ invoice, onClose, ledgerBanks, ledgerBenefic
     } else if (invoice.rentalCost && invoice.rentalCost > 0) {
       const n = invoice.noOfMachine || 1;
       const pumpLabel = n > 1 ? `${n} Dewatering Pumps` : '1 Dewatering Pump';
-      const dateRangeStr = formatDateRange(invoice.startDate || invoice.date, invoice.duration || 0);
+      const effectiveStart = invoice.pumpStartDate || invoice.startDate || invoice.date;
+      const dateRangeStr = formatDateRange(effectiveStart, invoice.duration || 0);
       const dateRangeSuffix = dateRangeStr ? ` ${dateRangeStr}` : '';
       list.push({ 
         id: generateId(), 

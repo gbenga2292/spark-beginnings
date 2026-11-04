@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useUserStore, UserPrivileges } from '../../store/userStore';
 import { useAuth } from '../../hooks/useAuth';
@@ -28,7 +28,12 @@ export function ProtectedRoute({ children, requiredModule }: ProtectedRouteProps
     const modules = Array.isArray(requiredModule) ? requiredModule : [requiredModule];
     
     // Check if user has access to ANY of the required modules
-    const hasAccess = modules.some(m => privs?.[m]?.canView);
+    const hasAccess = modules.some(m => {
+      if (privs?.[m]?.canView !== undefined) return privs[m].canView;
+      if (m === 'pettyCash') return privs?.ledger?.canView;
+      if (m === 'profitAndLoss') return privs?.profitAndLoss?.canView || privs?.ledger?.canView || privs?.financialReports?.canView;
+      return false;
+    });
 
     if (!hasAccess) {
       console.warn(`Access denied to modules: ${modules.join(', ')}`);

@@ -10,8 +10,17 @@ import {
   FileSpreadsheet,
   ChevronDown,
   ChevronRight,
-  History
+  History,
+  PieChart,
+  Download,
+  X
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/src/components/ui/dialog';
 import { useAppStore } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
 import * as XLSX from 'xlsx';
@@ -94,6 +103,16 @@ export function BalanceSheetReport({
 
   const [includeBF, setIncludeBF] = useIncludeBroughtForward();
   const [drillItem, setDrillItem] = useState<FinancialLineItem | null>(null);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+
+  const allExpanded = Object.values(expandedSections).every(Boolean);
+  const toggleAll = (exp: boolean) => setExpandedSections({
+    currentAssets: exp,
+    nonCurrentAssets: exp,
+    currentLiabilities: exp,
+    nonCurrentLiabilities: exp,
+    equity: exp,
+  });
 
   // Dynamic Company info
   const [companyInfo, setCompanyInfo] = useState({
@@ -704,470 +723,616 @@ export function BalanceSheetReport({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* ── Corporate Report Header ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
-              <Building2 className="w-4 h-4" />
-              <span>{companyInfo.name}</span>
-              {companyInfo.regNumber && (
-                <span className="text-slate-400 font-normal">({companyInfo.regNumber})</span>
-              )}
-            </div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              STATEMENT OF FINANCIAL POSITION
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-              Corporate Balance Sheet as of Period End • Presentation Currency: Nigerian Naira (NGN / ₦)
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 self-start md:self-center">
-            {/* Balance B/F toggle */}
-            <label
-              htmlFor="bs-include-bf"
-              className={cn(
-                "flex items-center gap-1.5 text-xs font-semibold cursor-pointer select-none px-3 py-1.5 rounded-md border transition-colors",
-                includeBF
-                  ? "border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800"
-                  : "border-slate-300 dark:border-slate-700 text-slate-500"
-              )}
-              title={
-                sheetData.hasPriorLedger
-                  ? (includeBF ? 'Prior-year balances brought forward included' : 'Click to include prior-year balances brought forward')
-                  : 'Prior-year ledger vouchers are not yet in database. Kept off to maintain accurate in-period records.'
-              }
-            >
-              <input
-                id="bs-include-bf"
-                type="checkbox"
-                checked={includeBF}
-                onChange={e => setIncludeBF(e.target.checked)}
-                className="accent-slate-900"
-              />
-              <History className="w-3.5 h-3.5" />
-              Include Balance B/F
-            </label>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportExcel}
-              className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950 font-semibold"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              Export Excel
-            </Button>
-          </div>
-        </div>
-
-        {/* ── KPI Metric Ribbons ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          <div className="p-4 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400">Total Assets</span>
-              <Layers className="w-4 h-4 text-blue-600" />
-            </div>
-            <div className="text-xl md:text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">
-              {formatMoney(sheetData.totalAssets)}
-            </div>
-            <div className="text-[11px] text-blue-600/80 dark:text-blue-400 mt-0.5 font-medium">
-              Current + Non-Current Fleet
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Total Liabilities</span>
-              <Landmark className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="text-xl md:text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">
-              {formatMoney(sheetData.totalLiabilities)}
-            </div>
-            <div className="text-[11px] text-amber-600/80 dark:text-amber-400 mt-0.5 font-medium">
-              Payables & Tax Liabilities
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Total Equity</span>
-              <Scale className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="text-xl md:text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">
-              {formatMoney(sheetData.totalEquity)}
-            </div>
-            <div className="text-[11px] text-emerald-600/80 dark:text-emerald-400 mt-0.5 font-medium">
-              Retained Earnings + Operating Surplus
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-slate-900 text-white border border-slate-800">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Accounting Equation</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-lg font-black font-mono text-emerald-400 mt-1">
-              {sheetData.isEquilibrium ? 'A = L + E (Balanced)' : 'Variance'}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5 font-medium">
-              Variance: {formatMoney(sheetData.balanceDifference)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Main Balance Sheet Document ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-        {/* Document Title Bar */}
-        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scale className="w-5 h-5 text-blue-600" />
-            <span className="text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-100">
-              Corporate Financial Position (Click any line to see source vouchers)
+    <div className="space-y-2 animate-in fade-in duration-150">
+      {/* ── Top Action Toolbar (Minimalist Single-Row Strip) ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm p-1.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 shadow-2xs">
+        {/* Left: View Identifier & Equilibrium Status Badge */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-sm bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 h-7 items-center">
+            <span className="px-2 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs flex items-center gap-1.5">
+              <Scale className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+              <span>Balance Sheet (Statement of Financial Position)</span>
             </span>
           </div>
-          <Badge variant="outline" className="text-xs font-mono font-semibold bg-white dark:bg-slate-900 border-slate-200 text-slate-700 dark:text-slate-300">
-            {filterYears.join(', ')} • {filterMonths.join(', ')}
-          </Badge>
+
+          <div
+            className={cn(
+              'h-7 px-2 inline-flex items-center gap-1.5 rounded-sm border text-[11px] font-semibold transition-colors',
+              sheetData.isEquilibrium
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+            )}
+            title={`Assets (${formatMoney(sheetData.totalAssets)}) vs L&E (${formatMoney(sheetData.totalLiabilitiesAndEquity)})`}
+          >
+            <CheckCircle2 className="h-3 w-3 shrink-0" />
+            <span>
+              {sheetData.isEquilibrium ? 'A = L + E (Balanced)' : `Variance: ${formatMoney(sheetData.balanceDifference)}`}
+            </span>
+          </div>
         </div>
 
-        <div className="p-6 md:p-8 space-y-8">
-          {/* ══════════════════════════════════════════════════════
-              SECTION 1: ASSETS
-             ══════════════════════════════════════════════════════ */}
-          <div>
-            <div className="border-b-2 border-slate-900 dark:border-slate-100 pb-2 mb-4 flex items-center justify-between">
-              <h2 className="text-base font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">
-                1. ASSETS
-              </h2>
-              <span className="text-xs font-semibold text-slate-500 uppercase">Click any item for details</span>
-            </div>
+        {/* Right: Expand/Collapse All, Balance B/F, Summary Modal, Excel Export */}
+        <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
+          {/* Expand / Collapse All */}
+          <button
+            type="button"
+            onClick={() => toggleAll(!allExpanded)}
+            title={allExpanded ? 'Collapse All Sections' : 'Expand All Sections'}
+            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Layers className="h-3 w-3 text-slate-400" />
+            <span>{allExpanded ? 'Collapse' : 'Expand'}</span>
+          </button>
 
-            {/* Current Assets */}
-            <div className="space-y-3 mb-6">
-              <button
-                type="button"
-                onClick={() => toggleSection('currentAssets')}
-                className="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  {expandedSections.currentAssets ? (
-                    <ChevronDown className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  )}
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Current Assets
-                  </span>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                  {formatMoney(sheetData.totalCurrentAssets)}
-                </span>
-              </button>
+          {/* Include Balance B/F toggle */}
+          <button
+            type="button"
+            onClick={() => setIncludeBF(!includeBF)}
+            title={
+              sheetData.hasPriorLedger
+                ? (includeBF ? 'Prior-year balances brought forward included' : 'Click to include prior-year balances brought forward')
+                : 'Prior-year ledger vouchers are not yet in database.'
+            }
+            className={cn(
+              'h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border transition-colors',
+              includeBF
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-2xs'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+            )}
+          >
+            <History className="h-3 w-3 text-slate-400" />
+            <span>{includeBF ? 'B/F Included' : 'B/F Excluded'}</span>
+          </button>
 
-              {expandedSections.currentAssets && (
-                <div className="pl-6 pr-2 space-y-2">
-                  {sheetData.currentAssetItems.map(item => (
-                    <div 
-                      key={item.code} 
-                      id={`bs-row-${item.code}`}
-                      onClick={() => setDrillItem(item)}
-                      title="Click to view underlying vouchers and audit rationale"
-                      className="flex items-center justify-between py-2 px-2 rounded-md border-b border-slate-100 dark:border-slate-800/60 text-xs cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-slate-400 font-semibold w-12">{item.code}</span>
-                        <div>
-                          <span className="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 underline decoration-dotted underline-offset-2">
-                            {item.name}
-                          </span>
-                          {item.note && (
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-2 italic">({item.note})</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {item.entries && item.entries.length > 0 && (
-                          <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono text-slate-400 border-slate-200 dark:border-slate-700">
-                            {item.entries.length} records
-                          </Badge>
-                        )}
-                        <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
-                          {formatMoney(item.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-300 dark:border-slate-700 text-xs font-bold">
-                    <span className="uppercase text-slate-700 dark:text-slate-300">Total Current Assets</span>
-                    <span className="font-mono text-slate-900 dark:text-white underline decoration-slate-400">
-                      {formatMoney(sheetData.totalCurrentAssets)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Summary Modal Button */}
+          <button
+            type="button"
+            onClick={() => setSummaryModalOpen(true)}
+            title="View Balance Sheet Breakdown & Rationale"
+            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <PieChart className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+            <span>Summary</span>
+          </button>
 
-            {/* Non-Current Assets */}
-            <div className="space-y-3 mb-6">
-              <button
-                type="button"
-                onClick={() => toggleSection('nonCurrentAssets')}
-                className="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  {expandedSections.nonCurrentAssets ? (
-                    <ChevronDown className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  )}
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Non-Current Assets (Property, Plant & Equipment)
-                  </span>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                  {formatMoney(sheetData.totalNonCurrentAssets)}
-                </span>
-              </button>
-
-              {expandedSections.nonCurrentAssets && (
-                <div className="pl-6 pr-2 space-y-2">
-                  {sheetData.nonCurrentAssetItems.map(item => (
-                    <div 
-                      key={item.code} 
-                      id={`bs-row-${item.code}`}
-                      onClick={() => setDrillItem(item)}
-                      title="Click to view underlying fixed asset vouchers"
-                      className="flex items-center justify-between py-2 px-2 rounded-md border-b border-slate-100 dark:border-slate-800/60 text-xs cursor-pointer hover:bg-blue-50/50 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-slate-400 font-semibold w-12">{item.code}</span>
-                        <div>
-                          <span className={cn(
-                            "font-medium underline decoration-dotted underline-offset-2",
-                            item.isContra ? "text-rose-600 dark:text-rose-400 font-semibold" : "text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400"
-                          )}>
-                            {item.name}
-                          </span>
-                          {item.note && (
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-2 italic">({item.note})</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {item.entries && item.entries.length > 0 && (
-                          <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono text-slate-400 border-slate-200 dark:border-slate-700">
-                            {item.entries.length} vouchers
-                          </Badge>
-                        )}
-                        <span className={cn(
-                          "font-mono font-semibold tabular-nums",
-                          item.isContra ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-slate-100"
-                        )}>
-                          {item.isContra ? formatMoney(-item.amount) : formatMoney(item.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-300 dark:border-slate-700 text-xs font-bold">
-                    <span className="uppercase text-slate-700 dark:text-slate-300">Total Non-Current Assets (Net Book Value)</span>
-                    <span className="font-mono text-slate-900 dark:text-white underline decoration-slate-400">
-                      {formatMoney(sheetData.totalNonCurrentAssets)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* TOTAL ASSETS DOUBLE UNDERLINE */}
-            <div className="flex items-center justify-between py-3 px-4 rounded-md bg-blue-50/50 dark:bg-blue-950/20 border-b-4 border-double border-slate-900 dark:border-slate-100 text-sm font-black">
-              <span className="uppercase tracking-wider text-slate-900 dark:text-white">TOTAL ASSETS</span>
-              <span className="font-mono text-lg text-blue-700 dark:text-blue-400">
-                {formatMoney(sheetData.totalAssets)}
-              </span>
-            </div>
-          </div>
-
-          {/* ══════════════════════════════════════════════════════
-              SECTION 2: LIABILITIES & EQUITY
-             ══════════════════════════════════════════════════════ */}
-          <div>
-            <div className="border-b-2 border-slate-900 dark:border-slate-100 pb-2 mb-4 flex items-center justify-between">
-              <h2 className="text-base font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">
-                2. LIABILITIES & EQUITY
-              </h2>
-              <span className="text-xs font-semibold text-slate-500 uppercase">Amounts in NGN (₦)</span>
-            </div>
-
-            {/* Current Liabilities */}
-            <div className="space-y-3 mb-6">
-              <button
-                type="button"
-                onClick={() => toggleSection('currentLiabilities')}
-                className="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  {expandedSections.currentLiabilities ? (
-                    <ChevronDown className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  )}
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Current Liabilities
-                  </span>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                  {formatMoney(sheetData.totalCurrentLiabilities)}
-                </span>
-              </button>
-
-              {expandedSections.currentLiabilities && (
-                <div className="pl-6 pr-2 space-y-2">
-                  {sheetData.currentLiabilityItems.map(item => (
-                    <div 
-                      key={item.code} 
-                      id={`bs-row-${item.code}`}
-                      onClick={() => setDrillItem(item)}
-                      title="Click to view underlying liabilities"
-                      className="flex items-center justify-between py-2 px-2 rounded-md border-b border-slate-100 dark:border-slate-800/60 text-xs cursor-pointer hover:bg-rose-50/50 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-slate-400 font-semibold w-12">{item.code}</span>
-                        <div>
-                          <span className="font-medium text-slate-900 dark:text-slate-100 hover:text-rose-600 dark:hover:text-rose-400 underline decoration-dotted underline-offset-2">
-                            {item.name}
-                          </span>
-                          {item.note && (
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-2 italic">({item.note})</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {item.entries && item.entries.length > 0 && (
-                          <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono text-slate-400 border-slate-200 dark:border-slate-700">
-                            {item.entries.length} records
-                          </Badge>
-                        )}
-                        <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 tabular-nums">
-                          {formatMoney(item.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-300 dark:border-slate-700 text-xs font-bold">
-                    <span className="uppercase text-slate-700 dark:text-slate-300">Total Current Liabilities</span>
-                    <span className="font-mono text-slate-900 dark:text-white underline decoration-slate-400">
-                      {formatMoney(sheetData.totalCurrentLiabilities)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Shareholders' Equity */}
-            <div className="space-y-3 mb-6">
-              <button
-                type="button"
-                onClick={() => toggleSection('equity')}
-                className="w-full flex items-center justify-between py-2 px-3 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700/70 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  {expandedSections.equity ? (
-                    <ChevronDown className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                  )}
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    Shareholders' Equity
-                  </span>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                  {formatMoney(sheetData.totalEquity)}
-                </span>
-              </button>
-
-              {expandedSections.equity && (
-                <div className="pl-6 pr-2 space-y-2">
-                  {sheetData.equityItems.map(item => (
-                    <div 
-                      key={item.code} 
-                      id={`bs-row-${item.code}`}
-                      onClick={() => setDrillItem(item)}
-                      title="Click to view underlying equity calculations"
-                      className="flex items-center justify-between py-2 px-2 rounded-md border-b border-slate-100 dark:border-slate-800/60 text-xs cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-slate-800/60 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-slate-400 font-semibold w-12">{item.code}</span>
-                        <div>
-                          <span className="font-medium text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 underline decoration-dotted underline-offset-2">
-                            {item.name}
-                          </span>
-                          {item.note && (
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-2 italic">({item.note})</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {item.entries && item.entries.length > 0 && (
-                          <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono text-slate-400 border-slate-200 dark:border-slate-700">
-                            {item.entries.length} records
-                          </Badge>
-                        )}
-                        <span className={cn(
-                          "font-mono font-semibold tabular-nums",
-                          item.amount < 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-slate-100"
-                        )}>
-                          {formatMoney(item.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-300 dark:border-slate-700 text-xs font-bold">
-                    <span className="uppercase text-slate-700 dark:text-slate-300">Total Shareholders' Equity</span>
-                    <span className="font-mono text-slate-900 dark:text-white underline decoration-slate-400">
-                      {formatMoney(sheetData.totalEquity)}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* TOTAL LIABILITIES & EQUITY DOUBLE UNDERLINE */}
-            <div className="flex items-center justify-between py-3 px-4 rounded-md bg-emerald-50/50 dark:bg-emerald-950/20 border-b-4 border-double border-slate-900 dark:border-slate-100 text-sm font-black">
-              <span className="uppercase tracking-wider text-slate-900 dark:text-white">TOTAL LIABILITIES & EQUITY</span>
-              <span className="font-mono text-lg text-emerald-700 dark:text-emerald-400">
-                {formatMoney(sheetData.totalLiabilitiesAndEquity)}
-              </span>
-            </div>
-          </div>
-
-          {/* ══════════════════════════════════════════════════════
-              EQUILIBRIUM AUDIT FOOTER
-             ══════════════════════════════════════════════════════ */}
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold">
-                ✓
-              </div>
-              <div>
-                <div className="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">
-                  Balance Sheet Equilibrium Validation
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                  Assets ({formatMoney(sheetData.totalAssets)}) = Liabilities ({formatMoney(sheetData.totalLiabilities)}) + Equity ({formatMoney(sheetData.totalEquity)})
-                </div>
-              </div>
-            </div>
-
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 font-mono font-bold text-xs">
-              ✓ In Perfect Equilibrium
-            </Badge>
-          </div>
+          {/* Excel Export Button */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            title="Export Balance Sheet to Excel (.xlsx)"
+            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Excel</span>
+          </button>
         </div>
       </div>
+
+      {/* ── Metadata Strip (Clean Corporate Accounting Header) ── */}
+      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-sm px-3 py-1.5 flex flex-wrap items-center justify-between text-[11px] font-mono text-slate-600 dark:text-slate-300 gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+            {companyInfo.name}
+          </span>
+          {companyInfo.regNumber && <span>· {companyInfo.regNumber}</span>}
+          <span>· Reporting: Years [{filterYears.join(', ')}] | Months [{filterMonths.join(', ')}]</span>
+          {filterClient && filterClient !== 'All' && <span>· Client: {filterClient}</span>}
+        </div>
+        <div className="flex items-center gap-4">
+          <span>Currency: NGN (₦)</span>
+          <span className="font-bold text-slate-900 dark:text-white">
+            Assets: {formatMoney(sheetData.totalAssets)}
+          </span>
+          <span className="font-bold text-slate-900 dark:text-white">
+            L &amp; E: {formatMoney(sheetData.totalLiabilitiesAndEquity)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Continuous Minimalist Balance Sheet Table ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-[12px] min-w-[760px]">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold tracking-wider text-slate-600 dark:text-slate-300">
+                <th className="py-1.5 px-3 w-16 font-mono">Code</th>
+                <th className="py-1.5 px-3">Account Title &amp; Details</th>
+                <th className="py-1.5 px-2 text-center w-20">Records</th>
+                <th className="py-1.5 px-3 text-right w-36 font-mono">Subtotal (₦)</th>
+                <th className="py-1.5 px-4 text-right w-40 font-mono">Total (₦)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+              {/* ═══════════════════════════════════════════════════
+                  SECTION 1: ASSETS
+                 ═══════════════════════════════════════════════════ */}
+              <tr className="bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-extrabold text-[11px] uppercase tracking-wider border-t border-b border-slate-300 dark:border-slate-700">
+                <td colSpan={5} className="py-1.5 px-3 flex items-center justify-between">
+                  <span>1. ASSETS</span>
+                  <span className="font-mono text-[11px] font-bold">
+                    {formatMoney(sheetData.totalAssets)}
+                  </span>
+                </td>
+              </tr>
+
+              {/* 1.1 Current Assets Band */}
+              <tr
+                onClick={() => toggleSection('currentAssets')}
+                className="bg-slate-50/80 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer font-bold text-[11px] text-slate-800 dark:text-slate-200 transition-colors"
+              >
+                <td colSpan={4} className="py-1 px-3">
+                  <div className="flex items-center gap-1.5">
+                    {expandedSections.currentAssets ? (
+                      <ChevronDown className="h-3 w-3 text-slate-500" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 text-slate-500" />
+                    )}
+                    <span className="uppercase tracking-wider">1.1 Current Assets</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-normal">
+                      ({sheetData.currentAssetItems.length} accounts)
+                    </span>
+                  </div>
+                </td>
+                <td className="py-1 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalCurrentAssets)}
+                </td>
+              </tr>
+
+              {expandedSections.currentAssets &&
+                sheetData.currentAssetItems.map((item, idx) => (
+                  <tr
+                    key={item.code}
+                    id={`bs-row-${item.code}`}
+                    onClick={() => setDrillItem(item)}
+                    title="Click to view underlying source vouchers & audit rationale"
+                    className={cn(
+                      'hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition-colors cursor-pointer',
+                      idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-900/40'
+                    )}
+                  >
+                    <td className="py-1.5 px-3 font-mono text-[11px] text-slate-400 font-semibold">
+                      {item.code}
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <span className="font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 underline decoration-dotted underline-offset-2">
+                        {item.name}
+                      </span>
+                      {item.note && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-2 italic">
+                          ({item.note})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-2 text-center">
+                      {item.entries && item.entries.length > 0 ? (
+                        <span className="inline-block px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                          {item.entries.length}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600">—</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-3 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                      {formatMoney(item.amount)}
+                    </td>
+                    <td className="py-1.5 px-4 text-right font-mono text-slate-300 dark:text-slate-600">
+                      —
+                    </td>
+                  </tr>
+                ))}
+
+              {/* Subtotal Current Assets Row */}
+              <tr className="bg-slate-50/60 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-700 font-semibold text-[11px]">
+                <td colSpan={3} className="py-1.5 px-3 uppercase tracking-wider text-slate-600 dark:text-slate-400 pl-8">
+                  Total Current Assets
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalCurrentAssets)}
+                </td>
+                <td className="py-1.5 px-4 text-right font-mono text-slate-400">
+                  —
+                </td>
+              </tr>
+
+              {/* 1.2 Non-Current Assets Band */}
+              <tr
+                onClick={() => toggleSection('nonCurrentAssets')}
+                className="bg-slate-50/80 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer font-bold text-[11px] text-slate-800 dark:text-slate-200 transition-colors"
+              >
+                <td colSpan={4} className="py-1 px-3">
+                  <div className="flex items-center gap-1.5">
+                    {expandedSections.nonCurrentAssets ? (
+                      <ChevronDown className="h-3 w-3 text-slate-500" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 text-slate-500" />
+                    )}
+                    <span className="uppercase tracking-wider">
+                      1.2 Non-Current Assets (Property, Plant &amp; Equipment)
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400 font-normal">
+                      ({sheetData.nonCurrentAssetItems.length} accounts)
+                    </span>
+                  </div>
+                </td>
+                <td className="py-1 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalNonCurrentAssets)}
+                </td>
+              </tr>
+
+              {expandedSections.nonCurrentAssets &&
+                sheetData.nonCurrentAssetItems.map((item, idx) => (
+                  <tr
+                    key={item.code}
+                    id={`bs-row-${item.code}`}
+                    onClick={() => setDrillItem(item)}
+                    title="Click to view fixed asset vouchers"
+                    className={cn(
+                      'hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition-colors cursor-pointer',
+                      idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-900/40'
+                    )}
+                  >
+                    <td className="py-1.5 px-3 font-mono text-[11px] text-slate-400 font-semibold">
+                      {item.code}
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <span className={cn(
+                        'font-medium underline decoration-dotted underline-offset-2',
+                        item.isContra ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400'
+                      )}>
+                        {item.name}
+                      </span>
+                      {item.note && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-2 italic">
+                          ({item.note})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-2 text-center">
+                      {item.entries && item.entries.length > 0 ? (
+                        <span className="inline-block px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                          {item.entries.length}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600">—</span>
+                      )}
+                    </td>
+                    <td className={cn(
+                      'py-1.5 px-3 text-right font-mono tabular-nums',
+                      item.isContra ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-slate-800 dark:text-slate-200'
+                    )}>
+                      {item.isContra ? formatMoney(-item.amount) : formatMoney(item.amount)}
+                    </td>
+                    <td className="py-1.5 px-4 text-right font-mono text-slate-300 dark:text-slate-600">
+                      —
+                    </td>
+                  </tr>
+                ))}
+
+              {/* Subtotal Non-Current Assets Row */}
+              <tr className="bg-slate-50/60 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-700 font-semibold text-[11px]">
+                <td colSpan={3} className="py-1.5 px-3 uppercase tracking-wider text-slate-600 dark:text-slate-400 pl-8">
+                  Total Non-Current Assets (Net Book Value)
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalNonCurrentAssets)}
+                </td>
+                <td className="py-1.5 px-4 text-right font-mono text-slate-400">
+                  —
+                </td>
+              </tr>
+
+              {/* TOTAL ASSETS DOUBLE UNDERLINE ROW */}
+              <tr className="bg-blue-50/60 dark:bg-blue-950/30 border-t-2 border-b-4 border-double border-slate-900 dark:border-slate-100 font-black text-[12px]">
+                <td colSpan={3} className="py-2.5 px-3 uppercase tracking-wider text-slate-900 dark:text-white">
+                  TOTAL ASSETS
+                </td>
+                <td className="py-2.5 px-3 text-right font-mono text-slate-400">
+                  —
+                </td>
+                <td className="py-2.5 px-4 text-right font-mono font-black text-blue-700 dark:text-blue-400 text-[13px] tabular-nums">
+                  {formatMoney(sheetData.totalAssets)}
+                </td>
+              </tr>
+
+              {/* ═══════════════════════════════════════════════════
+                  SECTION 2: LIABILITIES & EQUITY
+                 ═══════════════════════════════════════════════════ */}
+              <tr className="bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-extrabold text-[11px] uppercase tracking-wider border-t-2 border-b border-slate-300 dark:border-slate-700">
+                <td colSpan={5} className="py-1.5 px-3 flex items-center justify-between">
+                  <span>2. LIABILITIES &amp; EQUITY</span>
+                  <span className="font-mono text-[11px] font-bold">
+                    {formatMoney(sheetData.totalLiabilitiesAndEquity)}
+                  </span>
+                </td>
+              </tr>
+
+              {/* 2.1 Current Liabilities Band */}
+              <tr
+                onClick={() => toggleSection('currentLiabilities')}
+                className="bg-slate-50/80 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer font-bold text-[11px] text-slate-800 dark:text-slate-200 transition-colors"
+              >
+                <td colSpan={4} className="py-1 px-3">
+                  <div className="flex items-center gap-1.5">
+                    {expandedSections.currentLiabilities ? (
+                      <ChevronDown className="h-3 w-3 text-slate-500" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 text-slate-500" />
+                    )}
+                    <span className="uppercase tracking-wider">2.1 Current Liabilities</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-normal">
+                      ({sheetData.currentLiabilityItems.length} accounts)
+                    </span>
+                  </div>
+                </td>
+                <td className="py-1 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalCurrentLiabilities)}
+                </td>
+              </tr>
+
+              {expandedSections.currentLiabilities &&
+                sheetData.currentLiabilityItems.map((item, idx) => (
+                  <tr
+                    key={item.code}
+                    id={`bs-row-${item.code}`}
+                    onClick={() => setDrillItem(item)}
+                    title="Click to view underlying liabilities"
+                    className={cn(
+                      'hover:bg-rose-50/40 dark:hover:bg-slate-800/50 transition-colors cursor-pointer',
+                      idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-900/40'
+                    )}
+                  >
+                    <td className="py-1.5 px-3 font-mono text-[11px] text-slate-400 font-semibold">
+                      {item.code}
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <span className="font-medium text-slate-900 dark:text-slate-100 hover:text-rose-600 dark:hover:text-rose-400 underline decoration-dotted underline-offset-2">
+                        {item.name}
+                      </span>
+                      {item.note && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-2 italic">
+                          ({item.note})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-2 text-center">
+                      {item.entries && item.entries.length > 0 ? (
+                        <span className="inline-block px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                          {item.entries.length}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600">—</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-3 text-right font-mono tabular-nums text-slate-800 dark:text-slate-200">
+                      {formatMoney(item.amount)}
+                    </td>
+                    <td className="py-1.5 px-4 text-right font-mono text-slate-300 dark:text-slate-600">
+                      —
+                    </td>
+                  </tr>
+                ))}
+
+              {/* Subtotal Current Liabilities Row */}
+              <tr className="bg-slate-50/60 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-700 font-semibold text-[11px]">
+                <td colSpan={3} className="py-1.5 px-3 uppercase tracking-wider text-slate-600 dark:text-slate-400 pl-8">
+                  Total Current Liabilities
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalCurrentLiabilities)}
+                </td>
+                <td className="py-1.5 px-4 text-right font-mono text-slate-400">
+                  —
+                </td>
+              </tr>
+
+              {/* TOTAL LIABILITIES ROW */}
+              <tr className="bg-slate-100/70 dark:bg-slate-800/60 font-bold text-[11px] border-t border-b border-slate-300 dark:border-slate-700">
+                <td colSpan={3} className="py-2 px-3 uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                  TOTAL LIABILITIES
+                </td>
+                <td className="py-2 px-3 text-right font-mono text-slate-400">
+                  —
+                </td>
+                <td className="py-2 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalLiabilities)}
+                </td>
+              </tr>
+
+              {/* 2.2 Shareholders' Equity Band */}
+              <tr
+                onClick={() => toggleSection('equity')}
+                className="bg-slate-50/80 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/70 cursor-pointer font-bold text-[11px] text-slate-800 dark:text-slate-200 transition-colors"
+              >
+                <td colSpan={4} className="py-1 px-3">
+                  <div className="flex items-center gap-1.5">
+                    {expandedSections.equity ? (
+                      <ChevronDown className="h-3 w-3 text-slate-500" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 text-slate-500" />
+                    )}
+                    <span className="uppercase tracking-wider">2.2 Shareholders' Equity</span>
+                    <span className="text-[10px] font-mono text-slate-400 font-normal">
+                      ({sheetData.equityItems.length} accounts)
+                    </span>
+                  </div>
+                </td>
+                <td className="py-1 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalEquity)}
+                </td>
+              </tr>
+
+              {expandedSections.equity &&
+                sheetData.equityItems.map((item, idx) => (
+                  <tr
+                    key={item.code}
+                    id={`bs-row-${item.code}`}
+                    onClick={() => setDrillItem(item)}
+                    title="Click to view underlying equity calculations"
+                    className={cn(
+                      'hover:bg-emerald-50/40 dark:hover:bg-slate-800/50 transition-colors cursor-pointer',
+                      idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-900/40'
+                    )}
+                  >
+                    <td className="py-1.5 px-3 font-mono text-[11px] text-slate-400 font-semibold">
+                      {item.code}
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <span className="font-medium text-slate-900 dark:text-slate-100 hover:text-emerald-600 dark:hover:text-emerald-400 underline decoration-dotted underline-offset-2">
+                        {item.name}
+                      </span>
+                      {item.note && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 ml-2 italic">
+                          ({item.note})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1.5 px-2 text-center">
+                      {item.entries && item.entries.length > 0 ? (
+                        <span className="inline-block px-1.5 py-0.2 rounded-xs text-[9px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                          {item.entries.length}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 dark:text-slate-600">—</span>
+                      )}
+                    </td>
+                    <td className={cn(
+                      'py-1.5 px-3 text-right font-mono tabular-nums font-semibold',
+                      item.amount < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200'
+                    )}>
+                      {formatMoney(item.amount)}
+                    </td>
+                    <td className="py-1.5 px-4 text-right font-mono text-slate-300 dark:text-slate-600">
+                      —
+                    </td>
+                  </tr>
+                ))}
+
+              {/* Subtotal Shareholders' Equity Row */}
+              <tr className="bg-slate-50/60 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-700 font-semibold text-[11px]">
+                <td colSpan={3} className="py-1.5 px-3 uppercase tracking-wider text-slate-600 dark:text-slate-400 pl-8">
+                  Total Shareholders' Equity
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                  {formatMoney(sheetData.totalEquity)}
+                </td>
+                <td className="py-1.5 px-4 text-right font-mono text-slate-400">
+                  —
+                </td>
+              </tr>
+
+              {/* TOTAL LIABILITIES & EQUITY DOUBLE UNDERLINE ROW */}
+              <tr className="bg-slate-100 dark:bg-slate-800 border-t-2 border-b-4 border-double border-slate-900 dark:border-slate-100 font-black text-[12px]">
+                <td colSpan={3} className="py-2.5 px-3 uppercase tracking-wider text-slate-900 dark:text-white">
+                  TOTAL LIABILITIES &amp; EQUITY
+                </td>
+                <td className="py-2.5 px-3 text-right font-mono text-slate-400">
+                  —
+                </td>
+                <td className="py-2.5 px-4 text-right font-mono font-black text-slate-900 dark:text-white text-[13px] tabular-nums">
+                  {formatMoney(sheetData.totalLiabilitiesAndEquity)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footnote */}
+        <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 font-mono flex flex-wrap items-center justify-between gap-2">
+          <span>* Accrual Statement of Financial Position reconciled against client billing and registered expenses. Balance B/F {includeBF ? 'included' : 'excluded'}.</span>
+          <span>{companyInfo.name}</span>
+        </div>
+      </div>
+
+      {/* ── Summary & Breakdown Modal Dialog ── */}
+      <Dialog open={summaryModalOpen} onOpenChange={setSummaryModalOpen}>
+        <DialogContent className="max-w-lg p-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-800">
+          <DialogHeader className="p-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <PieChart className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <DialogTitle className="text-sm font-bold text-slate-900 dark:text-white">
+                Balance Sheet Executive Breakdown
+              </DialogTitle>
+            </div>
+            <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+              {companyInfo.name} · Years [{filterYears.join(', ')}] | Months [{filterMonths.join(', ')}]
+            </p>
+          </DialogHeader>
+
+          <div className="p-4 space-y-3 text-[12px]">
+            {/* Equilibrium Validation Pill */}
+            <div className={cn(
+              'p-2.5 rounded-sm border flex items-center justify-between',
+              sheetData.isEquilibrium
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+            )}>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span className="font-bold text-[11px] uppercase tracking-wider">
+                  {sheetData.isEquilibrium ? 'Balance Sheet is in Equilibrium' : 'Variance Detected'}
+                </span>
+              </div>
+              <span className="font-mono font-bold text-[11px]">
+                {sheetData.isEquilibrium ? 'Assets = L & E' : `Diff: ${formatMoney(sheetData.balanceDifference)}`}
+              </span>
+            </div>
+
+            {/* Breakdown Grid */}
+            <div className="space-y-2 border border-slate-200 dark:border-slate-800 rounded-sm p-3 bg-slate-50/40 dark:bg-slate-900/40">
+              <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Total Assets</span>
+                <span className="font-mono font-black text-blue-600 dark:text-blue-400">
+                  {formatMoney(sheetData.totalAssets)}
+                </span>
+              </div>
+              <div className="pl-3 space-y-1 text-[11px] text-slate-500">
+                <div className="flex justify-between">
+                  <span>Current Assets (Receivables, Bank, Withholding Tax)</span>
+                  <span className="font-mono">{formatMoney(sheetData.totalCurrentAssets)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Non-Current Fleet &amp; Equipment (CapEx)</span>
+                  <span className="font-mono">{formatMoney(sheetData.totalNonCurrentAssets)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-t border-b border-slate-200 dark:border-slate-800 mt-2">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Total Liabilities</span>
+                <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+                  {formatMoney(sheetData.totalLiabilities)}
+                </span>
+              </div>
+              <div className="pl-3 space-y-1 text-[11px] text-slate-500">
+                <div className="flex justify-between">
+                  <span>Trade Accounts Payable (Vendors)</span>
+                  <span className="font-mono">{formatMoney(sheetData.totalCurrentLiabilities)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center py-1 border-t border-b border-slate-200 dark:border-slate-800 mt-2">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Shareholders' Equity</span>
+                <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatMoney(sheetData.totalEquity)}
+                </span>
+              </div>
+              <div className="pl-3 space-y-1 text-[11px] text-slate-500">
+                <div className="flex justify-between">
+                  <span>Current Period Operating Net Surplus</span>
+                  <span className="font-mono">{formatMoney(sheetData.currentPeriodNetEarnings)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t-2 border-slate-300 dark:border-slate-700 text-[12px] font-black">
+                <span className="uppercase text-slate-900 dark:text-white">Total Liabilities &amp; Equity</span>
+                <span className="font-mono text-slate-900 dark:text-white">
+                  {formatMoney(sheetData.totalLiabilitiesAndEquity)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {drillItem && (
         <TransactionDrilldownDialog

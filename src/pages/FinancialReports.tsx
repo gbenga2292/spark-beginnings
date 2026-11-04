@@ -36,6 +36,7 @@ import { BalanceSheetReport } from '@/src/components/financial/BalanceSheetRepor
 import { TrialBalanceReport } from '@/src/components/financial/TrialBalanceReport';
 import { CompanyAccountStatement } from '@/src/components/financial/CompanyAccountStatement';
 import { LedgerSummaryReport } from '@/src/components/financial/LedgerSummaryReport';
+import { ProfitAndLossReport } from '@/src/components/financial/ProfitAndLossReport';
 import { cn } from '@/src/lib/utils';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#0284c7', '#0d9488'];
@@ -110,11 +111,10 @@ function YearDropdown({
       <button
         ref={btnRef}
         onClick={toggle}
-        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
-          isAll
+        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${isAll
             ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
             : 'border-blue-300 bg-blue-50 text-blue-700'
-        }`}
+          }`}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Year</span>
         {yearDisplayLabel}
@@ -191,11 +191,10 @@ function MonthDropdown({
       <button
         ref={btnRef}
         onClick={toggle}
-        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${
-          isAll
+        className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold transition-all whitespace-nowrap ${isAll
             ? 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-white'
             : 'border-blue-300 bg-blue-50 text-blue-700'
-        }`}
+          }`}
       >
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Month</span>
         {monthDisplayLabel}
@@ -239,8 +238,8 @@ export function FinancialReports() {
   const getVatDetails = (amount: number, payVat: string, rate: number, damages: number = 0) => {
     const baseAmount = Math.max(0, amount - damages);
     const vat = payVat === 'Add' ? Math.round(((baseAmount * rate) / (100 + rate)) * 100) / 100
-              : payVat === 'Yes' ? Math.round(((baseAmount / (100 + rate)) * rate) * 100) / 100
-              : 0;
+      : payVat === 'Yes' ? Math.round(((baseAmount / (100 + rate)) * rate) * 100) / 100
+        : 0;
     const amountForVat = payVat !== 'No' && vat > 0 ? baseAmount - vat : 0;
     return { vat, amountForVat };
   };
@@ -326,7 +325,7 @@ export function FinancialReports() {
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterClient, setFilterClient] = useState<string>('All');
   const [priorPeriodLimit, setPriorPeriodLimit] = useState<'none' | 'all' | 'this-year' | 'prev-month' | 'prev-2-months'>('all');
-  const [mainTab, setMainTab] = useState<'client-account' | 'balance-sheet' | 'trial-balance' | 'account-statement' | 'revenue-streams' | 'owed-services' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat'>('client-account');
+  const [mainTab, setMainTab] = useState<'client-account' | 'profit-loss' | 'balance-sheet' | 'trial-balance' | 'account-statement' | 'revenue-streams' | 'owed-services' | 'payroll-summary' | 'site-summary' | 'ledger-summary' | 'expenses-vat'>('client-account');
   const [reportBuilderOpen, setReportBuilderOpen] = useState(false);
   const sitesPriv = usePriv('sites');
   const [ledgerSummaryView, setLedgerSummaryView] = useState<'category' | 'bank' | 'client' | 'site'>('category');
@@ -434,9 +433,9 @@ export function FinancialReports() {
 
   const headerActions = (
     <div className="flex">
-      <Button 
-        size="sm" 
-        className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-bold whitespace-nowrap shrink-0 border border-blue-500 px-2 sm:px-4 rounded-sm" 
+      <Button
+        size="sm"
+        className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-bold whitespace-nowrap shrink-0 border border-blue-500 px-2 sm:px-4 rounded-sm"
         onClick={() => setReportBuilderOpen(true)}
         title="Open Report Builder"
       >
@@ -467,12 +466,12 @@ export function FinancialReports() {
   // OPTIMIZED: Only calculate if we are actually looking at payroll data
   const allMonthsPayroll = useMemo(() => {
     if (!(mainTab === 'payroll-summary' && accountsTab === 'payroll')) return {};
-    
+
     // Only calculate the specific month if filtered, otherwise all
     const monthsToProcess = (filterMonth === "All" ? null : parseInt(filterMonth, 10))
       ? [MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.key || 'jan']
       : MONTHS.map(m => m.key);
-      
+
     const yearToCalculate = filterYear === 'All' ? new Date().getFullYear() : parseInt(filterYear, 10);
 
     return monthsToProcess.reduce((acc, monthKey) => {
@@ -513,7 +512,7 @@ export function FinancialReports() {
       }
 
       const originalRows = allMonthsPayroll[month.key] || [];
-      
+
       if (prorateFactor === 1) {
         processed[month.key] = originalRows;
       } else if (prorateFactor === 0) {
@@ -521,7 +520,7 @@ export function FinancialReports() {
       } else {
         processed[month.key] = originalRows.map(r => {
           if (r.staffType === 'FIELD') return r;
-          
+
           const proratedSalary = r.salary * prorateFactor;
           const proratedBasic = r.basicSalary * prorateFactor;
           const proratedHousing = r.housing * prorateFactor;
@@ -532,7 +531,7 @@ export function FinancialReports() {
           const proratedPaye = r.paye * prorateFactor;
           const proratedWht = (r.withholdingTax || 0) * prorateFactor;
           const proratedLoan = r.loanRepayment * prorateFactor;
-          
+
           return {
             ...r,
             salary: proratedSalary,
@@ -577,7 +576,7 @@ export function FinancialReports() {
 
     const filterY = filterYear === "All" ? null : parseInt(filterYear, 10);
     const filterM = filterMonth === "All" ? null : parseInt(filterMonth, 10);
-    
+
     const isMatch = (dateStr: string | undefined) => {
       if (!dateStr) return false;
       const d = new Date(dateStr);
@@ -588,11 +587,11 @@ export function FinancialReports() {
     };
 
     let outstandingLoans = 0;
-    salaryAdvances.forEach(a => { 
-      if (a.status === 'Approved' && (!filterY && !filterM ? true : isMatch(a.requestDate))) outstandingLoans += a.amount; 
+    salaryAdvances.forEach(a => {
+      if (a.status === 'Approved' && (!filterY && !filterM ? true : isMatch(a.requestDate))) outstandingLoans += a.amount;
     });
-    loans.forEach(l => { 
-      if (l.status === 'Active' && (!filterY && !filterM ? true : isMatch(l.startDate))) outstandingLoans += l.remainingBalance; 
+    loans.forEach(l => {
+      if (l.status === 'Active' && (!filterY && !filterM ? true : isMatch(l.startDate))) outstandingLoans += l.remainingBalance;
     });
 
     return { totalGrossExposure, totalStatutory, totalOvertimeCost, outstandingLoans };
@@ -691,7 +690,7 @@ export function FinancialReports() {
     data: [],
     headers: [],
     filename: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   // Filters
@@ -882,7 +881,7 @@ export function FinancialReports() {
     invoices.forEach(inv => {
       const clientName = (inv.client || 'Unknown Client').trim();
       const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
-      
+
       if (rankingView === 'client') {
         if (!invoiceGroups.has(clientName)) {
           invoiceGroups.set(clientName, { key: clientName, name: clientName, client: clientName, siteList: new Set(), amount: 0 });
@@ -916,7 +915,7 @@ export function FinancialReports() {
     payments.forEach(pay => {
       const clientName = (pay.client || 'Unknown Client').trim();
       const siteName = (pay.site || 'Unknown Site').trim();
-      
+
       if (rankingView === 'client') {
         if (!paymentGroups.has(clientName)) {
           paymentGroups.set(clientName, { key: clientName, name: clientName, client: clientName, siteList: new Set(), amount: 0 });
@@ -956,34 +955,34 @@ export function FinancialReports() {
     // Determine the cutoff date string (YYYY-MM)
     const minYear = filterYear === 'All' ? new Date().getFullYear() : Math.min(...filterYear.split(',').map(y => parseInt(y.trim(), 10)).filter(y => !isNaN(y)));
     const minMonth = filterMonth === 'All' ? 1 : Math.min(...filterMonth.split(',').map(m => parseInt(m.trim(), 10)).filter(m => !isNaN(m)));
-    
+
     let cutoffYM = `${minYear}-${minMonth.toString().padStart(2, '0')}`;
 
     const isWithinPriorRange = (dateYM: string) => {
       if (dateYM >= cutoffYM) return false;
       if (priorPeriodLimit === 'none') return false;
       if (priorPeriodLimit === 'all') return true;
-      
+
       const currentMonthValue = minYear * 12 + minMonth;
 
       const dateYear = parseInt(dateYM.substring(0, 4), 10);
       const dateMonth = parseInt(dateYM.substring(5, 7), 10);
       const dateMonthValue = dateYear * 12 + dateMonth;
       const diff = currentMonthValue - dateMonthValue;
-      
+
       if (priorPeriodLimit === 'prev-month') {
         return diff === 1;
       }
-      
+
       if (priorPeriodLimit === 'prev-2-months') {
         return diff === 1 || diff === 2;
       }
-      
+
       if (priorPeriodLimit === 'this-year') {
         const lowerYM = `${minYear}-01`;
         return dateYM >= lowerYM;
       }
-      
+
       return true;
     };
 
@@ -992,7 +991,7 @@ export function FinancialReports() {
       if (!normalized) return;
       const dateYM = normalized.substring(0, 7);
       if (!isWithinPriorRange(dateYM)) return;
-      
+
       const matchC = filterClient === 'All' || (inv.client || '').trim() === filterClient;
       if (!matchC) return;
       const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
@@ -1085,34 +1084,34 @@ export function FinancialReports() {
     // Determine the cutoff date string (YYYY-MM)
     const minYear = filterYear === 'All' ? new Date().getFullYear() : Math.min(...filterYear.split(',').map(y => parseInt(y.trim(), 10)).filter(y => !isNaN(y)));
     const minMonth = filterMonth === 'All' ? 1 : Math.min(...filterMonth.split(',').map(m => parseInt(m.trim(), 10)).filter(m => !isNaN(m)));
-    
+
     let cutoffYM = `${minYear}-${minMonth.toString().padStart(2, '0')}`;
 
     const isWithinPriorRange = (dateYM: string) => {
       if (dateYM >= cutoffYM) return false;
       if (priorPeriodLimit === 'none') return false;
       if (priorPeriodLimit === 'all') return true;
-      
+
       const currentMonthValue = minYear * 12 + minMonth;
 
       const dateYear = parseInt(dateYM.substring(0, 4), 10);
       const dateMonth = parseInt(dateYM.substring(5, 7), 10);
       const dateMonthValue = dateYear * 12 + dateMonth;
       const diff = currentMonthValue - dateMonthValue;
-      
+
       if (priorPeriodLimit === 'prev-month') {
         return diff === 1;
       }
-      
+
       if (priorPeriodLimit === 'prev-2-months') {
         return diff === 1 || diff === 2;
       }
-      
+
       if (priorPeriodLimit === 'this-year') {
         const lowerYM = `${minYear}-01`;
         return dateYM >= lowerYM;
       }
-      
+
       return true;
     };
 
@@ -1122,9 +1121,9 @@ export function FinancialReports() {
     pendingSites.forEach(ps => {
       const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
       if (!siteIndex.has(key)) {
-        siteIndex.set(key, { 
-          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
-               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        siteIndex.set(key, {
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' :
+            ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No'
         });
       }
     });
@@ -1203,16 +1202,16 @@ export function FinancialReports() {
 
     let totalCollectedCash = 0, totalWHT = 0, totalDiscount = 0, totalVATCollected = 0;
     const clientVatMap = new Map<string, number>();
-    
+
     // OPTIMIZED: O(1) Site Lookup to prevent O(N*M) loop
     const siteIndex = new Map<string, any>();
     sites.forEach(s => siteIndex.set(`${(s.client || '').trim()}|${(s.name || '').trim()}`, s));
     pendingSites.forEach(ps => {
       const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
       if (!siteIndex.has(key)) {
-        siteIndex.set(key, { 
-          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
-               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        siteIndex.set(key, {
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' :
+            ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No'
         });
       }
     });
@@ -1225,11 +1224,11 @@ export function FinancialReports() {
       totalCollectedCash += (p.amount || 0);
       totalWHT += (p.withholdingTax || 0);
       totalDiscount += (p.discount || 0);
-      
+
       const siteKey = `${(p.client || '').trim()}|${(p.site || '').trim()}`;
       const payVatSetting = p.payVat || siteIndex.get(siteKey)?.vat || 'No';
       const { vat } = resolvePaymentVat(p, payVatSetting, invIndexGlobal);
-      
+
       if (vat > 0) clientVatMap.set(p.client, (clientVatMap.get(p.client) || 0) + vat);
       totalVATCollected += (vat || 0);
     });
@@ -1243,11 +1242,11 @@ export function FinancialReports() {
     const totalValueCleared = totalCollectedCash + totalWHT + totalDiscount;
     const rawOutstanding = totalBilled - totalValueCleared;
     const totalOutstanding = rawOutstanding <= 0.01 ? 0 : Math.round(rawOutstanding * 100) / 100;
-    
+
     const vatSources = Array.from(clientVatMap.entries())
       .map(([client, amount]) => ({ client, amount }))
       .sort((a, b) => b.amount - a.amount);
-    
+
     // Sum of prior periods' values
     let priorVatPaid = 0;
     let priorVatRemitted = 0;
@@ -1259,7 +1258,7 @@ export function FinancialReports() {
     const totalVATRemitted = vatPayments.reduce((sum, vp) => sum + (vp.amount || 0), 0) + (priorPeriodLimit !== 'none' ? priorVatRemitted : 0);
     const totalVATCollectedVal = totalVATCollected + (priorPeriodLimit !== 'none' ? priorVatPaid : 0);
     const vatDeficit = totalVATCollectedVal - totalVATRemitted;
-    
+
     return { totalBilled, totalVATInvoiced, totalCollectedCash, totalValueCleared, totalOutstanding, totalWHT, totalDiscount, totalVATCollected: totalVATCollectedVal, totalVATRemitted, vatDeficit, vatSources };
   }, [invoices, payments, vatPayments, sites, pendingSites, vatRate, bfVatData, priorPeriodLimit, rawInvoices]);
 
@@ -1274,19 +1273,19 @@ export function FinancialReports() {
         const siteName = (inv.siteName || (inv as any).site || 'Unknown Site').trim();
         const clientName = (inv.client || '').trim();
         const key = ((summaryTab as 'client' | 'site') === 'client') ? clientName : `${clientName} - ${siteName}`;
-        if (!rowMap.has(key)) rowMap.set(key, { 
-          client: clientName, 
-          site: siteName, 
-          key, 
-          noOfInvoices: 0, 
-          totalInvoices: 0, 
-          totalPayment: 0, 
-          discount: 0, 
-          withholdingTax: 0, 
-          vatInvoiced: 0, 
-          vatPaid: 0, 
+        if (!rowMap.has(key)) rowMap.set(key, {
+          client: clientName,
+          site: siteName,
+          key,
+          noOfInvoices: 0,
+          totalInvoices: 0,
+          totalPayment: 0,
+          discount: 0,
+          withholdingTax: 0,
+          vatInvoiced: 0,
+          vatPaid: 0,
           amountForVat: 0,
-          vatRemitted: 0 
+          vatRemitted: 0
         });
         rowMap.get(key)!.noOfInvoices += 1;
         rowMap.get(key)!.totalInvoices += (inv.amount || 0);
@@ -1304,9 +1303,9 @@ export function FinancialReports() {
     pendingSites.forEach(ps => {
       const key = `${(ps.clientName || '').trim()}|${(ps.siteName || '').trim()}`;
       if (!siteIndex.has(key)) {
-        siteIndex.set(key, { 
-          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' : 
-               ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No' 
+        siteIndex.set(key, {
+          vat: ps.phase4?.clientTaxStatus?.includes('Add') ? 'Add' :
+            ps.phase4?.clientTaxStatus?.includes('Yes') ? 'Yes' : 'No'
         });
       }
     });
@@ -1320,21 +1319,21 @@ export function FinancialReports() {
       const payDateNorm = normalizeDate(pay.date);
 
       const ensureRow = (siteName: string, key: string) => {
-        if (!rowMap.has(key)) rowMap.set(key, { 
-          client: clientName, 
-          site: siteName, 
-          key, 
-          noOfInvoices: 0, 
-          totalInvoices: 0, 
-          totalPayment: 0, 
-          discount: 0, 
-          withholdingTax: 0, 
-          vatInvoiced: 0, 
-          vatPaid: 0, 
-          amountForVat: 0, 
-          vatPolicy: 'No', 
-          vatRemitted: 0, 
-          latestActivityDate: '' 
+        if (!rowMap.has(key)) rowMap.set(key, {
+          client: clientName,
+          site: siteName,
+          key,
+          noOfInvoices: 0,
+          totalInvoices: 0,
+          totalPayment: 0,
+          discount: 0,
+          withholdingTax: 0,
+          vatInvoiced: 0,
+          vatPaid: 0,
+          amountForVat: 0,
+          vatPolicy: 'No',
+          vatRemitted: 0,
+          latestActivityDate: ''
         });
         const r = rowMap.get(key)!;
         if (payDateNorm && (!r.latestActivityDate || payDateNorm > r.latestActivityDate)) {
@@ -1477,8 +1476,8 @@ export function FinancialReports() {
         const parts = key.split(' - ');
         const client = parts[0];
         const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
-        rowMap.set(key, { 
-          client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
+        rowMap.set(key, {
+          client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0,
           discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0,
           latestActivityDate: ''
         });
@@ -1502,19 +1501,19 @@ export function FinancialReports() {
         const key = `${clientName} - ${siteName}`;
         if (!rowMap.has(key)) {
           const sDate = normalizeDate(s.startDate) || normalizeDate(s.createdAt) || normalizeDate((s as any).created_at) || '';
-          rowMap.set(key, { 
-            client: clientName, 
-            site: siteName, 
-            key, 
-            noOfInvoices: 0, 
-            totalInvoices: 0, 
-            totalPayment: 0, 
-            discount: 0, 
-            withholdingTax: 0, 
-            vatInvoiced: 0, 
-            vatPaid: 0, 
-            amountForVat: 0, 
-            vatPolicy: s.vat || 'No', 
+          rowMap.set(key, {
+            client: clientName,
+            site: siteName,
+            key,
+            noOfInvoices: 0,
+            totalInvoices: 0,
+            totalPayment: 0,
+            discount: 0,
+            withholdingTax: 0,
+            vatInvoiced: 0,
+            vatPaid: 0,
+            amountForVat: 0,
+            vatPolicy: s.vat || 'No',
             vatRemitted: 0,
             latestActivityDate: sDate
           });
@@ -1528,8 +1527,8 @@ export function FinancialReports() {
           const parts = key.split(' - ');
           const client = parts[0];
           const site = parts.length > 1 ? parts.slice(1).join(' - ') : 'Unknown Site';
-          rowMap.set(key, { 
-            client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0, 
+          rowMap.set(key, {
+            client, site, key, noOfInvoices: 0, totalInvoices: 0, totalPayment: 0,
             discount: 0, withholdingTax: 0, vatInvoiced: 0, vatPaid: 0, amountForVat: 0, vatPolicy: 'No', vatRemitted: 0,
             latestActivityDate: ''
           });
@@ -1544,9 +1543,9 @@ export function FinancialReports() {
       let balance = Math.abs(rawBalance) < 0.01 ? 0 : Math.round(rawBalance * 100) / 100;
       let status = balance > 0 && r.totalPayment === 0 && r.discount === 0 && r.withholdingTax === 0 && r.totalInvoices === 0 ? 'OWING'
         : balance > 0 && (r.totalPayment > 0 || r.discount > 0 || r.withholdingTax > 0 || bf < 0) ? 'PART PAID'
-        : balance > 0 ? 'OWING'
-        : balance === 0 && (r.totalInvoices > 0 || bf !== 0) ? 'FULLY PAID'
-        : balance < 0 ? 'OVER PAID' : '-';
+          : balance > 0 ? 'OWING'
+            : balance === 0 && (r.totalInvoices > 0 || bf !== 0) ? 'FULLY PAID'
+              : balance < 0 ? 'OVER PAID' : '-';
 
       const rawVatOwed = (priorPeriodLimit !== 'none' ? bfVatOwed : 0) + r.vatPaid - r.vatRemitted;
       const vatOwed = Math.abs(rawVatOwed) < 0.01 ? 0 : Math.round(rawVatOwed * 100) / 100;
@@ -1601,10 +1600,10 @@ export function FinancialReports() {
 
     if (filterMonth !== 'All') {
       if (priorPeriodLimit !== 'none') {
-        result = result.filter(r => 
-          r.totalInvoices > 0 || 
-          r.totalPayment > 0 || 
-          Math.abs(r.bf) > 0.01 || 
+        result = result.filter(r =>
+          r.totalInvoices > 0 ||
+          r.totalPayment > 0 ||
+          Math.abs(r.bf) > 0.01 ||
           Math.abs(r.bfVatOwed) > 0.01
         );
       } else {
@@ -1613,12 +1612,12 @@ export function FinancialReports() {
     }
 
     if (summaryTab === 'vat') {
-      result = result.filter(r => 
+      result = result.filter(r =>
         (r.totalPayment > 0 ||
-         Math.abs(r.vatPaid) > 0.01 ||
-         Math.abs(r.amountForVat) > 0.01 ||
-         Math.abs(r.vatRemitted) > 0.01 ||
-         Math.abs(r.vatOwed) > 0.01) &&
+          Math.abs(r.vatPaid) > 0.01 ||
+          Math.abs(r.amountForVat) > 0.01 ||
+          Math.abs(r.vatRemitted) > 0.01 ||
+          Math.abs(r.vatOwed) > 0.01) &&
         r.vatPolicy && r.vatPolicy !== 'No'
       );
     }
@@ -1816,10 +1815,10 @@ export function FinancialReports() {
     if (mode === 'bare') {
       head = [["Client", "Site", "Date", "Amount (₦)", "Status"]];
       body = invoices.map(inv => [
-        inv.client, 
-        inv.siteName || '', 
-        formatDisplayDate(inv.date), 
-        (inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+        inv.client,
+        inv.siteName || '',
+        formatDisplayDate(inv.date),
+        (inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         inv.status
       ]);
     } else {
@@ -1836,7 +1835,7 @@ export function FinancialReports() {
         (inv.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       ]);
     }
-    
+
     setPreviewModal({
       isOpen: true,
       title: `Invoice Report (${mode === 'bare' ? 'Basic' : 'Detailed'})`,
@@ -1852,11 +1851,11 @@ export function FinancialReports() {
     const headers = ["Client", "Client TIN", "Site", "Date", "Amount", "Amount for VAT", "WHT", "VAT", "Discount"];
     const extractCSV = (val: any) => typeof val === 'number' ? String(val) : `"${String(val ?? '').replace(/"/g, '""')}"`;
     const data = payments.map(p => {
-        const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const fallback = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
-        const vat = p.vat !== undefined && p.vat !== null ? Number(p.vat) : fallback.vat;
-        const amountForVat = p.amountForVat !== undefined && p.amountForVat !== null ? Number(p.amountForVat) : fallback.amountForVat;
-        return [ p.client, getTin(p.client), p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
+      const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
+      const fallback = getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0);
+      const vat = p.vat !== undefined && p.vat !== null ? Number(p.vat) : fallback.vat;
+      const amountForVat = p.amountForVat !== undefined && p.amountForVat !== null ? Number(p.amountForVat) : fallback.amountForVat;
+      return [p.client, getTin(p.client), p.site, formatDisplayDate(p.date), p.amount, amountForVat, p.withholdingTax || 0, vat || 0, p.discount || 0];
     });
     const csvData = [headers.join(','), ...data.map(row => row.map(extractCSV).join(','))].join('\n');
     const fileName = "payment_report.csv";
@@ -1894,19 +1893,19 @@ export function FinancialReports() {
   const exportPaymentPdf = () => {
     const head = [["Client", "Client TIN", "Site", "Date", "Amount (₦)", "WHT (₦)", "VAT (₦)"]];
     const body = payments.map(p => {
-        const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
-        const vat = p.vat !== undefined && p.vat !== null ? Number(p.vat) : getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0).vat;
-        return [
-            p.client,
-            getTin(p.client),
-            p.site,
-            formatDisplayDate(p.date),
-            (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            (vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        ];
+      const payVat = p.payVat || (sites.find(s => s.name === p.site && s.client === p.client)?.vat as any) || 'No';
+      const vat = p.vat !== undefined && p.vat !== null ? Number(p.vat) : getVatDetails(p.amount || 0, payVat, vatRate, (p as any).damages || 0).vat;
+      return [
+        p.client,
+        getTin(p.client),
+        p.site,
+        formatDisplayDate(p.date),
+        (p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        (p.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        (vat || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ];
     });
-    
+
     setPreviewModal({
       isOpen: true,
       title: "Payment Report",
@@ -1980,7 +1979,7 @@ export function FinancialReports() {
       return [
         r.client, ...(summaryTab === 'site' ? [r.site] : []),
         ...(filterYear !== 'All' ? [(r.bf || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })] : []),
-        r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
+        r.noOfInvoices, (r.totalInvoices || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         (r.totalPayment || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         (r.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         (r.withholdingTax || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -1993,7 +1992,7 @@ export function FinancialReports() {
         r.status
       ].filter(v => v !== undefined);
     });
-    
+
     const pdfTitle = showDebtorsOnly ? "Financial Summary Ledger (Debtors Only)" : "Financial Summary Ledger";
     const pdfFilename = showDebtorsOnly ? "financial_ledger_debtors.pdf" : "financial_ledger.pdf";
 
@@ -2155,18 +2154,18 @@ export function FinancialReports() {
       previewRows.push({ Module: 'Discounts', Scope: `${data.length} records`, Status: 'Included' });
     }
     if (selectedFields.includes('Client Balances')) {
-      const data = summaryData.map(r => ({ 
-        Client: r.client, 
-        Invoiced: r.totalInvoices, 
-        Paid: r.totalPayment, 
-        Discount: r.discount, 
-        WHT: r.withholdingTax, 
+      const data = summaryData.map(r => ({
+        Client: r.client,
+        Invoiced: r.totalInvoices,
+        Paid: r.totalPayment,
+        Discount: r.discount,
+        WHT: r.withholdingTax,
         VATInvoiced: r.vatInvoiced,
         VATPaid: r.vatPaid,
         VATRemitted: r.vatRemitted,
         VATDeficit: r.vatOwed,
-        Balance: r.balance, 
-        Status: r.status 
+        Balance: r.balance,
+        Status: r.status
       }));
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Client Balances');
@@ -2195,17 +2194,17 @@ export function FinancialReports() {
       previewRows.push({ Module: 'Site Revenue', Scope: `${data.length} sites`, Status: 'Included' });
     }
     if (selectedFields.includes('Collection Efficiency')) {
-      const data = [{ 
-        TotalBilled: globalStats.totalBilled, 
+      const data = [{
+        TotalBilled: globalStats.totalBilled,
         TotalVATInvoiced: globalStats.totalVATInvoiced,
-        TotalCollected: globalStats.totalCollectedCash, 
-        TotalWHT: globalStats.totalWHT, 
-        TotalDiscount: globalStats.totalDiscount, 
-        TotalOutstanding: globalStats.totalOutstanding, 
-        CollectionRate: `${collectionRate}%`, 
-        VATCollected: globalStats.totalVATCollected, 
-        VATRemitted: globalStats.totalVATRemitted, 
-        VATDeficit: globalStats.vatDeficit 
+        TotalCollected: globalStats.totalCollectedCash,
+        TotalWHT: globalStats.totalWHT,
+        TotalDiscount: globalStats.totalDiscount,
+        TotalOutstanding: globalStats.totalOutstanding,
+        CollectionRate: `${collectionRate}%`,
+        VATCollected: globalStats.totalVATCollected,
+        VATRemitted: globalStats.totalVATRemitted,
+        VATDeficit: globalStats.vatDeficit
       }];
       const ws = XLSX.utils.json_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, 'Efficiency');
@@ -2231,7 +2230,7 @@ export function FinancialReports() {
     }
 
     const fileName = 'Custom_Financial_Report.xlsx';
-    
+
     setPreviewModal({
       isOpen: true,
       title: 'Custom Financial Report (Multisheet)',
@@ -2375,26 +2374,26 @@ export function FinancialReports() {
                 </Table>
               </div>
             </div>
-            
+
             <div className="mt-4 p-4 rounded-md border border-blue-100 bg-blue-50/30 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
               <div className="text-xs text-slate-800 font-medium leading-relaxed">
-                Verification complete: The report matches your current filters ({filterYear === 'All' ? 'All Time' : filterYear}{filterClient !== 'All' ? `, Client: ${filterClient}` : ''}). 
+                Verification complete: The report matches your current filters ({filterYear === 'All' ? 'All Time' : filterYear}{filterClient !== 'All' ? `, Client: ${filterClient}` : ''}).
                 Clicking save will generate the full document as {previewModal.filename}.
               </div>
             </div>
           </div>
 
           <DialogFooter className="px-6 py-4 bg-slate-50/50 border-t items-center justify-between sm:justify-between">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="gap-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
               onClick={() => setPreviewModal(prev => ({ ...prev, isOpen: false }))}
             >
               <XCircle className="h-4 w-4" /> Cancel
             </Button>
             <div className="flex gap-3">
-              <Button 
+              <Button
                 className="gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-sm"
                 onClick={() => {
                   previewModal.onConfirm();
@@ -2430,6 +2429,7 @@ export function FinancialReports() {
             {[
               { id: 'client-account', label: 'Client Account', icon: Landmark },
               { id: 'balance-sheet', label: 'Balance Sheet', icon: Scale },
+              { id: 'profit-loss', label: 'Profit & Loss (P&L)', icon: ReceiptText },
               { id: 'trial-balance', label: 'Trial Balance', icon: FileSpreadsheet },
               { id: 'account-statement', label: 'Account Statement', icon: BookOpen },
               { id: 'revenue-streams', label: 'Revenue by Stream', icon: TrendingUp },
@@ -2446,11 +2446,10 @@ export function FinancialReports() {
                 <button
                   key={tab.id}
                   onClick={() => startTransition(() => setMainTab(tab.id as any))}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    isActive 
-                      ? 'bg-blue-600 text-white' 
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isActive
+                      ? 'bg-blue-600 text-white'
                       : 'text-slate-500 hover:bg-slate-50 hover:text-blue-600'
-                  }`}
+                    }`}
                 >
                   <Icon className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                   {tab.label}
@@ -2469,7 +2468,7 @@ export function FinancialReports() {
               </div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Report Filters</span>
             </div>
-            
+
             {/* Mobile Toggle */}
             <Button
               variant="ghost"
@@ -2480,7 +2479,7 @@ export function FinancialReports() {
               <Filter className="w-3.5 h-3.5" />
               {filtersOpen ? 'Hide' : 'Options'}
             </Button>
-            
+
             {/* Desktop Filters */}
             <div className="hidden md:flex items-center gap-4">
               <YearDropdown
@@ -2534,13 +2533,13 @@ export function FinancialReports() {
                   <option value="all">All Prior</option>
                 </select>
               </div>
-              
+
               <div className="w-px h-4 bg-slate-200" />
-              <label 
+              <label
                 className={cn(
                   "flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[11px] font-semibold cursor-pointer select-none transition-all",
-                  showDebtorsOnly 
-                    ? "border-rose-300 bg-rose-50 text-rose-700 font-bold" 
+                  showDebtorsOnly
+                    ? "border-rose-300 bg-rose-50 text-rose-700 font-bold"
                     : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-white"
                 )}
                 title="Only show debtors with balance due"
@@ -2574,7 +2573,7 @@ export function FinancialReports() {
               )}
             </div>
           </div>
-          
+
           {/* Mobile Filter Panel */}
           {filtersOpen && (
             <div className="md:hidden mt-3 pt-3 border-t border-slate-100 flex flex-col gap-3">
@@ -2634,11 +2633,11 @@ export function FinancialReports() {
                   <option value="all">All Prior</option>
                 </select>
               </div>
-              <label 
+              <label
                 className={cn(
                   "flex items-center gap-2 h-8 px-2.5 rounded-md border text-[11px] font-semibold cursor-pointer select-none transition-all",
-                  showDebtorsOnly 
-                    ? "border-rose-300 bg-rose-50 text-rose-700 font-bold" 
+                  showDebtorsOnly
+                    ? "border-rose-300 bg-rose-50 text-rose-700 font-bold"
                     : "border-slate-200 bg-slate-50 text-slate-700"
                 )}
               >
@@ -2670,1872 +2669,1861 @@ export function FinancialReports() {
           )}
         </div>
 
-        
 
 
-      {mainTab === 'site-summary' ? (
-        <SiteSummary filterYears={filterYear === 'All' ? ['All'] : selectedYears} filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} />
-      ) : mainTab === 'ledger-summary' ? (
-        <LedgerSummaryReport 
-          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
-          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
-          filterClient={filterClient} 
-        />
-      ) : mainTab === 'expenses-vat' ? (
-        /* ─────────────────────────────────────────────────────────────
-           EXPENSES VAT TAB — Monthly report of vatable expense entries
-           ───────────────────────────────────────────────────────────── */
-        (() => {
-          // Filter vatable entries based on filterYear, filterMonth, filterClient
-          const filteredVatEntries = ledgerEntries.filter(e => {
-            const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-            if (!isVat) return false;
-            if (!e.date) return false;
 
-            const entryYear = e.date.substring(0, 4);
-            if (filterYear !== 'All' && !selectedYears.includes(entryYear)) return false;
+        {mainTab === 'site-summary' ? (
+          <SiteSummary filterYears={filterYear === 'All' ? ['All'] : selectedYears} filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} />
+        ) : mainTab === 'ledger-summary' ? (
+          <LedgerSummaryReport
+            filterYears={filterYear === 'All' ? ['All'] : selectedYears}
+            filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)}
+            filterClient={filterClient}
+          />
+        ) : mainTab === 'expenses-vat' ? (
+          /* ─────────────────────────────────────────────────────────────
+             EXPENSES VAT TAB — Monthly report of vatable expense entries
+             ───────────────────────────────────────────────────────────── */
+          (() => {
+            // Filter vatable entries based on filterYear, filterMonth, filterClient
+            const filteredVatEntries = ledgerEntries.filter(e => {
+              const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+              if (!isVat) return false;
+              if (!e.date) return false;
 
-            if (filterMonth !== 'All') {
-              const d = new Date(e.date);
-              if (!isNaN(d.getTime())) {
-                const mNum = d.getMonth() + 1;
-                if (!selectedMonths.includes(mNum)) return false;
+              const entryYear = e.date.substring(0, 4);
+              if (filterYear !== 'All' && !selectedYears.includes(entryYear)) return false;
+
+              if (filterMonth !== 'All') {
+                const d = new Date(e.date);
+                if (!isNaN(d.getTime())) {
+                  const mNum = d.getMonth() + 1;
+                  if (!selectedMonths.includes(mNum)) return false;
+                }
               }
-            }
 
-            if (filterClient !== 'All') {
-              const entryClient = (e.client || '').trim();
-              if (entryClient !== filterClient.trim()) return false;
-            }
-            return true;
-          });
-
-          // Calculate aggregated stats
-          let totalAccVat = 0;
-          let totalBaseAmountForVat = 0;
-          let totalGrossVatable = 0;
-
-          filteredVatEntries.forEach(e => {
-            const vMode = e.vatMode || (e.isVatable ? 'Yes' : 'No');
-            const rateToUse = e.vatRate || vatRate;
-            const calculated = calculateItemVat(Number(e.amount), vMode, rateToUse);
-            totalAccVat += e.vatAmount ?? calculated.vatAmount;
-            totalBaseAmountForVat += e.amountForVat ?? calculated.amountForVat;
-            totalGrossVatable += Number(e.amount) || 0;
-          });
-
-          // Filter remittances for the period
-          const filteredRemittances = (expenseVatRemittances || []).filter(r => {
-            if (!r.date) return false;
-            const rYear = r.date.substring(0, 4);
-            if (filterYear !== 'All' && !selectedYears.includes(rYear)) return false;
-
-            if (filterMonth !== 'All') {
-              const d = new Date(r.date);
-              if (!isNaN(d.getTime())) {
-                const mNum = d.getMonth() + 1;
-                if (!selectedMonths.includes(mNum)) return false;
+              if (filterClient !== 'All') {
+                const entryClient = (e.client || '').trim();
+                if (entryClient !== filterClient.trim()) return false;
               }
-            }
-            return true;
-          });
+              return true;
+            });
 
-          const totalVatPaidRemitted = filteredRemittances.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-          const vatBalanceOwed = totalAccVat - totalVatPaidRemitted;
+            // Calculate aggregated stats
+            let totalAccVat = 0;
+            let totalBaseAmountForVat = 0;
+            let totalGrossVatable = 0;
 
-          return (
-            <div className="space-y-6">
-              {/* Stat Cards Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Accumulated Expenses VAT</p>
-                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
-                      ₦{totalAccVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h3>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Total VAT on vatable purchases</p>
-                  </CardContent>
-                </Card>
+            filteredVatEntries.forEach(e => {
+              const vMode = e.vatMode || (e.isVatable ? 'Yes' : 'No');
+              const rateToUse = e.vatRate || vatRate;
+              const calculated = calculateItemVat(Number(e.amount), vMode, rateToUse);
+              totalAccVat += e.vatAmount ?? calculated.vatAmount;
+              totalBaseAmountForVat += e.amountForVat ?? calculated.amountForVat;
+              totalGrossVatable += Number(e.amount) || 0;
+            });
 
-                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">VAT Paid / Remitted</p>
-                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
-                      ₦{totalVatPaidRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h3>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Reconciled VAT remittances</p>
-                  </CardContent>
-                </Card>
+            // Filter remittances for the period
+            const filteredRemittances = (expenseVatRemittances || []).filter(r => {
+              if (!r.date) return false;
+              const rYear = r.date.substring(0, 4);
+              if (filterYear !== 'All' && !selectedYears.includes(rYear)) return false;
 
-                <Card className={`border rounded-md ${vatBalanceOwed <= 0 ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900' : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20'}`}>
-                  <CardContent className="p-4">
-                    <p className={`text-[10px] font-bold uppercase tracking-wider ${vatBalanceOwed <= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                      Outstanding Deficit
-                    </p>
-                    <h3 className={`text-xl font-bold font-mono mt-1 tabular-nums ${vatBalanceOwed <= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-700 dark:text-rose-300'}`}>
-                      ₦{Math.max(0, vatBalanceOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h3>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                      {vatBalanceOwed <= 0 ? 'Fully Reconciled' : 'VAT payment deficit'}
-                    </p>
-                  </CardContent>
-                </Card>
+              if (filterMonth !== 'All') {
+                const d = new Date(r.date);
+                if (!isNaN(d.getTime())) {
+                  const mNum = d.getMonth() + 1;
+                  if (!selectedMonths.includes(mNum)) return false;
+                }
+              }
+              return true;
+            });
 
-                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Amount for VAT</p>
-                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
-                      ₦{totalBaseAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </h3>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Base gross amount for VAT</p>
-                  </CardContent>
-                </Card>
+            const totalVatPaidRemitted = filteredRemittances.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+            const vatBalanceOwed = totalAccVat - totalVatPaidRemitted;
 
-                <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
-                  <CardContent className="p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vatable Entries</p>
-                    <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
-                      {filteredVatEntries.length}
-                    </h3>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Line items in selection</p>
+            return (
+              <div className="space-y-6">
+                {/* Stat Cards Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                  <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Accumulated Expenses VAT</p>
+                      <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                        ₦{totalAccVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Total VAT on vatable purchases</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">VAT Paid / Remitted</p>
+                      <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                        ₦{totalVatPaidRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Reconciled VAT remittances</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className={`border rounded-md ${vatBalanceOwed <= 0 ? 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900' : 'border-rose-200 dark:border-rose-900/60 bg-rose-50/30 dark:bg-rose-950/20'}`}>
+                    <CardContent className="p-4">
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${vatBalanceOwed <= 0 ? 'text-slate-500 dark:text-slate-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        Outstanding Deficit
+                      </p>
+                      <h3 className={`text-xl font-bold font-mono mt-1 tabular-nums ${vatBalanceOwed <= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-700 dark:text-rose-300'}`}>
+                        ₦{Math.max(0, vatBalanceOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {vatBalanceOwed <= 0 ? 'Fully Reconciled' : 'VAT payment deficit'}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Amount for VAT</p>
+                      <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                        ₦{totalBaseAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Base gross amount for VAT</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-md">
+                    <CardContent className="p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Vatable Entries</p>
+                      <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-slate-100 mt-1 tabular-nums">
+                        {filteredVatEntries.length}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">Line items in selection</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Expenses VAT Ledger Table Card */}
+                <Card className="border-slate-200 overflow-hidden">
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-slate-800 text-base font-bold flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-emerald-600" /> Expenses VAT Financial Summary ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Categorized report of vatable expenses, calculated VAT, base taxable amounts, and line details
+                      </CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto max-h-[60vh] no-scrollbar">
+                      <table className="w-full text-left text-xs whitespace-nowrap">
+                        <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10">
+                          <tr>
+                            <th className="py-2.5 px-4 border-r border-slate-800">Voucher No.</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800">Date</th>
+                            <th className="py-2.5 px-4 border-r border-slate-800 w-1/3">Description</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800">Category</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800">Vendor</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800">Client / Site</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800 text-center">VAT Policy</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800 text-right">Line Amount (₦)</th>
+                            <th className="py-2.5 px-3 border-r border-slate-800 text-right">Amount for VAT (₦)</th>
+                            <th className="py-2.5 px-4 text-right">VAT Amount ({vatRate}%)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {filteredVatEntries.length === 0 ? (
+                            <tr>
+                              <td colSpan={10} className="text-center py-12 text-slate-400 italic">
+                                No vatable expense entries match the selected report filters ({filterYear === 'All' ? 'All Years' : filterYear}, {filterMonth === 'All' ? 'All Months' : `Month ${filterMonth}`}).
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredVatEntries.map((entry, idx) => {
+                              const vMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
+                              const calculated = calculateItemVat(Number(entry.amount), vMode, vatRate);
+                              const entryVat = entry.vatAmount ?? calculated.vatAmount;
+                              const entryBase = entry.amountForVat ?? calculated.amountForVat;
+                              return (
+                                <tr key={entry.id || idx} className="hover:bg-slate-50 transition-colors">
+                                  <td className="py-2.5 px-4 font-mono font-bold text-blue-600">{entry.voucherNo}</td>
+                                  <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
+                                  <td className="py-2.5 px-4 font-medium text-slate-800 max-w-[250px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                                  <td className="py-2.5 px-3">
+                                    <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm font-semibold border border-blue-200">{entry.category}</span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-600">{entry.vendor || '—'}</td>
+                                  <td className="py-2.5 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
+                                  <td className="py-2.5 px-3 text-center">
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 border border-slate-200">
+                                      {vMode}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums">
+                                    ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right font-semibold text-blue-600 tabular-nums font-mono">
+                                    ₦{entryBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right font-extrabold text-emerald-700 bg-emerald-50/50 tabular-nums">
+                                    ₦{entryVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Expenses VAT Ledger Table Card */}
-              <Card className="border-slate-200 overflow-hidden">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-3 px-4 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-slate-800 text-base font-bold flex items-center gap-2">
-                      <Receipt className="h-4 w-4 text-emerald-600" /> Expenses VAT Financial Summary ({filterYear === 'All' ? 'All Time' : filterYear}{filterMonth !== 'All' ? ` - Month ${filterMonth}` : ''})
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Categorized report of vatable expenses, calculated VAT, base taxable amounts, and line details
-                    </CardDescription>
+            );
+          })()
+        ) : mainTab === 'owed-services' ? (
+          <OwedServicesReport />
+        ) : mainTab === 'revenue-streams' ? (
+          <RevenueByStreamReport
+            filterYears={filterYear === 'All' ? ['All'] : selectedYears}
+            filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)}
+            filterClient={filterClient}
+            onNavigateToLedgerSummary={() => startTransition(() => setMainTab('ledger-summary'))}
+          />
+        ) : mainTab === 'balance-sheet' ? (
+          <BalanceSheetReport
+            filterYears={filterYear === 'All' ? ['All'] : selectedYears}
+            filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)}
+            filterClient={filterClient}
+          />
+        ) : mainTab === 'profit-loss' ? (
+          <ProfitAndLossReport
+            filterYears={filterYear === 'All' ? ['All'] : selectedYears}
+            filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)}
+            filterClient={filterClient}
+          />
+        ) : mainTab === 'trial-balance' ? (
+          <TrialBalanceReport
+            filterYears={filterYear === 'All' ? ['All'] : selectedYears}
+            filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)}
+            filterClient={filterClient}
+          />
+        ) : mainTab === 'account-statement' ? (
+          <CompanyAccountStatement
+            filterYears={filterYear === 'All' ? ['All'] : selectedYears}
+            filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)}
+            filterClient={filterClient}
+          />
+        ) : mainTab === 'client-account' ? (
+          <>
+            {/* Top Metrics */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Total Billed */}
+              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-sm transition-all">
+                <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Total Billed</p>
+                      <h3 className="text-lg sm:text-2xl font-bold font-mono text-slate-800 dark:text-slate-100 truncate">{formatCurrCompact(globalStats.totalBilled)}</h3>
+                    </div>
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
+                      <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto max-h-[60vh] no-scrollbar">
-                    <table className="w-full text-left text-xs whitespace-nowrap">
-                      <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10">
-                        <tr>
-                          <th className="py-2.5 px-4 border-r border-slate-800">Voucher No.</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800">Date</th>
-                          <th className="py-2.5 px-4 border-r border-slate-800 w-1/3">Description</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800">Category</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800">Vendor</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800">Client / Site</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800 text-center">VAT Policy</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800 text-right">Line Amount (₦)</th>
-                          <th className="py-2.5 px-3 border-r border-slate-800 text-right">Amount for VAT (₦)</th>
-                          <th className="py-2.5 px-4 text-right">VAT Amount ({vatRate}%)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {filteredVatEntries.length === 0 ? (
-                          <tr>
-                            <td colSpan={10} className="text-center py-12 text-slate-400 italic">
-                              No vatable expense entries match the selected report filters ({filterYear === 'All' ? 'All Years' : filterYear}, {filterMonth === 'All' ? 'All Months' : `Month ${filterMonth}`}).
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredVatEntries.map((entry, idx) => {
-                            const vMode = entry.vatMode || (entry.isVatable ? 'Yes' : 'No');
-                            const calculated = calculateItemVat(Number(entry.amount), vMode, vatRate);
-                            const entryVat = entry.vatAmount ?? calculated.vatAmount;
-                            const entryBase = entry.amountForVat ?? calculated.amountForVat;
-                            return (
-                              <tr key={entry.id || idx} className="hover:bg-slate-50 transition-colors">
-                                <td className="py-2.5 px-4 font-mono font-bold text-blue-600">{entry.voucherNo}</td>
-                                <td className="py-2.5 px-3 font-mono text-slate-600">{formatDisplayDate(entry.date)}</td>
-                                <td className="py-2.5 px-4 font-medium text-slate-800 max-w-[250px] truncate" title={entry.description}>{entry.description || '—'}</td>
-                                <td className="py-2.5 px-3">
-                                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm font-semibold border border-blue-200">{entry.category}</span>
-                                </td>
-                                <td className="py-2.5 px-3 text-slate-600">{entry.vendor || '—'}</td>
-                                <td className="py-2.5 px-3 text-slate-500">{entry.client || '—'}{entry.site ? ` / ${entry.site}` : ''}</td>
-                                <td className="py-2.5 px-3 text-center">
-                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-700 border border-slate-200">
-                                    {vMode}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-3 text-right font-semibold text-slate-800 tabular-nums">
-                                  ₦{Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                                <td className="py-2.5 px-3 text-right font-semibold text-blue-600 tabular-nums font-mono">
-                                  ₦{entryBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                                <td className="py-2.5 px-4 text-right font-extrabold text-emerald-700 bg-emerald-50/50 tabular-nums">
-                                  ₦{entryVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                  <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start truncate max-w-full">
+                    Across {invoices.length} invoices
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Total Collections */}
+              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-sm transition-all">
+                <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Total Collections</p>
+                      <h3 className="text-lg sm:text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">{formatCurrCompact(globalStats.totalCollectedCash)}</h3>
+                    </div>
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800 shrink-0">
+                      <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start truncate max-w-full">
+                    + {formatCurrCompact(globalStats.totalWHT)} WHT
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Balance Due */}
+              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 shadow-xs hover:shadow-sm transition-all">
+                <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Balance Due</p>
+                      <h3 className="text-lg sm:text-2xl font-bold font-mono text-amber-600 dark:text-amber-400 truncate">{formatCurrCompact(summaryData.reduce((sum, r) => sum + (r.balance || 0), 0))}</h3>
+                    </div>
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800 shrink-0">
+                      <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </div>
+                  <div className="w-full">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-amber-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, collectionRate))}%` }}></div>
+                    </div>
+                    <div className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase mt-1 tracking-wide truncate">{collectionRate}% Collection Eff.</div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* VAT Liability */}
+              <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-rose-500 relative group overflow-visible shadow-xs hover:shadow-sm transition-all">
+                <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative cursor-help">
+                  <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">VAT Liability</p>
+                      <h3 className={`text-lg sm:text-2xl font-bold font-mono truncate ${globalStats.vatDeficit < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {globalStats.vatDeficit < 0 ? `(${formatCurrCompact(Math.abs(globalStats.vatDeficit))})` : formatCurrCompact(globalStats.vatDeficit)}
+                      </h3>
+                    </div>
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 shrink-0">
+                      <Landmark className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowVatForensics(!showVatForensics);
+                    }}
+                    className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start border border-dashed border-rose-200 dark:border-rose-800 transition-colors truncate max-w-full text-left"
+                  >
+                    <span className="hidden sm:inline">Hover</span>
+                    <span className="sm:hidden inline">Tap</span> for Breakdown
+                  </button>
+
+                  {/* Tooltip / Tap popover for forensic breakdown */}
+                  <div className={cn(
+                    "absolute top-full mt-2 right-0 w-72 sm:w-64 max-w-[calc(100vw-2rem)] bg-slate-900 border border-slate-800 text-slate-100 p-3.5 sm:p-4 rounded-xl shadow-2xl transition-all duration-200 z-[100] origin-top-right",
+                    showVatForensics
+                      ? "opacity-100 visible pointer-events-auto"
+                      : "opacity-0 invisible pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto"
+                  )}>
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> VAT Forensics</span>
+                      {showVatForensics && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setShowVatForensics(false); }}
+                          className="text-slate-400 hover:text-white text-xs px-1 rounded sm:hidden"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 mb-3 max-h-[120px] overflow-y-auto no-scrollbar pr-1">
+                      {globalStats.vatSources.length === 0 ? (
+                        <div className="text-xs text-slate-500 italic">No VAT-applicable payments yet.</div>
+                      ) : (
+                        globalStats.vatSources.map(v => (
+                          <div key={v.client} className="flex justify-between items-center text-xs">
+                            <span className="truncate pr-3 text-slate-300 font-medium">{v.client}</span>
+                            <span className="font-mono text-emerald-400 font-bold shrink-0">₦{v.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="border-t border-slate-800 pt-3 space-y-1.5">
+                      <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                        <span>Total VAT Collected</span>
+                        <span className="font-mono text-white">₦{globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                        <span>Remitted to FIRS</span>
+                        <span className="font-mono text-sky-400">₦{globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-black text-rose-400 pt-1 mt-1 border-t border-slate-800">
+                        <span>Current Deficit</span>
+                        <span className="font-mono">₦{globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
-          );
-        })()
-      ) : mainTab === 'owed-services' ? (
-        <OwedServicesReport />
-      ) : mainTab === 'revenue-streams' ? (
-        <RevenueByStreamReport 
-          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
-          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
-          filterClient={filterClient} 
-          onNavigateToLedgerSummary={() => startTransition(() => setMainTab('ledger-summary'))}
-        />
-      ) : mainTab === 'balance-sheet' ? (
-        <BalanceSheetReport 
-          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
-          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
-          filterClient={filterClient} 
-        />
-      ) : mainTab === 'trial-balance' ? (
-        <TrialBalanceReport 
-          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
-          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
-          filterClient={filterClient} 
-        />
-      ) : mainTab === 'account-statement' ? (
-        <CompanyAccountStatement 
-          filterYears={filterYear === 'All' ? ['All'] : selectedYears} 
-          filterMonths={filterMonth === 'All' ? ['All'] : selectedMonths.map(String)} 
-          filterClient={filterClient} 
-        />
-      ) : mainTab === 'client-account' ? (
-        <>
-      {/* Top Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Billed */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Total Billed</p>
-                <h3 className="text-lg sm:text-2xl font-bold font-mono text-slate-800 dark:text-slate-100 truncate">{formatCurrCompact(globalStats.totalBilled)}</h3>
-              </div>
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800 shrink-0">
-                <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-            </div>
-            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start truncate max-w-full">
-              Across {invoices.length} invoices
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Total Collections */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Total Collections</p>
-                <h3 className="text-lg sm:text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 truncate">{formatCurrCompact(globalStats.totalCollectedCash)}</h3>
-              </div>
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800 shrink-0">
-                <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-            </div>
-            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start truncate max-w-full">
-              + {formatCurrCompact(globalStats.totalWHT)} WHT
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Balance Due */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">Balance Due</p>
-                <h3 className="text-lg sm:text-2xl font-bold font-mono text-amber-600 dark:text-amber-400 truncate">{formatCurrCompact(summaryData.reduce((sum, r) => sum + (r.balance || 0), 0))}</h3>
-              </div>
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800 shrink-0">
-                <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-            </div>
-            <div className="w-full">
-              <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                <div className="bg-amber-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, collectionRate))}%` }}></div>
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase mt-1 tracking-wide truncate">{collectionRate}% Collection Eff.</div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* VAT Liability */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 border-l-4 border-l-rose-500 relative group overflow-visible shadow-xs hover:shadow-sm transition-all">
-          <CardContent className="p-3.5 sm:p-5 flex flex-col justify-between h-full relative cursor-help">
-            <div className="flex justify-between items-start mb-2 sm:mb-4 gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5 sm:mb-1 truncate">VAT Liability</p>
-                <h3 className={`text-lg sm:text-2xl font-bold font-mono truncate ${globalStats.vatDeficit < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                  {globalStats.vatDeficit < 0 ? `(${formatCurrCompact(Math.abs(globalStats.vatDeficit))})` : formatCurrCompact(globalStats.vatDeficit)}
-                </h3>
-              </div>
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-800 shrink-0">
-                <Landmark className="w-4 h-4 sm:w-5 sm:h-5" />
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowVatForensics(!showVatForensics);
-              }}
-              className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 hover:bg-rose-50 dark:hover:bg-rose-950/40 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md inline-flex items-center gap-1 self-start border border-dashed border-rose-200 dark:border-rose-800 transition-colors truncate max-w-full text-left"
-            >
-              <span className="hidden sm:inline">Hover</span>
-              <span className="sm:hidden inline">Tap</span> for Breakdown
-            </button>
-            
-            {/* Tooltip / Tap popover for forensic breakdown */}
-            <div className={cn(
-              "absolute top-full mt-2 right-0 w-72 sm:w-64 max-w-[calc(100vw-2rem)] bg-slate-900 border border-slate-800 text-slate-100 p-3.5 sm:p-4 rounded-xl shadow-2xl transition-all duration-200 z-[100] origin-top-right",
-              showVatForensics 
-                ? "opacity-100 visible pointer-events-auto" 
-                : "opacity-0 invisible pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto"
-            )}>
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> VAT Forensics</span>
-                    {showVatForensics && (
-                      <button 
-                        type="button" 
-                        onClick={(e) => { e.stopPropagation(); setShowVatForensics(false); }}
-                        className="text-slate-400 hover:text-white text-xs px-1 rounded sm:hidden"
-                      >
-                        ✕
-                      </button>
-                    )}
-                </div>
-                
-                <div className="space-y-2 mb-3 max-h-[120px] overflow-y-auto no-scrollbar pr-1">
-                    {globalStats.vatSources.length === 0 ? (
-                        <div className="text-xs text-slate-500 italic">No VAT-applicable payments yet.</div>
-                    ) : (
-                        globalStats.vatSources.map(v => (
-                            <div key={v.client} className="flex justify-between items-center text-xs">
-                                <span className="truncate pr-3 text-slate-300 font-medium">{v.client}</span>
-                                <span className="font-mono text-emerald-400 font-bold shrink-0">₦{v.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </div>
-                        ))
-                    )}
-                </div>
-                
-                <div className="border-t border-slate-800 pt-3 space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-bold text-slate-400">
-                        <span>Total VAT Collected</span>
-                        <span className="font-mono text-white">₦{globalStats.totalVATCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px] font-bold text-slate-400">
-                        <span>Remitted to FIRS</span>
-                        <span className="font-mono text-sky-400">₦{globalStats.totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-black text-rose-400 pt-1 mt-1 border-t border-slate-800">
-                        <span>Current Deficit</span>
-                        <span className="font-mono">₦{globalStats.vatDeficit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* FINANCIAL SUMMARY Ledger - Featured at top */}
-      <Card className={`border-slate-200 rounded-md overflow-hidden ${fullScreenTable === 'ledger' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
-        <CardHeader className={`bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 pb-0 pt-3.5 sm:pt-4 px-0 shrink-0 ${fullScreenTable === 'ledger' ? 'hidden' : ''}`}>
-          <div className="flex flex-row items-center justify-between px-3.5 sm:px-5 pb-3 gap-2">
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 shrink-0" />
-              <CardTitle className="text-xs sm:text-sm text-slate-800 dark:text-slate-100 uppercase tracking-wide truncate">Financial Summary Ledger</CardTitle>
-            </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              <label 
-                htmlFor="ledger-debtors-only"
-                className={cn(
-                  "flex items-center gap-1.5 sm:gap-2 h-8 px-2.5 sm:px-3 rounded-md border text-xs font-semibold cursor-pointer select-none transition-all shadow-2xs",
-                  showDebtorsOnly
-                    ? "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300 ring-1 ring-rose-300/50"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300"
-                )}
-                title="Filter to show only debtors with outstanding balances"
-              >
-                <input
-                  id="ledger-debtors-only"
-                  type="checkbox"
-                  checked={showDebtorsOnly}
-                  onChange={(e) => setShowDebtorsOnly(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer"
-                />
-                <span className="whitespace-nowrap">Debtors Only</span>
-                {debtorCount > 0 && (
-                  <span className={cn(
-                    "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                    showDebtorsOnly
-                      ? "bg-rose-200/80 text-rose-800 dark:bg-rose-900 dark:text-rose-200"
-                      : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                  )}>
-                    {debtorCount}
-                  </span>
-                )}
-              </label>
-
-              {priv.canExport && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-1.5 sm:gap-2 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30 px-2 sm:px-3 h-8" 
-                  onClick={exportLedgerPdf}
-                  title="Export PDF"
-                >
-                  <FileText className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">Export PDF</span>
-                </Button>
-              )}
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1.5 sm:gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 px-2 sm:px-3 h-8" 
-                onClick={() => toggleFullScreen('ledger')}
-                title="Full Screen"
-              >
-                <Maximize2 className="h-4 w-4 shrink-0" />
-                <span className="hidden sm:inline">Full Screen</span>
-              </Button>
-            </div>
-          </div>
-          <div className="flex px-5 gap-6 border-b border-slate-200 overflow-x-auto no-scrollbar">
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'client' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'site' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'vat' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
-            <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 ${summaryTab === 'expenses-vat' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('expenses-vat')}>
-              <Receipt className="h-3.5 w-3.5" /> Expenses VAT
-            </button>
-          </div>
-        </CardHeader>
-        
-        {fullScreenTable === 'ledger' && (
-          <>
-            <div className="fixed top-4 left-4 z-[110] flex items-center gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xl">
-              <label 
-                htmlFor="fullscreen-debtors-only"
-                className={cn(
-                  "flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-xs font-semibold cursor-pointer select-none transition-all",
-                  showDebtorsOnly
-                    ? "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300"
-                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300"
-                )}
-              >
-                <input
-                  id="fullscreen-debtors-only"
-                  type="checkbox"
-                  checked={showDebtorsOnly}
-                  onChange={(e) => setShowDebtorsOnly(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer"
-                />
-                <span className="whitespace-nowrap">Debtors Only</span>
-                {debtorCount > 0 && (
-                  <span className={cn(
-                    "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold",
-                    showDebtorsOnly ? "bg-rose-200/80 text-rose-800" : "bg-slate-100 text-slate-600"
-                  )}>
-                    {debtorCount}
-                  </span>
-                )}
-              </label>
-            </div>
-            <Button 
-              variant="default" 
-              size="icon" 
-              className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
-              onClick={() => toggleFullScreen('ledger')}
-              title="Exit Full Screen"
-            >
-              <Minimize2 className="h-5 w-5" />
-            </Button>
-          </>
-        )}
-
-        {summaryTab === 'expenses-vat' ? (
-          /* ── EXPENSES VAT TABLE ── */
-          <div ref={expensesVatScrollRef} className={`overflow-auto relative no-scrollbar cursor-grab active:cursor-grabbing ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
-            <table className="w-full text-left text-[13px] whitespace-nowrap">
-              <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-20">
-                <tr>
-                  <th className="py-3 px-5 sticky left-0 z-30 bg-slate-900 text-xs tracking-wider uppercase text-slate-300 border-r border-slate-700">Voucher No.</th>
-                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Date</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 w-1/4">Description</th>
-                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Category</th>
-                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Vendor</th>
-                  <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300 text-center">VAT Policy</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Line Amount (₦)</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Amt for VAT (₦)</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-emerald-300 text-right">VAT Amount (₦)</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-sky-300 text-right">VAT Remitted (₦)</th>
-                  <th className="py-3 px-5 text-xs tracking-wider uppercase text-rose-300 text-right">VAT Owed (₦)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {(() => {
-                  const vatEntries = ledgerEntries.filter(e => {
-                    const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-                    if (!isVat) return false;
-                    if (!e.date) return false;
-                    if (filterYear !== 'All') {
-                      const yr = e.date.substring(0, 4);
-                      if (!filterYear.split(',').map(y => y.trim()).includes(yr)) return false;
-                    }
-                    if (filterMonth !== 'All') {
-                      const d = new Date(e.date);
-                      if (!isNaN(d.getTime())) {
-                        const mNum = String(d.getMonth() + 1);
-                        if (!filterMonth.split(',').map(m => m.trim()).includes(mNum)) return false;
-                      }
-                    }
-                    return true;
-                  });
-
-                  if (vatEntries.length === 0) return (
-                    <tr><td colSpan={11} className="py-12 text-center text-slate-400 italic">No vatable expense entries for the selected period.</td></tr>
-                  );
-
-                  // Build a map of monthKey → total VAT accumulated for that month
-                  // Then distribute remittances proportionally per-entry
-                  const monthVatTotals = new Map<string, number>();
-                  vatEntries.forEach(e => {
-                    if (!e.date) return;
-                    const mk = e.date.substring(0, 7); // YYYY-MM
-                    const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
-                    const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
-                    const entryVat = e.vatAmount ?? calc.vatAmount;
-                    monthVatTotals.set(mk, (monthVatTotals.get(mk) || 0) + entryVat);
-                  });
-
-                  // Build a map of monthKey → total remitted for that month
-                  const monthRemittedTotals = new Map<string, number>();
-                  (expenseVatRemittances || []).forEach(r => {
-                    if (!r.date) return;
-                    const mk = r.date.substring(0, 7);
-                    monthRemittedTotals.set(mk, (monthRemittedTotals.get(mk) || 0) + (Number(r.amount) || 0));
-                  });
-
-                  let grandLineAmt = 0, grandAmtForVat = 0, grandVatAmt = 0, grandRemitted = 0, grandOwed = 0;
-
-                  const rows = vatEntries.map((entry, idx) => {
-                    const vMode: 'No' | 'Yes' | 'Add' = (entry.vatMode as any) || (entry.isVatable ? 'Yes' : 'No');
-                    const calc = calculateItemVat(Number(entry.amount), vMode, entry.vatRate || vatRate);
-                    const lineAmt = Number(entry.amount) || 0;
-                    const amtForVat = entry.amountForVat ?? calc.amountForVat;
-                    const vatAmt = entry.vatAmount ?? calc.vatAmount;
-
-                    // Prorate this entry's share of the month's remittance
-                    const mk = entry.date?.substring(0, 7) || '';
-                    const monthTotalVat = monthVatTotals.get(mk) || 0;
-                    const monthTotalRemitted = monthRemittedTotals.get(mk) || 0;
-                    const entryShare = monthTotalVat > 0 ? vatAmt / monthTotalVat : 0;
-                    const entryRemitted = Math.min(vatAmt, monthTotalRemitted * entryShare);
-                    const entryOwed = Math.max(0, vatAmt - entryRemitted);
-
-                    grandLineAmt += lineAmt;
-                    grandAmtForVat += amtForVat;
-                    grandVatAmt += vatAmt;
-                    grandRemitted += entryRemitted;
-                    grandOwed += entryOwed;
-
-                    const isEven = idx % 2 === 0;
-                    const isFullyPaid = entryOwed <= 0.01;
-                    const isPartPaid = entryRemitted > 0.01 && !isFullyPaid;
-
-                    return (
-                      <tr key={entry.id || idx} className={`hover:bg-slate-50 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
-                        <td className={`py-2.5 px-5 sticky left-0 z-10 border-r border-slate-100  font-mono font-bold text-blue-600 ${isEven ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{entry.voucherNo || '—'}</td>
-                        <td className="py-2.5 px-4 font-mono text-slate-500 text-xs">{formatDisplayDate(entry.date)}</td>
-                        <td className="py-2.5 px-5 font-medium text-slate-800 max-w-[220px] truncate" title={entry.description}>{entry.description || '—'}</td>
-                        <td className="py-2.5 px-4">
-                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm text-[11px] font-semibold border border-blue-200">{entry.category || '—'}</span>
-                        </td>
-                        <td className="py-2.5 px-4 text-slate-500 text-[12px]">{entry.vendor || '—'}</td>
-                        <td className="py-2.5 px-4 text-center">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${
-                            vMode === 'Yes' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            vMode === 'Add' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-slate-100 text-slate-500 border-slate-200'
-                          }`}>{vMode}</span>
-                        </td>
-                        <td className="py-2.5 px-5 text-right font-mono font-semibold text-slate-700 tabular-nums">
-                          {lineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-2.5 px-5 text-right font-mono font-semibold text-blue-600 tabular-nums">
-                          {amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td
-                          className="py-2.5 px-5 text-right font-mono font-extrabold text-emerald-700 bg-emerald-50/40 tabular-nums"
-                          title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | VAT Amount: ₦${vatAmt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`}
-                        >
-                          {vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td
-                          className="py-2.5 px-5 text-right font-mono font-semibold text-sky-600 tabular-nums"
-                          title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | VAT Amount: ₦${vatAmt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | Remitted: ₦${entryRemitted > 0.005 ? entryRemitted.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '0.00'}`}
-                        >
-                          {entryRemitted > 0.005
-                            ? entryRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                            : <span className="text-slate-300">—</span>}
-                        </td>
-                        <td
-                          className="py-2.5 px-5 text-right tabular-nums"
-                          title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | VAT Amount: ₦${vatAmt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} | Remitted: ₦${entryRemitted > 0.005 ? entryRemitted.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '0.00'} | Owed: ₦${entryOwed.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`}
-                        >
-                          {isFullyPaid ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-                              <CheckCircle2 className="h-3 w-3" /> Paid
-                            </span>
-                          ) : isPartPaid ? (
-                            <span className="font-mono font-bold text-amber-600 text-xs">
-                              {entryOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          ) : (
-                            <span className="font-mono font-bold text-rose-600 text-xs">
-                              {vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  });
-
-                    return (
-                      <>
-                        {rows}
-                      </>
-                    );
-                  })()}
-                </tbody>
-                <tfoot className="sticky bottom-0 z-30 bg-slate-900 border-t-4 border-emerald-500 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]">
-                  <tr className="bg-slate-900">
-                    <td className="sticky left-0 z-40 bg-slate-900 py-3.5 px-5 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700" colSpan={6}>Grand Total</td>
-                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-slate-200 tabular-nums">
-                      {ledgerEntries
-                        .filter(e => {
-                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-                          if (!isVat || !e.date) return false;
-                          if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
-                          if (filterMonth !== 'All') {
-                            const d = new Date(e.date);
-                            if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
-                          }
-                          return true;
-                        })
-                        .reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
-                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-slate-300 tabular-nums">
-                      {ledgerEntries
-                        .filter(e => {
-                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-                          if (!isVat || !e.date) return false;
-                          if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
-                          if (filterMonth !== 'All') {
-                            const d = new Date(e.date);
-                            if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
-                          }
-                          return true;
-                        })
-                        .reduce((acc, e) => {
-                          const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
-                          const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
-                          return acc + (e.amountForVat ?? calc.amountForVat);
-                        }, 0)
-                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-emerald-400 tabular-nums">
-                      {ledgerEntries
-                        .filter(e => {
-                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-                          if (!isVat || !e.date) return false;
-                          if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
-                          if (filterMonth !== 'All') {
-                            const d = new Date(e.date);
-                            if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
-                          }
-                          return true;
-                        })
-                        .reduce((acc, e) => {
-                          const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
-                          const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
-                          return acc + (e.vatAmount ?? calc.vatAmount);
-                        }, 0)
-                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-sky-400 tabular-nums">
-                      {(expenseVatRemittances || [])
-                        .reduce((acc, r) => acc + (Number(r.amount) || 0), 0) > 0
-                        ? (expenseVatRemittances || [])
-                            .reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
-                            .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                        : '—'}
-                    </td>
-                    <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-rose-400 tabular-nums">
-                      {Math.max(
-                        0,
-                        ledgerEntries
-                          .filter(e => {
-                            const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
-                            if (!isVat || !e.date) return false;
-                            if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
-                            if (filterMonth !== 'All') {
-                              const d = new Date(e.date);
-                              if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
-                            }
-                            return true;
-                          })
-                          .reduce((acc, e) => {
-                            const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
-                            const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
-                            return acc + (e.vatAmount ?? calc.vatAmount);
-                          }, 0) -
-                          (expenseVatRemittances || []).reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
-                      ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-          </div>
-        ) : (
-        <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
-          <Table className="whitespace-nowrap min-w-full text-[13px]">
-            <TableHeader className="bg-slate-900 sticky top-0 z-20">
-              <TableRow className="hover:bg-slate-900 border-b border-slate-800">
-                <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px]">Client</TableHead>
-                {summaryTab === 'vat' && <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-left">VAT Policy</TableHead>}
-                {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] border-l border-slate-700/50">Site</TableHead>}
-                {summaryTab !== 'vat' && filterYear !== 'All' && (
-                  <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
-                    B/F
-                  </TableHead>
-                )}
-                {summaryTab !== 'vat' && (
-                  <>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
-                  </>
-                )}
-                <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">{summaryTab === 'vat' ? 'Payment Made' : 'Total Payments'}</TableHead>
-                {summaryTab !== 'vat' && (
-                  <>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">WHT</TableHead>
-                  </>
-                )}
-                {summaryTab === 'vat' && (
-                  <>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT (REMITTED)</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">VAT REMIT</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT (OWED)</TableHead>
-                    <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
-                  </>
-                )}
-                {summaryTab !== 'vat' && (
-                  <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedSummaryData.map((row, i) => (
-                <TableRow key={i} className={`hover:bg-slate-50 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
-                  <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
-                  {summaryTab === 'vat' && <TableCell className={`px-5 py-3 text-slate-500 font-medium ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.vatPolicy || 'No'}</TableCell>}
-                  {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
-                  {summaryTab !== 'vat' && filterYear !== 'All' && (
-                    <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${
-                      !row.bf || row.bf === 0 ? 'text-slate-300' : row.bf > 0 ? 'text-amber-600' : 'text-emerald-600'
-                    }`}>
-                      {row.bf && row.bf !== 0
-                        ? (row.bf < 0
-                          ? `(${Math.abs(row.bf).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                          : row.bf.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
-                        : '-'}
-                    </TableCell>
-                  )}
-                  {summaryTab !== 'vat' && (
-                    <>
-                      <TableCell className="px-5 py-3 text-center text-slate-500 font-medium">
-                        <div className="bg-slate-100 text-slate-600 rounded-md px-2 py-0.5 inline-block text-[11px] font-bold">{row.noOfInvoices || '0'}</div>
-                      </TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono font-medium text-slate-700">{row.totalInvoices ? row.totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    </>
-                  )}
-                  <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                  {summaryTab !== 'vat' && (
-                    <>
-                      <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance >= 0.01 ? 'text-rose-600' : row.balance <= -0.01 ? 'text-blue-600' : 'text-emerald-600'}`}>
-                        {Math.abs(row.balance) >= 0.01 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
-                      </TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-blue-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                    </>
-                  )}
-                  {summaryTab === 'vat' && (
-                    <>
-                      <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.amountForVat ? row.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">
-                        {row.vatRemitted !== 0 && vatRate > 0 ? ((row.vatRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                      </TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      <TableCell className="px-5 py-3 text-right font-mono text-rose-600/70 text-xs">{row.vatOwed !== 0 && vatRate > 0 ? ((row.vatOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                      </TableCell>
-                      <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed <= -0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {Math.abs(row.vatOwed) >= 0.01 ? (row.vatOwed < 0 ? `(${Math.abs(row.vatOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
-                      </TableCell>
-                    </>
-                  )}
-                  {summaryTab !== 'vat' && (
-                    <TableCell className="px-5 py-3 text-center">
-                      <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase
-                        ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
-                          row.status === 'PART PAID' ? 'bg-amber-100 border border-amber-200 text-amber-700' :
-                            row.status === 'OVER PAID' ? 'bg-blue-100 border border-blue-200 text-blue-700' :
-                              row.status === 'FULLY PAID' ? 'bg-emerald-100 border border-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                        {row.status}
-                      </span>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-              {displayedSummaryData.length === 0 && (
-                <TableRow><TableCell colSpan={15} className="px-4 py-12 text-center text-slate-500 font-medium">{showDebtorsOnly ? 'No debtor records found for the selected period.' : 'No data available.'}</TableCell></TableRow>
-              )}
-            </TableBody>
-            {displayedSummaryData.length > 0 && (() => {
-              const totalBF = displayedSummaryData.reduce((sum, r) => sum + (r.bf || 0), 0);
-              const totalBalance = displayedSummaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
-              const totalInvoices = displayedSummaryData.reduce((sum, r) => sum + (r.totalInvoices || 0), 0);
-              const totalPayment = displayedSummaryData.reduce((sum, r) => sum + (r.totalPayment || 0), 0);
-              const totalDiscount = displayedSummaryData.reduce((sum, r) => sum + (r.discount || 0), 0);
-              const totalWHT = displayedSummaryData.reduce((sum, r) => sum + (r.withholdingTax || 0), 0);
-              const totalAmountForVat = displayedSummaryData.reduce((sum, r) => sum + (r.amountForVat || 0), 0);
-              const totalVATPaid = displayedSummaryData.reduce((sum, r) => sum + (r.vatPaid || 0), 0);
-              const totalVATRemitted = displayedSummaryData.reduce((sum, r) => sum + (r.vatRemitted || 0), 0);
-              const totalVATOwed = displayedSummaryData.reduce((sum, r) => sum + (r.vatOwed || 0), 0);
-
-              return (
-                <TableFooter className="sticky bottom-0 z-30 bg-slate-900 border-t-4 border-slate-700 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]">
-                  <TableRow className="bg-slate-900 hover:bg-slate-900 border-none">
-                    <TableCell className="sticky left-0 z-40 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700/50">Grand Total</TableCell>
-                    {summaryTab === 'vat' && <TableCell className="bg-slate-900 px-5 py-4"></TableCell>}
-                    {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-40 bg-slate-900 px-5 py-4 border-r border-slate-700/50"></TableCell>}
-                    {summaryTab !== 'vat' && filterYear !== 'All' && (
-                      <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold ${
-                        !totalBF || totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
-                      }`}>
-                        {totalBF && totalBF !== 0
-                          ? (totalBF < 0
-                            ? `(${Math.abs(totalBF).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                            : totalBF.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
-                          : '-'}
-                      </TableCell>
-                    )}
-                    {summaryTab !== 'vat' && (
-                      <>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{displayedSummaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-slate-200">{totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                      </>
-                    )}
-                    <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-emerald-400">{totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                    {summaryTab !== 'vat' && (
-                      <>
-                        <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold ${totalBalance >= 0.01 ? 'text-rose-400 bg-rose-950/20' : totalBalance <= -0.01 ? 'text-blue-400 bg-blue-950/20' : 'text-emerald-400'}`}>
-                          {Math.abs(totalBalance) >= 0.01
-                            ? (totalBalance < 0
-                              ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                              : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
-                            : '-'}
-                        </TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                      </>
-                    )}
-                    {summaryTab === 'vat' && (
-                      <>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalAmountForVat ? totalAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalVATPaid ? totalVATPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">
-                          {totalVATRemitted !== 0 && vatRate > 0 ? ((totalVATRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                        </TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">{totalVATRemitted ? totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-rose-400">{totalVATOwed !== 0 && vatRate > 0 ? ((totalVATOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
-                        <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold text-xs ${totalVATOwed < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {totalVATOwed !== 0 
-                            ? (totalVATOwed < 0 
-                                ? `(${Math.abs(totalVATOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` 
-                                : totalVATOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) 
-                            : '-'}
-                        </TableCell>
-                      </>
-                    )}
-                    {summaryTab !== 'vat' && (
-                      <TableCell className="bg-slate-900 px-5 py-4"></TableCell>
-                    )}
-                  </TableRow>
-                </TableFooter>
-              );
-            })()}
-          </Table>
-        </div>
-        )}
-      </Card>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="border-slate-200 col-span-1 lg:col-span-2 flex flex-col">
-          <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Cash Flow Velocity</CardTitle>
-            </div>
-            <CardDescription>Billed Revenue vs Cash Collected over time.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-5 flex-1 min-h-[300px]">
-            {trendData.length > 0 ? (
-              <div className="w-full h-[300px] overflow-x-auto">
-                <div className="min-w-[600px] h-full">
-                  <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorBilledR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.8} /><stop offset="95%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
-                        <linearGradient id="colorCollectedR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#34d399" stopOpacity={0.8} /><stop offset="95%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
-                      <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                      <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
-                      <Area type="monotone" dataKey="Billed" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
-                        <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
-                      </Area>
-                      <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
-                        <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v/1000000).toFixed(1)}M` : ''} />
-                      </Area>
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                <BarChart3 className="w-10 h-10 mb-2 opacity-20" /><p className="text-sm">Not enough data to map trends.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 flex flex-col">
-          <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PieChartIcon className="w-5 h-5 text-blue-600" />
-                <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">VAT Compliance</CardTitle>
-              </div>
-              <Badge variant={globalStats.vatDeficit > 0 ? "outline" : "secondary"} className={globalStats.vatDeficit > 0 ? "text-amber-600 border-amber-200 bg-amber-50" : "bg-emerald-50 text-emerald-700"}>
-                {globalStats.vatDeficit > 0 ? 'Action Reqd' : 'Healthy'}
-              </Badge>
-            </div>
-            <CardDescription>Portion of collected VAT remitted.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-5 flex-1 min-h-[300px] flex flex-col items-center justify-center relative">
-            {globalStats.totalVATCollected > 0 ? (
-              <>
-                <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="80%">
-                  <PieChart>
-                    <Pie data={vatPieData} cx="50%" cy="50%" innerRadius={65} outerRadius={95} paddingAngle={3} dataKey="value" stroke="none">
-                      <Cell fill="#10b981" /><Cell fill="#f43f5e" />
-                    </Pie>
-                    <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
-                  <span className="text-2xl font-bold text-slate-800 tracking-tighter font-mono mt-8">
-                    {Math.round((globalStats.totalVATRemitted / Math.max(1, globalStats.totalVATCollected)) * 100)}%
-                  </span>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Remitted</span>
-                </div>
-                <div className="flex w-full justify-center gap-4 mt-2 mb-2 text-xs">
-                  <div className="flex items-center gap-1 font-medium text-slate-600"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span> Remitted</div>
-                  <div className="flex items-center gap-1 font-medium text-slate-600"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500"></span> Deficit</div>
-                </div>
-              </>
-            ) : (
-              <div className="text-slate-400 text-sm text-center">
-                <AlertCircle className="w-8 h-8 opacity-20 mx-auto mb-2" /><p>No VAT collected yet.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Debtors Chart */}
-      <Card className="border-slate-200">
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-amber-500" />
-              <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Receivables Risk Analysis</CardTitle>
-            </div>
-            <div className="flex bg-slate-200/50 p-1 rounded-lg">
-              <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'client' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'}`} onClick={() => setDebtorView('client')}>By Client</button>
-              <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'site' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'}`} onClick={() => setDebtorView('site')}>By Site</button>
-            </div>
-          </div>
-          <CardDescription>Highest outstanding balances.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 sm:p-5">
-          {clientDebtData.length > 0 ? (
-            <div className="overflow-x-auto">
-              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height={250} className="min-w-[600px]">
-                <BarChart data={clientDebtData} layout="vertical" margin={{ top: 10, right: 30, left: debtorView === 'site' ? 80 : 20, bottom: 5 }} barSize={20}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${(val / 1000000)}M`} />
-                  <YAxis type="category" dataKey="name" width={debtorView === 'site' ? 180 : 100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }} />
-                  <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
-                  <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
-                  <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
-                    <LabelList dataKey="Outstanding" position="insideRight" formatter={(val: number) => val > 0 ? `₦${(val / 1000000).toFixed(1)}M` : ''} style={{ fill: '#fff', fontSize: 10, fontWeight: 700 }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="text-slate-400 text-sm text-center py-10">
-              <AlertCircle className="w-8 h-8 opacity-20 mx-auto mb-2" /><p>No receivables data available.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Invoices & Payments Ranking Card */}
-      <Card className="border-slate-200">
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Invoices & Payments Ranking</CardTitle>
-            </div>
-            <div className="flex bg-slate-200/50 p-1 rounded-lg">
-              <button
-                className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
-                  rankingView === 'client' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'
-                }`}
-                onClick={() => setRankingView('client')}
-              >
-                By Client
-              </button>
-              <button
-                className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
-                  rankingView === 'site' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'
-                }`}
-                onClick={() => setRankingView('site')}
-              >
-                By Site
-              </button>
-            </div>
-          </div>
-          <CardDescription>Highest revenue and collections ranked by Client or Site.</CardDescription>
-        </CardHeader>
-        <CardContent className="p-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* INVOICES RANKING */}
-            <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
-                <span>INVOICES</span>
-                <span className="text-[10px] text-slate-400 normal-case font-normal">Ranked by Billed Amount</span>
-              </div>
-              <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
-                <Table className="whitespace-nowrap min-w-full text-xs">
-                  <TableHeader className="bg-slate-900 sticky top-0 z-10">
-                    <TableRow className="hover:bg-slate-900 border-b border-slate-800">
-                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
-                        {rankingView === 'client' ? 'CLIENT' : 'SITE'}
-                      </TableHead>
-                      {rankingView === 'client' ? (
-                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-24">NO OF SITE</TableHead>
-                      ) : (
-                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">CLIENT</TableHead>
-                      )}
-                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-right">AMOUNT</TableHead>
-                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-14">RANK</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rankingData.invoiceRanked.length > 0 ? (
-                      rankingData.invoiceRanked.map((row, idx) => (
-                        <TableRow
-                          key={idx}
-                          className={`hover:bg-slate-50 transition-colors border-b border-slate-100/80 ${
-                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
-                          }`}
-                        >
-                          <TableCell className="py-3 font-semibold text-slate-700 truncate max-w-[150px]" title={row.name}>
-                            {row.name}
-                          </TableCell>
-                          {rankingView === 'client' ? (
-                            <TableCell className="py-3 text-center">
-                              <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95"
-                                onMouseEnter={(e) => {
-                                  if (row.sites && row.sites.length > 0) {
-                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'blue' });
-                                  }
-                                }}
-                                onMouseLeave={() => setRankingTooltip(null)}
-                              >
-                                <MapPin className="w-2.5 h-2.5 shrink-0" />
-                                {row.noOfSites}
-                              </span>
-                            </TableCell>
-                          ) : (
-                            <TableCell className="py-3 text-slate-500 truncate max-w-[120px]" title={row.client}>
-                              {row.client}
-                            </TableCell>
-                          )}
-                          <TableCell className="py-3 text-right font-mono font-bold text-blue-600">
-                            {fmRaw(row.amount)}
-                          </TableCell>
-                          <TableCell className="py-3 text-center">
-                            <div className="flex justify-center">
-                              {idx === 0 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-500 border border-amber-400 text-white">
-                                  1
-                                </span>
-                              ) : idx === 1 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-slate-500 border border-slate-400 text-white">
-                                  2
-                                </span>
-                              ) : idx === 2 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-700 border border-amber-600 text-white">
-                                  3
-                                </span>
-                              ) : (
-                                <span className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[10px] text-slate-500 bg-slate-100 border border-slate-200">
-                                  {idx + 1}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="py-8 text-center text-slate-400 italic">
-                          No invoice data available for this period.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            {/* PAYMENTS RANKING */}
-            <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
-                <span>PAYMENTS</span>
-                <span className="text-[10px] text-slate-400 normal-case font-normal">Ranked by Collected Amount</span>
-              </div>
-              <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
-                <Table className="whitespace-nowrap min-w-full text-xs">
-                  <TableHeader className="bg-slate-900 sticky top-0 z-10">
-                    <TableRow className="hover:bg-slate-900 border-b border-emerald-500/50">
-                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
-                        {rankingView === 'client' ? 'CLIENT' : 'SITE'}
-                      </TableHead>
-                      {rankingView === 'client' ? (
-                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-24">NO OF SITE</TableHead>
-                      ) : (
-                        <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">CLIENT</TableHead>
-                      )}
-                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-right">AMOUNT</TableHead>
-                      <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-14">RANK</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rankingData.paymentRanked.length > 0 ? (
-                      rankingData.paymentRanked.map((row, idx) => (
-                        <TableRow
-                          key={idx}
-                          className={`hover:bg-emerald-50/20 transition-colors border-b border-slate-100/80 ${
-                            idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
-                          }`}
-                        >
-                          <TableCell className="py-3 font-semibold text-slate-700 truncate max-w-[150px]" title={row.name}>
-                            {row.name}
-                          </TableCell>
-                          {rankingView === 'client' ? (
-                            <TableCell className="py-3 text-center">
-                              <span
-                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95"
-                                onMouseEnter={(e) => {
-                                  if (row.sites && row.sites.length > 0) {
-                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'emerald' });
-                                  }
-                                }}
-                                onMouseLeave={() => setRankingTooltip(null)}
-                              >
-                                <MapPin className="w-2.5 h-2.5 shrink-0" />
-                                {row.noOfSites}
-                              </span>
-                            </TableCell>
-                          ) : (
-                            <TableCell className="py-3 text-slate-500 truncate max-w-[120px]" title={row.client}>
-                              {row.client}
-                            </TableCell>
-                          )}
-                          <TableCell className="py-3 text-right font-mono font-bold text-emerald-600">
-                            {fmRaw(row.amount)}
-                          </TableCell>
-                          <TableCell className="py-3 text-center">
-                            <div className="flex justify-center">
-                              {idx === 0 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-500 border border-amber-400 text-white">
-                                  1
-                                </span>
-                              ) : idx === 1 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-slate-500 border border-slate-400 text-white">
-                                  2
-                                </span>
-                              ) : idx === 2 ? (
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-700 border border-amber-600 text-white">
-                                  3
-                                </span>
-                              ) : (
-                                <span className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[10px] text-slate-500 bg-slate-100 border border-slate-200">
-                                  {idx + 1}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="py-8 text-center text-slate-400 italic">
-                          No payment data available for this period.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-
-        {/* Fixed-position tooltip — renders above all overflow containers */}
-        {rankingTooltip && (
-          <div
-            className="pointer-events-none fixed z-[9999]"
-            style={{
-              left: rankingTooltip.x,
-              top: rankingTooltip.y - 8,
-              transform: 'translateX(-50%) translateY(-100%)',
-            }}
-          >
-            <div className={`w-56 bg-slate-950/97 backdrop-blur-md border shadow-2xl rounded-md p-3 text-left ${rankingTooltip.accent === 'blue' ? 'border-blue-900/60' : 'border-emerald-900/60'}`}>
-              <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 pb-1 border-b border-slate-800 flex items-center justify-between ${rankingTooltip.accent === 'blue' ? 'text-blue-400' : 'text-emerald-400'}`}>
-                <span>Sites</span>
-                <span className={`font-mono px-1.5 rounded text-[9px] font-extrabold border ${rankingTooltip.accent === 'blue' ? 'bg-blue-950 border-blue-900/50 text-blue-300' : 'bg-emerald-950 border-emerald-900/50 text-emerald-300'}`}>
-                  {rankingTooltip.count}
-                </span>
-              </div>
-              <ul className="space-y-1 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
-                {rankingTooltip.sites.map((siteName, sIdx) => (
-                  <li key={sIdx} className={`text-[10px] font-medium text-slate-300 flex items-center gap-1.5 py-0.5 ${rankingTooltip.accent === 'blue' ? 'hover:text-blue-400' : 'hover:text-emerald-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rankingTooltip.accent === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
-                    <span className="truncate">{siteName}</span>
-                  </li>
-                ))}
-              </ul>
-              {/* Arrow */}
-              <div className={`absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-r border-b rotate-45 -mt-1.5 ${rankingTooltip.accent === 'blue' ? 'bg-slate-950 border-blue-900/60' : 'bg-slate-950 border-emerald-900/60'}`}></div>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Site Revenue Chart */}
-      <Card className="border-slate-200">
-        <CardHeader className="border-b border-slate-100 pb-4">
-          <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
-            <BarChart3 className="h-5 w-5 text-blue-600" /> Revenue by Site
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="w-full h-[300px] overflow-x-auto">
-            <div className="min-w-[600px] h-full">
-              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                <BarChart data={siteFinancialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                  <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-                  <Legend verticalAlign="bottom" height={36} />
-                  <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
-                    <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                  </Bar>
-                  <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
-                    <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-
-      </>
-      ) : (
-        <>
-      {/* ═══════════════════ PAYROLL SUMMARY TAB ═══════════════════ */}
-
-      {/* PAYROLL EXPOSURE SECTION */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-md border border-slate-200">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
-          <NairaSign className="w-5 h-5 text-blue-600" /> Payroll & Statutory Overview
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Filtered by global filters above</span>
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="bg-slate-900 text-white border border-slate-800 rounded-md overflow-hidden relative">
-          <div className="absolute right-0 top-0 opacity-10"><NairaSign className="w-32 h-32 -mt-4 -mr-4" /></div>
-          <CardHeader className="pb-2 relative z-10">
-            <CardTitle className="text-sm font-medium text-slate-300 uppercase tracking-widest flex justify-between">
-              Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{(filterMonth === "All" ? null : parseInt(filterMonth, 10)) ? MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.label : 'All Months'} {(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
-            <p className="text-xs text-slate-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-slate-200 relative overflow-hidden">
-          <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
-            <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Annual Payroll & Overtime Trend */}
-      <Card className="border-slate-200">
-        <CardHeader className="bg-slate-50/50 border-b pb-4">
-          <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
-            <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-blue-600" /> Annual Payroll & Overtime Trend (Gross)</span>
-            <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{(filterYear === "All" ? currentYear : parseInt(filterYear, 10))} Performance</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="w-full h-[300px] overflow-x-auto">
-            <div className="min-w-[600px] h-full">
-              <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
-                <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
-                    tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
-                    tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                  <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                  </Line>
-                  <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
-                    <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v/1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v/1000).toFixed(0)}k` : ''} />
-                  </Line>
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ───────────────── ACCOUNTS REPORTS ───────────────── */}
-      <Card className={`bg-white mb-6 ${fullScreenTable === 'payroll' ? 'fixed z-[100] m-0 rounded-none border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : 'border-slate-200'}`}>
-        <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <CardTitle className="text-slate-900 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border text-amber-700 bg-amber-50 border-amber-200">Accounts</span>
-              Financial Staff Reports
-            </CardTitle>
-            {/* Tab switcher */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                <button onClick={() => setAccountsTab('payroll')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    accountsTab === 'payroll' ? 'bg-white text-amber-700 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
-                  }`}>
-                  <FileText className="h-3.5 w-3.5" /> Payroll Summary
-                </button>
-                <button onClick={() => setAccountsTab('loans')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    accountsTab === 'loans' ? 'bg-white text-amber-700 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
-                  }`}>
-                  <FileSpreadsheet className="h-3.5 w-3.5" /> Loans & Advances
-                </button>
-              </div>
-              <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 h-[32px]" onClick={() => toggleFullScreen('payroll')}>
-                <Maximize2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Full Screen</span>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        {fullScreenTable === 'payroll' && (
-          <Button 
-            variant="default" 
-            size="icon" 
-            className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12" 
-            onClick={() => toggleFullScreen('payroll')}
-            title="Exit Full Screen"
-          >
-            <Minimize2 className="h-5 w-5" />
-          </Button>
-        )}
-
-        <CardContent className={`pt-6 ${fullScreenTable === 'payroll' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
-          {accountsTab === 'payroll' ? (
-            /* ── PAYROLL SUMMARY ── */
-            (() => {
-              // compute Grand Totals
-              const gSalary = payrollSummaryData.reduce((s, row) => s + row.salary, 0);
-              const gOvertime = payrollSummaryData.reduce((s, row) => s + row.overtime, 0);
-              const gGrossPay = payrollSummaryData.reduce((s, row) => s + row.grossPay, 0);
-              const gEmployeePension = payrollSummaryData.reduce((s, row) => s + row.employeePension, 0);
-              const gLoans = payrollSummaryData.reduce((s, row) => s + row.loans, 0);
-              const gPaye = payrollSummaryData.reduce((s, row) => s + row.paye, 0);
-              const gWht = payrollSummaryData.reduce((s, row) => s + row.wht, 0);
-              const gTotalPayout = payrollSummaryData.reduce((s, row) => s + row.totalPayout, 0);
-
-              const fm = (n: number) => priv?.canViewAmounts === false ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-              const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-              const exportPayrollSummaryCsv = () => {
-                const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'WHT', 'TOTAL PAYOUT'];
-                const data = [
-                  ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.employeePension), fm(r.loans), fm(r.paye), fm(r.wht), fm(r.totalPayout)]),
-                  ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gEmployeePension), fm(gLoans), fm(gPaye), fm(gWht), fm(gTotalPayout)]
-                ];
-                let csv = 'data:text/csv;charset=utf-8,';
-                csv += headers.join(',') + '\n';
-                data.forEach(row => {
-                  csv += row.map(val => `"${val}"`).join(',') + '\n';
-                });
-                const fileName = `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.csv`;
-
-                setPreviewModal({
-                  isOpen: true,
-                  title: `Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`,
-                  type: 'csv',
-                  data: data,
-                  headers: headers,
-                  filename: fileName,
-                  onConfirm: () => {
-                    const link = document.createElement('a');
-                    link.setAttribute('href', encodeURI(csv));
-                    link.setAttribute('download', fileName);
-                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                    showExportMessage('Payroll Summary (CSV) exported!');
-                  }
-                });
-              };
-
-              const exportPayrollSummaryPdf = () => {
-                const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'WHT', 'TOTAL PAYOUT']];
-                const body = [
-                  ...payrollSummaryData.map(r => [
-                    r.monthLabel,
-                    fm(r.salary),
-                    fm(r.overtime),
-                    fm(r.grossPay),
-                    fm(r.employeePension),
-                    fm(r.loans),
-                    fm(r.paye),
-                    fm(r.wht),
-                    fm(r.totalPayout)
-                  ]),
-                  [
-                     'GRAND TOTAL',
-                     fm(gSalary),
-                     fm(gOvertime),
-                     fm(gGrossPay),
-                     fm(gEmployeePension),
-                     fm(gLoans),
-                     fm(gPaye),
-                     fm(gWht),
-                     fm(gTotalPayout)
-                  ]
-                ];
-
-                setPreviewModal({
-                  isOpen: true,
-                  title: `Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`,
-                  type: 'pdf',
-                  data: body,
-                  headers: head[0],
-                  filename: `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.pdf`,
-                  onConfirm: () => generatePdf(`Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`, head, body, `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.pdf`)
-                });
-              };
-
-              return (
-                <>
-                  <div className={`flex items-center justify-end flex-wrap gap-3 ${fullScreenTable === 'payroll' ? 'hidden' : 'mb-4'}`}>
-                    {priv.canExport && (
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
-                          <FileSpreadsheet className="h-4 w-4" /> CSV
-                        </Button>
-                        <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportPayrollSummaryPdf}>
-                          <FileText className="h-4 w-4" /> PDF
-                        </Button>
-                      </div>
-                    )}
+            {/* FINANCIAL SUMMARY Ledger - Featured at top */}
+            <Card className={`border-slate-200 rounded-md overflow-hidden ${fullScreenTable === 'ledger' ? 'fixed z-[100] m-0 rounded-none bg-slate-50 border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : ''}`}>
+              <CardHeader className={`bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 pb-0 pt-3.5 sm:pt-4 px-0 shrink-0 ${fullScreenTable === 'ledger' ? 'hidden' : ''}`}>
+                <div className="flex flex-row items-center justify-between px-3.5 sm:px-5 pb-3 gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+                    <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 shrink-0" />
+                    <CardTitle className="text-xs sm:text-sm text-slate-800 dark:text-slate-100 uppercase tracking-wide truncate">Financial Summary Ledger</CardTitle>
                   </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                    <label
+                      htmlFor="ledger-debtors-only"
+                      className={cn(
+                        "flex items-center gap-1.5 sm:gap-2 h-8 px-2.5 sm:px-3 rounded-md border text-xs font-semibold cursor-pointer select-none transition-all shadow-2xs",
+                        showDebtorsOnly
+                          ? "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300 ring-1 ring-rose-300/50"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300"
+                      )}
+                      title="Filter to show only debtors with outstanding balances"
+                    >
+                      <input
+                        id="ledger-debtors-only"
+                        type="checkbox"
+                        checked={showDebtorsOnly}
+                        onChange={(e) => setShowDebtorsOnly(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer"
+                      />
+                      <span className="whitespace-nowrap">Debtors Only</span>
+                      {debtorCount > 0 && (
+                        <span className={cn(
+                          "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                          showDebtorsOnly
+                            ? "bg-rose-200/80 text-rose-800 dark:bg-rose-900 dark:text-rose-200"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                        )}>
+                          {debtorCount}
+                        </span>
+                      )}
+                    </label>
 
-                  <div className={`rounded-md border border-slate-200 dark:border-slate-800 overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`}>
-                    <div className="min-w-[1240px]">
-                      {/* column legend bar */}
-                      <div className="grid grid-cols-9 text-[10px] font-bold tracking-widest uppercase px-0 bg-slate-900 border-b border-slate-800">
-                        {[
-                          { label: 'MONTH',        align: 'left',  accent: false, wide: true },
-                          { label: 'SALARY',       align: 'right', accent: false },
-                          { label: 'OVERTIME',     align: 'right', accent: false },
-                          { label: 'GROSS PAY',    align: 'right', accent: true  },
-                          { label: 'EMP. PENSION', align: 'right', accent: false },
-                          { label: 'LOANS',        align: 'right', accent: false },
-                          { label: 'PAYE',         align: 'right', accent: false },
-                          { label: 'WHT',          align: 'right', accent: false },
-                          { label: 'TOTAL PAYOUT', align: 'right', accent: true  },
-                        ].map(col => (
-                          <div
-                            key={col.label}
-                            className={`py-3.5 px-3 text-${col.align} ${
-                              col.accent
-                                ? 'text-amber-300 bg-[#0d3344]/40 border-l border-r border-[#0d3344]/60'
-                                : 'text-[#9ecfe8]'
-                            } ${col.label === 'MONTH' ? 'col-span-1' : ''}`}
-                          >
-                            {col.label}
-                          </div>
-                        ))}
-                      </div>
+                    {priv.canExport && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 sm:gap-2 border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30 px-2 sm:px-3 h-8"
+                        onClick={exportLedgerPdf}
+                        title="Export PDF"
+                      >
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span className="hidden sm:inline">Export PDF</span>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 sm:gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 px-2 sm:px-3 h-8"
+                      onClick={() => toggleFullScreen('ledger')}
+                      title="Full Screen"
+                    >
+                      <Maximize2 className="h-4 w-4 shrink-0" />
+                      <span className="hidden sm:inline">Full Screen</span>
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex px-5 gap-6 border-b border-slate-200 overflow-x-auto no-scrollbar">
+                  <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'client' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('client')}>Client Summary</button>
+                  <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'site' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('site')}>Site Summary</button>
+                  <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap ${summaryTab === 'vat' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('vat')}>VAT Summary</button>
+                  <button className={`pb-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 ${summaryTab === 'expenses-vat' ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setSummaryTab('expenses-vat')}>
+                    <Receipt className="h-3.5 w-3.5" /> Expenses VAT
+                  </button>
+                </div>
+              </CardHeader>
 
-                      {/* rows */}
-                      <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                        {payrollSummaryData.map((row, idx) => {
-                          const maxPayout = Math.max(...payrollSummaryData.map(r => r.totalPayout), 1);
-                          const pct = Math.round((row.totalPayout / maxPayout) * 100);
+              {fullScreenTable === 'ledger' && (
+                <>
+                  <div className="fixed top-4 left-4 z-[110] flex items-center gap-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xl">
+                    <label
+                      htmlFor="fullscreen-debtors-only"
+                      className={cn(
+                        "flex items-center gap-1.5 h-8 px-2.5 rounded-md border text-xs font-semibold cursor-pointer select-none transition-all",
+                        showDebtorsOnly
+                          ? "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300"
+                      )}
+                    >
+                      <input
+                        id="fullscreen-debtors-only"
+                        type="checkbox"
+                        checked={showDebtorsOnly}
+                        onChange={(e) => setShowDebtorsOnly(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 accent-rose-600 cursor-pointer"
+                      />
+                      <span className="whitespace-nowrap">Debtors Only</span>
+                      {debtorCount > 0 && (
+                        <span className={cn(
+                          "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                          showDebtorsOnly ? "bg-rose-200/80 text-rose-800" : "bg-slate-100 text-slate-600"
+                        )}>
+                          {debtorCount}
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12"
+                    onClick={() => toggleFullScreen('ledger')}
+                    title="Exit Full Screen"
+                  >
+                    <Minimize2 className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
+
+              {summaryTab === 'expenses-vat' ? (
+                /* ── EXPENSES VAT TABLE ── */
+                <div ref={expensesVatScrollRef} className={`overflow-auto relative no-scrollbar cursor-grab active:cursor-grabbing ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
+                  <table className="w-full text-left text-[13px] whitespace-nowrap">
+                    <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-20">
+                      <tr>
+                        <th className="py-3 px-5 sticky left-0 z-30 bg-slate-900 text-xs tracking-wider uppercase text-slate-300 border-r border-slate-700">Voucher No.</th>
+                        <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Date</th>
+                        <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 w-1/4">Description</th>
+                        <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Category</th>
+                        <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300">Vendor</th>
+                        <th className="py-3 px-4 text-xs tracking-wider uppercase text-slate-300 text-center">VAT Policy</th>
+                        <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Line Amount (₦)</th>
+                        <th className="py-3 px-5 text-xs tracking-wider uppercase text-slate-300 text-right">Amt for VAT (₦)</th>
+                        <th className="py-3 px-5 text-xs tracking-wider uppercase text-emerald-300 text-right">VAT Amount (₦)</th>
+                        <th className="py-3 px-5 text-xs tracking-wider uppercase text-sky-300 text-right">VAT Remitted (₦)</th>
+                        <th className="py-3 px-5 text-xs tracking-wider uppercase text-rose-300 text-right">VAT Owed (₦)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {(() => {
+                        const vatEntries = ledgerEntries.filter(e => {
+                          const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                          if (!isVat) return false;
+                          if (!e.date) return false;
+                          if (filterYear !== 'All') {
+                            const yr = e.date.substring(0, 4);
+                            if (!filterYear.split(',').map(y => y.trim()).includes(yr)) return false;
+                          }
+                          if (filterMonth !== 'All') {
+                            const d = new Date(e.date);
+                            if (!isNaN(d.getTime())) {
+                              const mNum = String(d.getMonth() + 1);
+                              if (!filterMonth.split(',').map(m => m.trim()).includes(mNum)) return false;
+                            }
+                          }
+                          return true;
+                        });
+
+                        if (vatEntries.length === 0) return (
+                          <tr><td colSpan={11} className="py-12 text-center text-slate-400 italic">No vatable expense entries for the selected period.</td></tr>
+                        );
+
+                        // Build a map of monthKey → total VAT accumulated for that month
+                        // Then distribute remittances proportionally per-entry
+                        const monthVatTotals = new Map<string, number>();
+                        vatEntries.forEach(e => {
+                          if (!e.date) return;
+                          const mk = e.date.substring(0, 7); // YYYY-MM
+                          const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                          const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                          const entryVat = e.vatAmount ?? calc.vatAmount;
+                          monthVatTotals.set(mk, (monthVatTotals.get(mk) || 0) + entryVat);
+                        });
+
+                        // Build a map of monthKey → total remitted for that month
+                        const monthRemittedTotals = new Map<string, number>();
+                        (expenseVatRemittances || []).forEach(r => {
+                          if (!r.date) return;
+                          const mk = r.date.substring(0, 7);
+                          monthRemittedTotals.set(mk, (monthRemittedTotals.get(mk) || 0) + (Number(r.amount) || 0));
+                        });
+
+                        let grandLineAmt = 0, grandAmtForVat = 0, grandVatAmt = 0, grandRemitted = 0, grandOwed = 0;
+
+                        const rows = vatEntries.map((entry, idx) => {
+                          const vMode: 'No' | 'Yes' | 'Add' = (entry.vatMode as any) || (entry.isVatable ? 'Yes' : 'No');
+                          const calc = calculateItemVat(Number(entry.amount), vMode, entry.vatRate || vatRate);
+                          const lineAmt = Number(entry.amount) || 0;
+                          const amtForVat = entry.amountForVat ?? calc.amountForVat;
+                          const vatAmt = entry.vatAmount ?? calc.vatAmount;
+
+                          // Prorate this entry's share of the month's remittance
+                          const mk = entry.date?.substring(0, 7) || '';
+                          const monthTotalVat = monthVatTotals.get(mk) || 0;
+                          const monthTotalRemitted = monthRemittedTotals.get(mk) || 0;
+                          const entryShare = monthTotalVat > 0 ? vatAmt / monthTotalVat : 0;
+                          const entryRemitted = Math.min(vatAmt, monthTotalRemitted * entryShare);
+                          const entryOwed = Math.max(0, vatAmt - entryRemitted);
+
+                          grandLineAmt += lineAmt;
+                          grandAmtForVat += amtForVat;
+                          grandVatAmt += vatAmt;
+                          grandRemitted += entryRemitted;
+                          grandOwed += entryOwed;
+
                           const isEven = idx % 2 === 0;
+                          const isFullyPaid = entryOwed <= 0.01;
+                          const isPartPaid = entryRemitted > 0.01 && !isFullyPaid;
+
                           return (
-                            <div
-                              key={row.monthLabel}
-                              className={`grid grid-cols-9 items-center group transition-all duration-150 hover:z-10 relative ${
-                                isEven ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/70 dark:bg-slate-800/40'
-                              } hover:bg-teal-50/60 dark:hover:bg-teal-950/20`}
-                            >
-                              <div className="py-2.5 px-3 flex items-center gap-2">
-                                <span className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[9px] font-black bg-slate-800 text-white border border-slate-700 shrink-0">
-                                  {row.monthLabel.slice(0, 3).toUpperCase()}
-                                </span>
-                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{row.monthLabel}</span>
-                              </div>
-                              <div className="py-2.5 px-3 text-right">
-                                <span className="text-xs xl:text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap tabular-nums">₦{fm(row.salary)}</span>
-                              </div>
-                              <div className="py-2.5 px-3 text-right">
-                                {row.overtime > 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-xs font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 whitespace-nowrap tabular-nums">
-                                    ₦{fm(row.overtime)}
+                            <tr key={entry.id || idx} className={`hover:bg-slate-50 transition-colors ${isEven ? 'bg-white' : 'bg-slate-50/30'}`}>
+                              <td className={`py-2.5 px-5 sticky left-0 z-10 border-r border-slate-100  font-mono font-bold text-blue-600 ${isEven ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{entry.voucherNo || '—'}</td>
+                              <td className="py-2.5 px-4 font-mono text-slate-500 text-xs">{formatDisplayDate(entry.date)}</td>
+                              <td className="py-2.5 px-5 font-medium text-slate-800 max-w-[220px] truncate" title={entry.description}>{entry.description || '—'}</td>
+                              <td className="py-2.5 px-4">
+                                <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-sm text-[11px] font-semibold border border-blue-200">{entry.category || '—'}</span>
+                              </td>
+                              <td className="py-2.5 px-4 text-slate-500 text-[12px]">{entry.vendor || '—'}</td>
+                              <td className="py-2.5 px-4 text-center">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold border ${vMode === 'Yes' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                    vMode === 'Add' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                      'bg-slate-100 text-slate-500 border-slate-200'
+                                  }`}>{vMode}</span>
+                              </td>
+                              <td className="py-2.5 px-5 text-right font-mono font-semibold text-slate-700 tabular-nums">
+                                {lineAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-5 text-right font-mono font-semibold text-blue-600 tabular-nums">
+                                {amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td
+                                className="py-2.5 px-5 text-right font-mono font-extrabold text-emerald-700 bg-emerald-50/40 tabular-nums"
+                                title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | VAT Amount: ₦${vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              >
+                                {vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td
+                                className="py-2.5 px-5 text-right font-mono font-semibold text-sky-600 tabular-nums"
+                                title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | VAT Amount: ₦${vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Remitted: ₦${entryRemitted > 0.005 ? entryRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}`}
+                              >
+                                {entryRemitted > 0.005
+                                  ? entryRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                  : <span className="text-slate-300">—</span>}
+                              </td>
+                              <td
+                                className="py-2.5 px-5 text-right tabular-nums"
+                                title={`Amt for VAT: ₦${amtForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | VAT Amount: ₦${vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | Remitted: ₦${entryRemitted > 0.005 ? entryRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'} | Owed: ₦${entryOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                              >
+                                {isFullyPaid ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                                    <CheckCircle2 className="h-3 w-3" /> Paid
+                                  </span>
+                                ) : isPartPaid ? (
+                                  <span className="font-mono font-bold text-amber-600 text-xs">
+                                    {entryOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
                                 ) : (
-                                  <span className="text-xs font-mono text-slate-400">—</span>
+                                  <span className="font-mono font-bold text-rose-600 text-xs">
+                                    {vatAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
                                 )}
-                              </div>
-                              <div className="py-2.5 px-3 text-right bg-teal-50/50 dark:bg-teal-950/20 border-l border-r border-teal-100 dark:border-teal-900/40 group-hover:bg-teal-100/40">
-                                <span className="text-xs xl:text-sm font-mono font-bold text-teal-800 dark:text-teal-300 whitespace-nowrap tabular-nums">₦{fm(row.grossPay)}</span>
-                              </div>
-                              <div className="py-2.5 px-3 text-right">
-                                <span className="text-xs xl:text-sm font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">₦{fm(row.employeePension)}</span>
-                              </div>
-                              <div className="py-2.5 px-3 text-right">
-                                <span className="text-xs xl:text-sm font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">₦{fm(row.loans)}</span>
-                              </div>
-                              <div className="py-2.5 px-3 text-right">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 whitespace-nowrap tabular-nums">
-                                  ₦{fm(row.paye)}
-                                </span>
-                              </div>
-                              <div className="py-2.5 px-3 text-right">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 whitespace-nowrap tabular-nums">
-                                  ₦{fm(row.wht)}
-                                </span>
-                              </div>
-                              <div className="py-2.5 px-3 bg-slate-800/[0.03] dark:bg-slate-700/[0.1] border-l border-slate-200 dark:border-slate-800 group-hover:bg-slate-800/[0.06]">
-                                <div className="flex flex-col items-end gap-1">
-                                  <span className="text-xs xl:text-sm font-mono font-extrabold text-slate-900 dark:text-white whitespace-nowrap tabular-nums">₦{fm(row.totalPayout)}</span>
-                                  <div className="w-full max-w-[70px] h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full bg-blue-600"
-                                      style={{ width: `${pct}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                              </td>
+                            </tr>
                           );
-                        })}
-                      </div>
+                        });
 
-                      {/* Grand Total footer */}
-                      <div className="grid grid-cols-9 items-center bg-slate-900 border-t-2 border-slate-800">
-                        <div className="py-3 px-3 flex items-center gap-2">
-                          <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-md px-2 py-1 whitespace-nowrap">
-                            GRAND TOTAL
-                          </span>
-                        </div>
-                        {[
-                          { val: gSalary, isAccent: false, isTax: false, border: '' },
-                          { val: gOvertime, isAccent: false, isTax: false, border: '' },
-                          { val: gGrossPay, isAccent: true, isTax: false, border: 'border-l border-r border-white/10' },
-                          { val: gEmployeePension, isAccent: false, isTax: false, border: '' },
-                          { val: gLoans, isAccent: false, isTax: false, border: '' },
-                          { val: gPaye, isAccent: false, isTax: true, border: '' },
-                          { val: gWht, isAccent: false, isTax: true, border: '' },
-                          { val: gTotalPayout, isAccent: true, isTax: false, border: 'border-l border-white/10' },
-                        ].map((col, i) => (
-                          <div
-                            key={i}
-                            className={`py-3 px-3 text-right ${
-                              col.isAccent ? 'bg-white/10' : ''
-                            } ${col.border}`}
-                          >
-                            <span className={`text-xs xl:text-sm font-mono font-extrabold tracking-tight whitespace-nowrap tabular-nums ${
-                              col.isAccent ? 'text-amber-300' : col.isTax ? 'text-rose-300' : 'text-white'
-                            }`}>
-                              ₦{fmT(col.val)}
-                            </span>
-                          </div>
-                        ))}
+                        return (
+                          <>
+                            {rows}
+                          </>
+                        );
+                      })()}
+                    </tbody>
+                    <tfoot className="sticky bottom-0 z-30 bg-slate-900 border-t-4 border-emerald-500 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]">
+                      <tr className="bg-slate-900">
+                        <td className="sticky left-0 z-40 bg-slate-900 py-3.5 px-5 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700" colSpan={6}>Grand Total</td>
+                        <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-slate-200 tabular-nums">
+                          {ledgerEntries
+                            .filter(e => {
+                              const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                              if (!isVat || !e.date) return false;
+                              if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                              if (filterMonth !== 'All') {
+                                const d = new Date(e.date);
+                                if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                              }
+                              return true;
+                            })
+                            .reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
+                            .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-slate-300 tabular-nums">
+                          {ledgerEntries
+                            .filter(e => {
+                              const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                              if (!isVat || !e.date) return false;
+                              if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                              if (filterMonth !== 'All') {
+                                const d = new Date(e.date);
+                                if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                              }
+                              return true;
+                            })
+                            .reduce((acc, e) => {
+                              const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                              const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                              return acc + (e.amountForVat ?? calc.amountForVat);
+                            }, 0)
+                            .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-emerald-400 tabular-nums">
+                          {ledgerEntries
+                            .filter(e => {
+                              const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                              if (!isVat || !e.date) return false;
+                              if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                              if (filterMonth !== 'All') {
+                                const d = new Date(e.date);
+                                if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                              }
+                              return true;
+                            })
+                            .reduce((acc, e) => {
+                              const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                              const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                              return acc + (e.vatAmount ?? calc.vatAmount);
+                            }, 0)
+                            .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-sky-400 tabular-nums">
+                          {(expenseVatRemittances || [])
+                            .reduce((acc, r) => acc + (Number(r.amount) || 0), 0) > 0
+                            ? (expenseVatRemittances || [])
+                              .reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+                              .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            : '—'}
+                        </td>
+                        <td className="bg-slate-900 py-3.5 px-5 text-right font-mono font-bold text-rose-400 tabular-nums">
+                          {Math.max(
+                            0,
+                            ledgerEntries
+                              .filter(e => {
+                                const isVat = e.isVatable || (e.vatMode && e.vatMode !== 'No');
+                                if (!isVat || !e.date) return false;
+                                if (filterYear !== 'All' && !filterYear.split(',').map(y => y.trim()).includes(e.date.substring(0, 4))) return false;
+                                if (filterMonth !== 'All') {
+                                  const d = new Date(e.date);
+                                  if (!isNaN(d.getTime()) && !filterMonth.split(',').map(m => m.trim()).includes(String(d.getMonth() + 1))) return false;
+                                }
+                                return true;
+                              })
+                              .reduce((acc, e) => {
+                                const vMode: 'No' | 'Yes' | 'Add' = (e.vatMode as any) || (e.isVatable ? 'Yes' : 'No');
+                                const calc = calculateItemVat(Number(e.amount), vMode, e.vatRate || vatRate);
+                                return acc + (e.vatAmount ?? calc.vatAmount);
+                              }, 0) -
+                            (expenseVatRemittances || []).reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+                          ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className={`overflow-auto relative no-scrollbar ${fullScreenTable === 'ledger' ? 'flex-1 h-full min-h-0' : 'max-h-[70vh]'}`}>
+                  <Table className="whitespace-nowrap min-w-full text-[13px]">
+                    <TableHeader className="bg-slate-900 sticky top-0 z-20">
+                      <TableRow className="hover:bg-slate-900 border-b border-slate-800">
+                        <TableHead className="sticky left-0 z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[180px]">Client</TableHead>
+                        {summaryTab === 'vat' && <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-left">VAT Policy</TableHead>}
+                        {summaryTab === 'site' && <TableHead className="sticky left-[180px] z-30 bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 w-[160px] border-l border-slate-700/50">Site</TableHead>}
+                        {summaryTab !== 'vat' && filterYear !== 'All' && (
+                          <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-amber-300 px-5 py-4 text-right" title="Balance carried over from previous years">
+                            B/F
+                          </TableHead>
+                        )}
+                        {summaryTab !== 'vat' && (
+                          <>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Inv. Qty</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Total Invoiced</TableHead>
+                          </>
+                        )}
+                        <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">{summaryTab === 'vat' ? 'Payment Made' : 'Total Payments'}</TableHead>
+                        {summaryTab !== 'vat' && (
+                          <>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">Balance Due</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">Discounts</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">WHT</TableHead>
+                          </>
+                        )}
+                        {summaryTab === 'vat' && (
+                          <>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">VAT ON PAYMENTS</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT (REMITTED)</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">VAT REMIT</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-right">AMT FOR VAT (OWED)</TableHead>
+                            <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-rose-300 px-5 py-4 text-right">VAT OWED</TableHead>
+                          </>
+                        )}
+                        {summaryTab !== 'vat' && (
+                          <TableHead className="bg-slate-900 font-semibold text-xs tracking-wider uppercase text-slate-300 px-5 py-4 text-center">Health</TableHead>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {displayedSummaryData.map((row, i) => (
+                        <TableRow key={i} className={`hover:bg-slate-50 transition-colors border-b border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
+                          <TableCell className={`sticky left-0 z-10 px-5 py-3 font-semibold text-slate-700 border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.client}</TableCell>
+                          {summaryTab === 'vat' && <TableCell className={`px-5 py-3 text-slate-500 font-medium ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.vatPolicy || 'No'}</TableCell>}
+                          {summaryTab === 'site' && <TableCell className={`sticky left-[180px] z-10 px-5 py-3 text-slate-500 font-medium border-r border-slate-100  ${i % 2 === 0 ? 'bg-white' : 'bg-[#fcfdfe]'}`}>{row.site}</TableCell>}
+                          {summaryTab !== 'vat' && filterYear !== 'All' && (
+                            <TableCell className={`px-5 py-3 text-right font-mono font-semibold ${!row.bf || row.bf === 0 ? 'text-slate-300' : row.bf > 0 ? 'text-amber-600' : 'text-emerald-600'
+                              }`}>
+                              {row.bf && row.bf !== 0
+                                ? (row.bf < 0
+                                  ? `(${Math.abs(row.bf).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                                  : row.bf.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                                : '-'}
+                            </TableCell>
+                          )}
+                          {summaryTab !== 'vat' && (
+                            <>
+                              <TableCell className="px-5 py-3 text-center text-slate-500 font-medium">
+                                <div className="bg-slate-100 text-slate-600 rounded-md px-2 py-0.5 inline-block text-[11px] font-bold">{row.noOfInvoices || '0'}</div>
+                              </TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono font-medium text-slate-700">{row.totalInvoices ? row.totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                            </>
+                          )}
+                          <TableCell className="px-5 py-3 text-right font-mono font-medium text-emerald-700 text-xs">{row.totalPayment ? row.totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                          {summaryTab !== 'vat' && (
+                            <>
+                              <TableCell className={`px-5 py-3 text-right font-mono font-bold ${row.balance >= 0.01 ? 'text-rose-600' : row.balance <= -0.01 ? 'text-blue-600' : 'text-emerald-600'}`}>
+                                {Math.abs(row.balance) >= 0.01 ? (row.balance < 0 ? `(${Math.abs(row.balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                              </TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono text-slate-400 text-xs">{row.discount ? row.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono text-blue-600/70 text-xs">{row.withholdingTax ? row.withholdingTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                            </>
+                          )}
+                          {summaryTab === 'vat' && (
+                            <>
+                              <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.amountForVat ? row.amountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono text-emerald-600/70 text-xs">{row.vatPaid ? row.vatPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">
+                                {row.vatRemitted !== 0 && vatRate > 0 ? ((row.vatRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                              </TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono text-sky-600/70 text-xs">{row.vatRemitted ? row.vatRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                              <TableCell className="px-5 py-3 text-right font-mono text-rose-600/70 text-xs">{row.vatOwed !== 0 && vatRate > 0 ? ((row.vatOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                              </TableCell>
+                              <TableCell className={`px-5 py-3 text-right font-mono font-bold text-xs ${row.vatOwed <= -0.01 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                {Math.abs(row.vatOwed) >= 0.01 ? (row.vatOwed < 0 ? `(${Math.abs(row.vatOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : row.vatOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : '-'}
+                              </TableCell>
+                            </>
+                          )}
+                          {summaryTab !== 'vat' && (
+                            <TableCell className="px-5 py-3 text-center">
+                              <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase
+                        ${row.status === 'OWING' ? 'bg-rose-100 border border-rose-200 text-rose-700' :
+                                  row.status === 'PART PAID' ? 'bg-amber-100 border border-amber-200 text-amber-700' :
+                                    row.status === 'OVER PAID' ? 'bg-blue-100 border border-blue-200 text-blue-700' :
+                                      row.status === 'FULLY PAID' ? 'bg-emerald-100 border border-emerald-200 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                                {row.status}
+                              </span>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                      {displayedSummaryData.length === 0 && (
+                        <TableRow><TableCell colSpan={15} className="px-4 py-12 text-center text-slate-500 font-medium">{showDebtorsOnly ? 'No debtor records found for the selected period.' : 'No data available.'}</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                    {displayedSummaryData.length > 0 && (() => {
+                      const totalBF = displayedSummaryData.reduce((sum, r) => sum + (r.bf || 0), 0);
+                      const totalBalance = displayedSummaryData.reduce((sum, r) => sum + (r.balance || 0), 0);
+                      const totalInvoices = displayedSummaryData.reduce((sum, r) => sum + (r.totalInvoices || 0), 0);
+                      const totalPayment = displayedSummaryData.reduce((sum, r) => sum + (r.totalPayment || 0), 0);
+                      const totalDiscount = displayedSummaryData.reduce((sum, r) => sum + (r.discount || 0), 0);
+                      const totalWHT = displayedSummaryData.reduce((sum, r) => sum + (r.withholdingTax || 0), 0);
+                      const totalAmountForVat = displayedSummaryData.reduce((sum, r) => sum + (r.amountForVat || 0), 0);
+                      const totalVATPaid = displayedSummaryData.reduce((sum, r) => sum + (r.vatPaid || 0), 0);
+                      const totalVATRemitted = displayedSummaryData.reduce((sum, r) => sum + (r.vatRemitted || 0), 0);
+                      const totalVATOwed = displayedSummaryData.reduce((sum, r) => sum + (r.vatOwed || 0), 0);
+
+                      return (
+                        <TableFooter className="sticky bottom-0 z-30 bg-slate-900 border-t-4 border-slate-700 shadow-[0_-4px_16px_rgba(0,0,0,0.35)]">
+                          <TableRow className="bg-slate-900 hover:bg-slate-900 border-none">
+                            <TableCell className="sticky left-0 z-40 bg-slate-900 px-5 py-4 font-bold text-slate-200 text-sm tracking-wider uppercase border-r border-slate-700/50">Grand Total</TableCell>
+                            {summaryTab === 'vat' && <TableCell className="bg-slate-900 px-5 py-4"></TableCell>}
+                            {summaryTab === 'site' && <TableCell className="sticky left-[180px] z-40 bg-slate-900 px-5 py-4 border-r border-slate-700/50"></TableCell>}
+                            {summaryTab !== 'vat' && filterYear !== 'All' && (
+                              <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold ${!totalBF || totalBF === 0 ? 'text-slate-400' : totalBF > 0 ? 'text-amber-400' : 'text-emerald-400'
+                                }`}>
+                                {totalBF && totalBF !== 0
+                                  ? (totalBF < 0
+                                    ? `(${Math.abs(totalBF).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                                    : totalBF.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                                  : '-'}
+                              </TableCell>
+                            )}
+                            {summaryTab !== 'vat' && (
+                              <>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-center font-bold text-slate-300 bg-slate-800/80 rounded-sm">{displayedSummaryData.reduce((sum, r) => sum + r.noOfInvoices, 0)}</TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-slate-200">{totalInvoices.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                              </>
+                            )}
+                            <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-bold text-emerald-400">{totalPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                            {summaryTab !== 'vat' && (
+                              <>
+                                <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold ${totalBalance >= 0.01 ? 'text-rose-400 bg-rose-950/20' : totalBalance <= -0.01 ? 'text-blue-400 bg-blue-950/20' : 'text-emerald-400'}`}>
+                                  {Math.abs(totalBalance) >= 0.01
+                                    ? (totalBalance < 0
+                                      ? `(${Math.abs(totalBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                                      : totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                                    : '-'}
+                                </TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-400">{totalDiscount ? totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-slate-300">{totalWHT ? totalWHT.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                              </>
+                            )}
+                            {summaryTab === 'vat' && (
+                              <>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalAmountForVat ? totalAmountForVat.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-emerald-400">{totalVATPaid ? totalVATPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">
+                                  {totalVATRemitted !== 0 && vatRate > 0 ? ((totalVATRemitted / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                                </TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-sky-400">{totalVATRemitted ? totalVATRemitted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                                <TableCell className="bg-slate-900 px-5 py-4 text-right font-mono font-medium text-rose-400">{totalVATOwed !== 0 && vatRate > 0 ? ((totalVATOwed / (vatRate / 100)) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}</TableCell>
+                                <TableCell className={`bg-slate-900 px-5 py-4 text-right font-mono font-bold text-xs ${totalVATOwed < 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                  {totalVATOwed !== 0
+                                    ? (totalVATOwed < 0
+                                      ? `(${Math.abs(totalVATOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                                      : totalVATOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+                                    : '-'}
+                                </TableCell>
+                              </>
+                            )}
+                            {summaryTab !== 'vat' && (
+                              <TableCell className="bg-slate-900 px-5 py-4"></TableCell>
+                            )}
+                          </TableRow>
+                        </TableFooter>
+                      );
+                    })()}
+                  </Table>
+                </div>
+              )}
+            </Card>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <Card className="border-slate-200 col-span-1 lg:col-span-2 flex flex-col">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Cash Flow Velocity</CardTitle>
+                  </div>
+                  <CardDescription>Billed Revenue vs Cash Collected over time.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-5 flex-1 min-h-[300px]">
+                  {trendData.length > 0 ? (
+                    <div className="w-full h-[300px] overflow-x-auto">
+                      <div className="min-w-[600px] h-full">
+                        <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                          <AreaChart data={trendData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorBilledR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#818cf8" stopOpacity={0.8} /><stop offset="95%" stopColor="#818cf8" stopOpacity={0} /></linearGradient>
+                              <linearGradient id="colorCollectedR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#34d399" stopOpacity={0.8} /><stop offset="95%" stopColor="#34d399" stopOpacity={0} /></linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${val / 1000000}M`} />
+                            <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '13px' }} />
+                            <Area type="monotone" dataKey="Billed" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorBilledR)">
+                              <LabelList dataKey="Billed" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v > 0 ? `₦${(v / 1000000).toFixed(1)}M` : ''} />
+                            </Area>
+                            <Area type="monotone" dataKey="Collected" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorCollectedR)">
+                              <LabelList dataKey="Collected" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v > 0 ? `₦${(v / 1000000).toFixed(1)}M` : ''} />
+                            </Area>
+                          </AreaChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
-                  </div>
-                </>
-              );
-            })()
-          ) : (
-            /* ── LOANS & ADVANCES ── */
-            (() => {
-              const activeLoans = loans.filter(l => l.status === 'Active' || l.status === 'Approved');
-              const pendingAdvances = salaryAdvances.filter(a => a.status !== 'Deducted');
-
-              const exportLoansCsv = () => {
-                const headers = ['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Deduction', 'Remaining Balance', 'Duration', 'Start Date', 'Status'];
-                const data: any[] = [];
-                loans.forEach(l => {
-                  data.push(['Loan', l.employeeName, l.loanType, l.principalAmount, l.monthlyDeduction, l.remainingBalance, `${l.duration} months`, l.startDate, l.status]);
-                });
-                salaryAdvances.forEach(a => {
-                  data.push(['Advance', a.employeeName, '-', a.amount, '-', '-', '-', '-', a.status]);
-                });
-
-                let csv = 'data:text/csv;charset=utf-8,';
-                csv += headers.join(',') + '\n';
-                data.forEach(row => {
-                  csv += row.map((val: any) => `"${val}"`).join(',') + '\n';
-                });
-                const fileName = 'loans_advances_report.csv';
-
-                setPreviewModal({
-                  isOpen: true,
-                  title: 'Loans & Advances Report',
-                  type: 'csv',
-                  data: data,
-                  headers: headers,
-                  filename: fileName,
-                  onConfirm: () => {
-                    const link = document.createElement('a');
-                    link.setAttribute('href', encodeURI(csv));
-                    link.setAttribute('download', fileName);
-                    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-                    showExportMessage('Loans & Advances (CSV) exported!');
-                  }
-                });
-              };
-
-              const exportLoansPdf = () => {
-                const head = [['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Ded.', 'Balance', 'Status']];
-                const body = [
-                  ...loans.map(l => ['Loan', l.employeeName, l.loanType, l.principalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.monthlyDeduction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.remainingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.status]),
-                  ...salaryAdvances.map(a => ['Advance', a.employeeName, '-', a.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), '-', '-', a.status]),
-                ];
-                
-                setPreviewModal({
-                  isOpen: true,
-                  title: 'Loans & Advances Report',
-                  type: 'pdf',
-                  data: body,
-                  headers: head[0],
-                  filename: 'loans_advances_report.pdf',
-                  onConfirm: () => generatePdf('Loans & Advances Report', head, body, 'loans_advances_report.pdf')
-                });
-              };
-
-              return (
-                <>
-                  {/* Summary tiles */}
-                  <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
-                    {[
-                      { label: 'Active Loans', value: activeLoans.length, color: 'amber' },
-                      { label: 'Total Loan Balance', value: fmRaw(activeLoans.reduce((s, l) => s + l.remainingBalance, 0)), color: 'amber' },
-                      { label: 'Pending Advances', value: pendingAdvances.length, color: 'rose' },
-                      { label: 'Total Advance Amount', value: fmRaw(pendingAdvances.reduce((s, a) => s + a.amount, 0)), color: 'rose' },
-                    ].map(tile => (
-                      <div key={tile.label} className={`rounded-md border p-4 ${
-                        tile.color === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'
-                      }`}>
-                        <div className={`text-lg font-bold ${
-                          tile.color === 'amber' ? 'text-amber-800' : 'text-rose-800'
-                        }`}>{tile.value}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{tile.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {priv.canExport && (
-                    <div className={`flex justify-end gap-2 mb-4 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
-                      <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportLoansCsv}>
-                        <FileSpreadsheet className="h-4 w-4" /> CSV
-                      </Button>
-                      <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportLoansPdf}>
-                        <FileText className="h-4 w-4" /> PDF
-                      </Button>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                      <BarChart3 className="w-10 h-10 mb-2 opacity-20" /><p className="text-sm">Not enough data to map trends.</p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
 
-                  {/* Loans table */}
-                  <div className={`${fullScreenTable === 'payroll' ? 'flex-1 overflow-auto min-h-0 space-y-6 pr-2' : ''}`}>
-                    <div className="mb-6">
-                      <div className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2 px-1">Staff Loans</div>
-                    <div className="rounded-md border border-slate-200 rounded-md overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-amber-700 text-white">
-                              <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3">Loan Type</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Principal</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Monthly Deduction</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Remaining Balance</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-center">Duration</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3">Start Date</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-center">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {loans.length === 0 ? (
-                              <TableRow><TableCell colSpan={8} className="text-center py-6 text-slate-400">No loan records.</TableCell></TableRow>
-                            ) : loans.map((loan, idx) => (
-                              <TableRow key={loan.id} className={`hover:bg-amber-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{loan.employeeName}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-slate-600">{loan.loanType}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">{fmRaw(loan.principalAmount)}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">{fmRaw(loan.monthlyDeduction)}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-amber-700">{fmRaw(loan.remainingBalance)}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-center text-slate-600">{loan.duration}m</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{loan.startDate}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-center">
-                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                    loan.status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
-                                    loan.status === 'Completed' ? 'bg-slate-100 text-slate-500' :
-                                    loan.status === 'Approved' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-amber-100 text-amber-700'
-                                  }`}>{loan.status}</span>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+              <Card className="border-slate-200 flex flex-col">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PieChartIcon className="w-5 h-5 text-blue-600" />
+                      <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">VAT Compliance</CardTitle>
                     </div>
+                    <Badge variant={globalStats.vatDeficit > 0 ? "outline" : "secondary"} className={globalStats.vatDeficit > 0 ? "text-amber-600 border-amber-200 bg-amber-50" : "bg-emerald-50 text-emerald-700"}>
+                      {globalStats.vatDeficit > 0 ? 'Action Reqd' : 'Healthy'}
+                    </Badge>
                   </div>
+                  <CardDescription>Portion of collected VAT remitted.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-5 flex-1 min-h-[300px] flex flex-col items-center justify-center relative">
+                  {globalStats.totalVATCollected > 0 ? (
+                    <>
+                      <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="80%">
+                        <PieChart>
+                          <Pie data={vatPieData} cx="50%" cy="50%" innerRadius={65} outerRadius={95} paddingAngle={3} dataKey="value" stroke="none">
+                            <Cell fill="#10b981" /><Cell fill="#f43f5e" />
+                          </Pie>
+                          <RechartsTooltip formatter={(value: number | undefined) => formatCurr(value ?? 0)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
+                        <span className="text-2xl font-bold text-slate-800 tracking-tighter font-mono mt-8">
+                          {Math.round((globalStats.totalVATRemitted / Math.max(1, globalStats.totalVATCollected)) * 100)}%
+                        </span>
+                        <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest">Remitted</span>
+                      </div>
+                      <div className="flex w-full justify-center gap-4 mt-2 mb-2 text-xs">
+                        <div className="flex items-center gap-1 font-medium text-slate-600"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span> Remitted</div>
+                        <div className="flex items-center gap-1 font-medium text-slate-600"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500"></span> Deficit</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-slate-400 text-sm text-center">
+                      <AlertCircle className="w-8 h-8 opacity-20 mx-auto mb-2" /><p>No VAT collected yet.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-                  {/* Salary Advances table */}
+            {/* Debtors Chart */}
+            <Card className="border-slate-200">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
+                    <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Receivables Risk Analysis</CardTitle>
+                  </div>
+                  <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                    <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'client' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'}`} onClick={() => setDebtorView('client')}>By Client</button>
+                    <button className={`px-3 py-1 text-xs font-semibold rounded transition-all ${debtorView === 'site' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'}`} onClick={() => setDebtorView('site')}>By Site</button>
+                  </div>
+                </div>
+                <CardDescription>Highest outstanding balances.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 sm:p-5">
+                {clientDebtData.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height={250} className="min-w-[600px]">
+                      <BarChart data={clientDebtData} layout="vertical" margin={{ top: 10, right: 30, left: debtorView === 'site' ? 80 : 20, bottom: 5 }} barSize={20}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₦${(val / 1000000)}M`} />
+                        <YAxis type="category" dataKey="name" width={debtorView === 'site' ? 180 : 100} axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 600, fill: '#334155' }} />
+                        <RechartsTooltip cursor={{ fill: '#f1f5f9' }} formatter={(value: number | undefined) => formatCurr(value ?? 0)} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px', fontSize: '13px' }} />
+                        <Bar dataKey="Cleared" stackId="a" fill="#cbd5e1" name="Received" />
+                        <Bar dataKey="Outstanding" stackId="a" fill="#f59e0b" name="Outstanding" radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="Outstanding" position="insideRight" formatter={(val: number) => val > 0 ? `₦${(val / 1000000).toFixed(1)}M` : ''} style={{ fill: '#fff', fontSize: 10, fontWeight: 700 }} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="text-slate-400 text-sm text-center py-10">
+                    <AlertCircle className="w-8 h-8 opacity-20 mx-auto mb-2" /><p>No receivables data available.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Invoices & Payments Ranking Card */}
+            <Card className="border-slate-200">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                    <CardTitle className="text-sm text-slate-800 uppercase tracking-wide">Invoices & Payments Ranking</CardTitle>
+                  </div>
+                  <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                    <button
+                      className={`px-3 py-1 text-xs font-semibold rounded transition-all ${rankingView === 'client' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'
+                        }`}
+                      onClick={() => setRankingView('client')}
+                    >
+                      By Client
+                    </button>
+                    <button
+                      className={`px-3 py-1 text-xs font-semibold rounded transition-all ${rankingView === 'site' ? 'bg-white text-blue-700 border border-slate-200' : 'text-slate-500'
+                        }`}
+                      onClick={() => setRankingView('site')}
+                    >
+                      By Site
+                    </button>
+                  </div>
+                </div>
+                <CardDescription>Highest revenue and collections ranked by Client or Site.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* INVOICES RANKING */}
                   <div>
-                    <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-2 px-1">Salary Advances</div>
-                    <div className="rounded-md border border-slate-200 rounded-md overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-rose-700 text-white">
-                              <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-right">Amount</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3">Request Date</TableHead>
-                              <TableHead className="text-white font-semibold py-2 px-3 text-center">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {salaryAdvances.length === 0 ? (
-                              <TableRow><TableCell colSpan={4} className="text-center py-6 text-slate-400">No salary advance records.</TableCell></TableRow>
-                            ) : salaryAdvances.map((adv, idx) => (
-                              <TableRow key={adv.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{adv.employeeName}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-rose-700">{fmRaw(adv.amount)}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{adv.requestDate}</TableCell>
-                                <TableCell className="py-1.5 px-3 text-center">
-                                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                    adv.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
-                                    adv.status === 'Deducted' ? 'bg-slate-100 text-slate-500' :
-                                    adv.status === 'Rejected' ? 'bg-red-100 text-red-700' :
-                                    'bg-amber-100 text-amber-700'
-                                  }`}>{adv.status}</span>
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
+                      <span>INVOICES</span>
+                      <span className="text-[10px] text-slate-400 normal-case font-normal">Ranked by Billed Amount</span>
+                    </div>
+                    <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
+                      <Table className="whitespace-nowrap min-w-full text-xs">
+                        <TableHeader className="bg-slate-900 sticky top-0 z-10">
+                          <TableRow className="hover:bg-slate-900 border-b border-slate-800">
+                            <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
+                              {rankingView === 'client' ? 'CLIENT' : 'SITE'}
+                            </TableHead>
+                            {rankingView === 'client' ? (
+                              <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-24">NO OF SITE</TableHead>
+                            ) : (
+                              <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">CLIENT</TableHead>
+                            )}
+                            <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-right">AMOUNT</TableHead>
+                            <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-14">RANK</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rankingData.invoiceRanked.length > 0 ? (
+                            rankingData.invoiceRanked.map((row, idx) => (
+                              <TableRow
+                                key={idx}
+                                className={`hover:bg-slate-50 transition-colors border-b border-slate-100/80 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
+                                  }`}
+                              >
+                                <TableCell className="py-3 font-semibold text-slate-700 truncate max-w-[150px]" title={row.name}>
+                                  {row.name}
+                                </TableCell>
+                                {rankingView === 'client' ? (
+                                  <TableCell className="py-3 text-center">
+                                    <span
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95"
+                                      onMouseEnter={(e) => {
+                                        if (row.sites && row.sites.length > 0) {
+                                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                          setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'blue' });
+                                        }
+                                      }}
+                                      onMouseLeave={() => setRankingTooltip(null)}
+                                    >
+                                      <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                      {row.noOfSites}
+                                    </span>
+                                  </TableCell>
+                                ) : (
+                                  <TableCell className="py-3 text-slate-500 truncate max-w-[120px]" title={row.client}>
+                                    {row.client}
+                                  </TableCell>
+                                )}
+                                <TableCell className="py-3 text-right font-mono font-bold text-blue-600">
+                                  {fmRaw(row.amount)}
+                                </TableCell>
+                                <TableCell className="py-3 text-center">
+                                  <div className="flex justify-center">
+                                    {idx === 0 ? (
+                                      <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-500 border border-amber-400 text-white">
+                                        1
+                                      </span>
+                                    ) : idx === 1 ? (
+                                      <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-slate-500 border border-slate-400 text-white">
+                                        2
+                                      </span>
+                                    ) : idx === 2 ? (
+                                      <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-700 border border-amber-600 text-white">
+                                        3
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[10px] text-slate-500 bg-slate-100 border border-slate-200">
+                                        {idx + 1}
+                                      </span>
+                                    )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={4} className="py-8 text-center text-slate-400 italic">
+                                No invoice data available for this period.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
-                  </div>
-                </>
-              );
-            })()
-          )}
-        </CardContent>
-      </Card>
 
-      </>
-      )}
+                  {/* PAYMENTS RANKING */}
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 border-b border-slate-100 pb-2 flex items-center justify-between">
+                      <span>PAYMENTS</span>
+                      <span className="text-[10px] text-slate-400 normal-case font-normal">Ranked by Collected Amount</span>
+                    </div>
+                    <div className="[&>div]:max-h-[350px] [&>div]:no-scrollbar">
+                      <Table className="whitespace-nowrap min-w-full text-xs">
+                        <TableHeader className="bg-slate-900 sticky top-0 z-10">
+                          <TableRow className="hover:bg-slate-900 border-b border-emerald-500/50">
+                            <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">
+                              {rankingView === 'client' ? 'CLIENT' : 'SITE'}
+                            </TableHead>
+                            {rankingView === 'client' ? (
+                              <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-24">NO OF SITE</TableHead>
+                            ) : (
+                              <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-left">CLIENT</TableHead>
+                            )}
+                            <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-right">AMOUNT</TableHead>
+                            <TableHead className="font-semibold tracking-wider uppercase text-slate-300 py-3 text-center w-14">RANK</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {rankingData.paymentRanked.length > 0 ? (
+                            rankingData.paymentRanked.map((row, idx) => (
+                              <TableRow
+                                key={idx}
+                                className={`hover:bg-emerald-50/20 transition-colors border-b border-slate-100/80 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'
+                                  }`}
+                              >
+                                <TableCell className="py-3 font-semibold text-slate-700 truncate max-w-[150px]" title={row.name}>
+                                  {row.name}
+                                </TableCell>
+                                {rankingView === 'client' ? (
+                                  <TableCell className="py-3 text-center">
+                                    <span
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all cursor-help hover:scale-105 active:scale-95"
+                                      onMouseEnter={(e) => {
+                                        if (row.sites && row.sites.length > 0) {
+                                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                          setRankingTooltip({ x: rect.left + rect.width / 2, y: rect.top, sites: row.sites, count: row.noOfSites, accent: 'emerald' });
+                                        }
+                                      }}
+                                      onMouseLeave={() => setRankingTooltip(null)}
+                                    >
+                                      <MapPin className="w-2.5 h-2.5 shrink-0" />
+                                      {row.noOfSites}
+                                    </span>
+                                  </TableCell>
+                                ) : (
+                                  <TableCell className="py-3 text-slate-500 truncate max-w-[120px]" title={row.client}>
+                                    {row.client}
+                                  </TableCell>
+                                )}
+                                <TableCell className="py-3 text-right font-mono font-bold text-emerald-600">
+                                  {fmRaw(row.amount)}
+                                </TableCell>
+                                <TableCell className="py-3 text-center">
+                                  <div className="flex justify-center">
+                                    {idx === 0 ? (
+                                      <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-500 border border-amber-400 text-white">
+                                        1
+                                      </span>
+                                    ) : idx === 1 ? (
+                                      <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-slate-500 border border-slate-400 text-white">
+                                        2
+                                      </span>
+                                    ) : idx === 2 ? (
+                                      <span className="flex items-center justify-center w-7 h-7 rounded-full font-black text-[11px] text-white bg-amber-700 border border-amber-600 text-white">
+                                        3
+                                      </span>
+                                    ) : (
+                                      <span className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[10px] text-slate-500 bg-slate-100 border border-slate-200">
+                                        {idx + 1}
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={4} className="py-8 text-center text-slate-400 italic">
+                                No payment data available for this period.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+
+              {/* Fixed-position tooltip — renders above all overflow containers */}
+              {rankingTooltip && (
+                <div
+                  className="pointer-events-none fixed z-[9999]"
+                  style={{
+                    left: rankingTooltip.x,
+                    top: rankingTooltip.y - 8,
+                    transform: 'translateX(-50%) translateY(-100%)',
+                  }}
+                >
+                  <div className={`w-56 bg-slate-950/97 backdrop-blur-md border shadow-2xl rounded-md p-3 text-left ${rankingTooltip.accent === 'blue' ? 'border-blue-900/60' : 'border-emerald-900/60'}`}>
+                    <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 pb-1 border-b border-slate-800 flex items-center justify-between ${rankingTooltip.accent === 'blue' ? 'text-blue-400' : 'text-emerald-400'}`}>
+                      <span>Sites</span>
+                      <span className={`font-mono px-1.5 rounded text-[9px] font-extrabold border ${rankingTooltip.accent === 'blue' ? 'bg-blue-950 border-blue-900/50 text-blue-300' : 'bg-emerald-950 border-emerald-900/50 text-emerald-300'}`}>
+                        {rankingTooltip.count}
+                      </span>
+                    </div>
+                    <ul className="space-y-1 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
+                      {rankingTooltip.sites.map((siteName, sIdx) => (
+                        <li key={sIdx} className={`text-[10px] font-medium text-slate-300 flex items-center gap-1.5 py-0.5 ${rankingTooltip.accent === 'blue' ? 'hover:text-blue-400' : 'hover:text-emerald-400'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${rankingTooltip.accent === 'blue' ? 'bg-blue-500' : 'bg-emerald-500'}`}></span>
+                          <span className="truncate">{siteName}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {/* Arrow */}
+                    <div className={`absolute top-full left-1/2 -translate-x-1/2 w-2.5 h-2.5 border-r border-b rotate-45 -mt-1.5 ${rankingTooltip.accent === 'blue' ? 'bg-slate-950 border-blue-900/60' : 'bg-slate-950 border-emerald-900/60'}`}></div>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Site Revenue Chart */}
+            <Card className="border-slate-200">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <CardTitle className="text-lg flex items-center gap-2 text-slate-900">
+                  <BarChart3 className="h-5 w-5 text-blue-600" /> Revenue by Site
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="w-full h-[300px] overflow-x-auto">
+                  <div className="min-w-[600px] h-full">
+                    <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                      <BarChart data={siteFinancialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                        <RechartsTooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+                        <Legend verticalAlign="bottom" height={36} />
+                        <Bar dataKey="paid" stackId="a" fill="#10b981" name="Paid Invoice">
+                          <LabelList dataKey="paid" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#10b981' }} formatter={(v: any) => v >= 1000000 ? `₦${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v / 1000).toFixed(0)}k` : ''} />
+                        </Bar>
+                        <Bar dataKey="pending" stackId="a" fill="#f59e0b" name="Pending Invoice" radius={[4, 4, 0, 0]}>
+                          <LabelList dataKey="pending" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#d97706' }} formatter={(v: any) => v >= 1000000 ? `₦${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v / 1000).toFixed(0)}k` : ''} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+
+          </>
+        ) : (
+          <>
+            {/* ═══════════════════ PAYROLL SUMMARY TAB ═══════════════════ */}
+
+            {/* PAYROLL EXPOSURE SECTION */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-md border border-slate-200">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
+                <NairaSign className="w-5 h-5 text-blue-600" /> Payroll & Statutory Overview
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Filtered by global filters above</span>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card className="bg-slate-900 text-white border border-slate-800 rounded-md overflow-hidden relative">
+                <div className="absolute right-0 top-0 opacity-10"><NairaSign className="w-32 h-32 -mt-4 -mr-4" /></div>
+                <CardHeader className="pb-2 relative z-10">
+                  <CardTitle className="text-sm font-medium text-slate-300 uppercase tracking-widest flex justify-between">
+                    Payroll Exposure <Badge variant="outline" className="text-[10px] text-white/60 border-white/20">{(filterMonth === "All" ? null : parseInt(filterMonth, 10)) ? MONTHS_LIST.find(m => m.value === (filterMonth === "All" ? null : parseInt(filterMonth, 10)))?.label : 'All Months'} {(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="relative z-10">
+                  <div className="text-4xl font-black mb-1">₦{fm(payrollStats.totalGrossExposure)}</div>
+                  <p className="text-xs text-slate-300 flex items-center mt-1 font-medium">Gross liability based on attendance.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border-slate-200 relative overflow-hidden">
+                <div className="absolute right-0 top-0 opacity-[0.03] text-rose-500"><Backpack className="w-32 h-32 -mt-4 -mr-4" /></div>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-500 uppercase tracking-widest">Est. Statutory Liab.</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-slate-900 mb-1">₦{fm(payrollStats.totalStatutory)}</div>
+                  <p className="text-xs text-slate-500 flex items-center mt-1">Projected PAYE, Pension & NSITF.</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Annual Payroll & Overtime Trend */}
+            <Card className="border-slate-200">
+              <CardHeader className="bg-slate-50/50 border-b pb-4">
+                <CardTitle className="text-lg flex items-center justify-between gap-2 text-slate-800">
+                  <span className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-blue-600" /> Annual Payroll & Overtime Trend (Gross)</span>
+                  <Badge variant="outline" className="font-normal text-xs bg-white text-slate-500">{(filterYear === "All" ? currentYear : parseInt(filterYear, 10))} Performance</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="w-full h-[300px] overflow-x-auto">
+                  <div className="min-w-[600px] h-full">
+                    <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
+                      <LineChart data={payrollChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="left" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false}
+                          tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false}
+                          tickFormatter={(value) => value >= 1000000 ? `₦${(value / 1000000).toFixed(1)}M` : `₦${(value / 1000).toFixed(0)}k`} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          formatter={(value: number | undefined) => `₦${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                        <Line yAxisId="left" type="monotone" name="Total Gross Payroll" dataKey="Payroll" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                          <LabelList dataKey="Payroll" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#2563eb' }} formatter={(v: any) => v >= 1000000 ? `₦${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v / 1000).toFixed(0)}k` : ''} />
+                        </Line>
+                        <Line yAxisId="right" type="monotone" name="Overtime Burn" dataKey="Overtime" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+                          <LabelList dataKey="Overtime" position="bottom" style={{ fontSize: 10, fontWeight: 700, fill: '#f59e0b' }} formatter={(v: any) => v >= 1000000 ? `₦${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `₦${(v / 1000).toFixed(0)}k` : ''} />
+                        </Line>
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ───────────────── ACCOUNTS REPORTS ───────────────── */}
+            <Card className={`bg-white mb-6 ${fullScreenTable === 'payroll' ? 'fixed z-[100] m-0 rounded-none border-none landscape:inset-0 landscape:w-screen landscape:h-screen landscape:flex landscape:flex-col portrait:top-1/2 portrait:left-1/2 portrait:w-[100vh] portrait:h-[100vw] portrait:-translate-x-1/2 portrait:-translate-y-1/2 portrait:rotate-90 portrait:flex portrait:flex-col' : 'border-slate-200'}`}>
+              <CardHeader className={`border-b border-slate-100 pb-4 shrink-0 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <CardTitle className="text-slate-900 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border text-amber-700 bg-amber-50 border-amber-200">Accounts</span>
+                    Financial Staff Reports
+                  </CardTitle>
+                  {/* Tab switcher */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                      <button onClick={() => setAccountsTab('payroll')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${accountsTab === 'payroll' ? 'bg-white text-amber-700 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
+                          }`}>
+                        <FileText className="h-3.5 w-3.5" /> Payroll Summary
+                      </button>
+                      <button onClick={() => setAccountsTab('loans')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${accountsTab === 'loans' ? 'bg-white text-amber-700 border border-slate-200' : 'text-slate-500 hover:text-slate-700'
+                          }`}>
+                        <FileSpreadsheet className="h-3.5 w-3.5" /> Loans & Advances
+                      </button>
+                    </div>
+                    <Button variant="outline" size="sm" className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-100 h-[32px]" onClick={() => toggleFullScreen('payroll')}>
+                      <Maximize2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Full Screen</span>
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              {fullScreenTable === 'payroll' && (
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="fixed top-4 right-4 z-[110] rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 text-white w-12 h-12"
+                  onClick={() => toggleFullScreen('payroll')}
+                  title="Exit Full Screen"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </Button>
+              )}
+
+              <CardContent className={`pt-6 ${fullScreenTable === 'payroll' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
+                {accountsTab === 'payroll' ? (
+                  /* ── PAYROLL SUMMARY ── */
+                  (() => {
+                    // compute Grand Totals
+                    const gSalary = payrollSummaryData.reduce((s, row) => s + row.salary, 0);
+                    const gOvertime = payrollSummaryData.reduce((s, row) => s + row.overtime, 0);
+                    const gGrossPay = payrollSummaryData.reduce((s, row) => s + row.grossPay, 0);
+                    const gEmployeePension = payrollSummaryData.reduce((s, row) => s + row.employeePension, 0);
+                    const gLoans = payrollSummaryData.reduce((s, row) => s + row.loans, 0);
+                    const gPaye = payrollSummaryData.reduce((s, row) => s + row.paye, 0);
+                    const gWht = payrollSummaryData.reduce((s, row) => s + row.wht, 0);
+                    const gTotalPayout = payrollSummaryData.reduce((s, row) => s + row.totalPayout, 0);
+
+                    const fm = (n: number) => priv?.canViewAmounts === false ? '***' : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const fmT = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                    const exportPayrollSummaryCsv = () => {
+                      const headers = ['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'WHT', 'TOTAL PAYOUT'];
+                      const data = [
+                        ...payrollSummaryData.map(r => [r.monthLabel, fm(r.salary), fm(r.overtime), fm(r.grossPay), fm(r.employeePension), fm(r.loans), fm(r.paye), fm(r.wht), fm(r.totalPayout)]),
+                        ['GRAND TOTAL', fm(gSalary), fm(gOvertime), fm(gGrossPay), fm(gEmployeePension), fm(gLoans), fm(gPaye), fm(gWht), fm(gTotalPayout)]
+                      ];
+                      let csv = 'data:text/csv;charset=utf-8,';
+                      csv += headers.join(',') + '\n';
+                      data.forEach(row => {
+                        csv += row.map(val => `"${val}"`).join(',') + '\n';
+                      });
+                      const fileName = `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.csv`;
+
+                      setPreviewModal({
+                        isOpen: true,
+                        title: `Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`,
+                        type: 'csv',
+                        data: data,
+                        headers: headers,
+                        filename: fileName,
+                        onConfirm: () => {
+                          const link = document.createElement('a');
+                          link.setAttribute('href', encodeURI(csv));
+                          link.setAttribute('download', fileName);
+                          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                          showExportMessage('Payroll Summary (CSV) exported!');
+                        }
+                      });
+                    };
+
+                    const exportPayrollSummaryPdf = () => {
+                      const head = [['MONTH', 'SALARY', 'OVERTIME', 'GROSS PAY', 'EMPLOYEE PENSION', 'LOANS', 'PAYE', 'WHT', 'TOTAL PAYOUT']];
+                      const body = [
+                        ...payrollSummaryData.map(r => [
+                          r.monthLabel,
+                          fm(r.salary),
+                          fm(r.overtime),
+                          fm(r.grossPay),
+                          fm(r.employeePension),
+                          fm(r.loans),
+                          fm(r.paye),
+                          fm(r.wht),
+                          fm(r.totalPayout)
+                        ]),
+                        [
+                          'GRAND TOTAL',
+                          fm(gSalary),
+                          fm(gOvertime),
+                          fm(gGrossPay),
+                          fm(gEmployeePension),
+                          fm(gLoans),
+                          fm(gPaye),
+                          fm(gWht),
+                          fm(gTotalPayout)
+                        ]
+                      ];
+
+                      setPreviewModal({
+                        isOpen: true,
+                        title: `Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`,
+                        type: 'pdf',
+                        data: body,
+                        headers: head[0],
+                        filename: `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.pdf`,
+                        onConfirm: () => generatePdf(`Payroll Summary ${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}`, head, body, `payroll_summary_${(filterYear === "All" ? currentYear : parseInt(filterYear, 10))}.pdf`)
+                      });
+                    };
+
+                    return (
+                      <>
+                        <div className={`flex items-center justify-end flex-wrap gap-3 ${fullScreenTable === 'payroll' ? 'hidden' : 'mb-4'}`}>
+                          {priv.canExport && (
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportPayrollSummaryCsv}>
+                                <FileSpreadsheet className="h-4 w-4" /> CSV
+                              </Button>
+                              <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportPayrollSummaryPdf}>
+                                <FileText className="h-4 w-4" /> PDF
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className={`rounded-md border border-slate-200 dark:border-slate-800 overflow-auto no-scrollbar ${fullScreenTable === 'payroll' ? 'flex-1 min-h-0' : ''}`}>
+                          <div className="min-w-[1240px]">
+                            {/* column legend bar */}
+                            <div className="grid grid-cols-9 text-[10px] font-bold tracking-widest uppercase px-0 bg-slate-900 border-b border-slate-800">
+                              {[
+                                { label: 'MONTH', align: 'left', accent: false, wide: true },
+                                { label: 'SALARY', align: 'right', accent: false },
+                                { label: 'OVERTIME', align: 'right', accent: false },
+                                { label: 'GROSS PAY', align: 'right', accent: true },
+                                { label: 'EMP. PENSION', align: 'right', accent: false },
+                                { label: 'LOANS', align: 'right', accent: false },
+                                { label: 'PAYE', align: 'right', accent: false },
+                                { label: 'WHT', align: 'right', accent: false },
+                                { label: 'TOTAL PAYOUT', align: 'right', accent: true },
+                              ].map(col => (
+                                <div
+                                  key={col.label}
+                                  className={`py-3.5 px-3 text-${col.align} ${col.accent
+                                      ? 'text-amber-300 bg-[#0d3344]/40 border-l border-r border-[#0d3344]/60'
+                                      : 'text-[#9ecfe8]'
+                                    } ${col.label === 'MONTH' ? 'col-span-1' : ''}`}
+                                >
+                                  {col.label}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* rows */}
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                              {payrollSummaryData.map((row, idx) => {
+                                const maxPayout = Math.max(...payrollSummaryData.map(r => r.totalPayout), 1);
+                                const pct = Math.round((row.totalPayout / maxPayout) * 100);
+                                const isEven = idx % 2 === 0;
+                                return (
+                                  <div
+                                    key={row.monthLabel}
+                                    className={`grid grid-cols-9 items-center group transition-all duration-150 hover:z-10 relative ${isEven ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/70 dark:bg-slate-800/40'
+                                      } hover:bg-teal-50/60 dark:hover:bg-teal-950/20`}
+                                  >
+                                    <div className="py-2.5 px-3 flex items-center gap-2">
+                                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[9px] font-black bg-slate-800 text-white border border-slate-700 shrink-0">
+                                        {row.monthLabel.slice(0, 3).toUpperCase()}
+                                      </span>
+                                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{row.monthLabel}</span>
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right">
+                                      <span className="text-xs xl:text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap tabular-nums">₦{fm(row.salary)}</span>
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right">
+                                      {row.overtime > 0 ? (
+                                        <span className="inline-flex items-center gap-1 text-xs font-mono text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 whitespace-nowrap tabular-nums">
+                                          ₦{fm(row.overtime)}
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs font-mono text-slate-400">—</span>
+                                      )}
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right bg-teal-50/50 dark:bg-teal-950/20 border-l border-r border-teal-100 dark:border-teal-900/40 group-hover:bg-teal-100/40">
+                                      <span className="text-xs xl:text-sm font-mono font-bold text-teal-800 dark:text-teal-300 whitespace-nowrap tabular-nums">₦{fm(row.grossPay)}</span>
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right">
+                                      <span className="text-xs xl:text-sm font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">₦{fm(row.employeePension)}</span>
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right">
+                                      <span className="text-xs xl:text-sm font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap tabular-nums">₦{fm(row.loans)}</span>
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right">
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 whitespace-nowrap tabular-nums">
+                                        ₦{fm(row.paye)}
+                                      </span>
+                                    </div>
+                                    <div className="py-2.5 px-3 text-right">
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-full px-2 py-0.5 whitespace-nowrap tabular-nums">
+                                        ₦{fm(row.wht)}
+                                      </span>
+                                    </div>
+                                    <div className="py-2.5 px-3 bg-slate-800/[0.03] dark:bg-slate-700/[0.1] border-l border-slate-200 dark:border-slate-800 group-hover:bg-slate-800/[0.06]">
+                                      <div className="flex flex-col items-end gap-1">
+                                        <span className="text-xs xl:text-sm font-mono font-extrabold text-slate-900 dark:text-white whitespace-nowrap tabular-nums">₦{fm(row.totalPayout)}</span>
+                                        <div className="w-full max-w-[70px] h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full rounded-full bg-blue-600"
+                                            style={{ width: `${pct}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Grand Total footer */}
+                            <div className="grid grid-cols-9 items-center bg-slate-900 border-t-2 border-slate-800">
+                              <div className="py-3 px-3 flex items-center gap-2">
+                                <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-white/90 bg-white/10 border border-white/20 rounded-md px-2 py-1 whitespace-nowrap">
+                                  GRAND TOTAL
+                                </span>
+                              </div>
+                              {[
+                                { val: gSalary, isAccent: false, isTax: false, border: '' },
+                                { val: gOvertime, isAccent: false, isTax: false, border: '' },
+                                { val: gGrossPay, isAccent: true, isTax: false, border: 'border-l border-r border-white/10' },
+                                { val: gEmployeePension, isAccent: false, isTax: false, border: '' },
+                                { val: gLoans, isAccent: false, isTax: false, border: '' },
+                                { val: gPaye, isAccent: false, isTax: true, border: '' },
+                                { val: gWht, isAccent: false, isTax: true, border: '' },
+                                { val: gTotalPayout, isAccent: true, isTax: false, border: 'border-l border-white/10' },
+                              ].map((col, i) => (
+                                <div
+                                  key={i}
+                                  className={`py-3 px-3 text-right ${col.isAccent ? 'bg-white/10' : ''
+                                    } ${col.border}`}
+                                >
+                                  <span className={`text-xs xl:text-sm font-mono font-extrabold tracking-tight whitespace-nowrap tabular-nums ${col.isAccent ? 'text-amber-300' : col.isTax ? 'text-rose-300' : 'text-white'
+                                    }`}>
+                                    ₦{fmT(col.val)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()
+                ) : (
+                  /* ── LOANS & ADVANCES ── */
+                  (() => {
+                    const activeLoans = loans.filter(l => l.status === 'Active' || l.status === 'Approved');
+                    const pendingAdvances = salaryAdvances.filter(a => a.status !== 'Deducted');
+
+                    const exportLoansCsv = () => {
+                      const headers = ['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Deduction', 'Remaining Balance', 'Duration', 'Start Date', 'Status'];
+                      const data: any[] = [];
+                      loans.forEach(l => {
+                        data.push(['Loan', l.employeeName, l.loanType, l.principalAmount, l.monthlyDeduction, l.remainingBalance, `${l.duration} months`, l.startDate, l.status]);
+                      });
+                      salaryAdvances.forEach(a => {
+                        data.push(['Advance', a.employeeName, '-', a.amount, '-', '-', '-', '-', a.status]);
+                      });
+
+                      let csv = 'data:text/csv;charset=utf-8,';
+                      csv += headers.join(',') + '\n';
+                      data.forEach(row => {
+                        csv += row.map((val: any) => `"${val}"`).join(',') + '\n';
+                      });
+                      const fileName = 'loans_advances_report.csv';
+
+                      setPreviewModal({
+                        isOpen: true,
+                        title: 'Loans & Advances Report',
+                        type: 'csv',
+                        data: data,
+                        headers: headers,
+                        filename: fileName,
+                        onConfirm: () => {
+                          const link = document.createElement('a');
+                          link.setAttribute('href', encodeURI(csv));
+                          link.setAttribute('download', fileName);
+                          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                          showExportMessage('Loans & Advances (CSV) exported!');
+                        }
+                      });
+                    };
+
+                    const exportLoansPdf = () => {
+                      const head = [['Type', 'Employee', 'Loan Type', 'Principal', 'Monthly Ded.', 'Balance', 'Status']];
+                      const body = [
+                        ...loans.map(l => ['Loan', l.employeeName, l.loanType, l.principalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.monthlyDeduction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.remainingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), l.status]),
+                        ...salaryAdvances.map(a => ['Advance', a.employeeName, '-', a.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), '-', '-', a.status]),
+                      ];
+
+                      setPreviewModal({
+                        isOpen: true,
+                        title: 'Loans & Advances Report',
+                        type: 'pdf',
+                        data: body,
+                        headers: head[0],
+                        filename: 'loans_advances_report.pdf',
+                        onConfirm: () => generatePdf('Loans & Advances Report', head, body, 'loans_advances_report.pdf')
+                      });
+                    };
+
+                    return (
+                      <>
+                        {/* Summary tiles */}
+                        <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
+                          {[
+                            { label: 'Active Loans', value: activeLoans.length, color: 'amber' },
+                            { label: 'Total Loan Balance', value: fmRaw(activeLoans.reduce((s, l) => s + l.remainingBalance, 0)), color: 'amber' },
+                            { label: 'Pending Advances', value: pendingAdvances.length, color: 'rose' },
+                            { label: 'Total Advance Amount', value: fmRaw(pendingAdvances.reduce((s, a) => s + a.amount, 0)), color: 'rose' },
+                          ].map(tile => (
+                            <div key={tile.label} className={`rounded-md border p-4 ${tile.color === 'amber' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'
+                              }`}>
+                              <div className={`text-lg font-bold ${tile.color === 'amber' ? 'text-amber-800' : 'text-rose-800'
+                                }`}>{tile.value}</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{tile.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {priv.canExport && (
+                          <div className={`flex justify-end gap-2 mb-4 ${fullScreenTable === 'payroll' ? 'hidden' : ''}`}>
+                            <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={exportLoansCsv}>
+                              <FileSpreadsheet className="h-4 w-4" /> CSV
+                            </Button>
+                            <Button size="sm" className="gap-2 bg-amber-600 hover:bg-amber-700 text-white" onClick={exportLoansPdf}>
+                              <FileText className="h-4 w-4" /> PDF
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Loans table */}
+                        <div className={`${fullScreenTable === 'payroll' ? 'flex-1 overflow-auto min-h-0 space-y-6 pr-2' : ''}`}>
+                          <div className="mb-6">
+                            <div className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2 px-1">Staff Loans</div>
+                            <div className="rounded-md border border-slate-200 rounded-md overflow-hidden">
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-amber-700 text-white">
+                                      <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3">Loan Type</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-right">Principal</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-right">Monthly Deduction</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-right">Remaining Balance</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-center">Duration</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3">Start Date</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-center">Status</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {loans.length === 0 ? (
+                                      <TableRow><TableCell colSpan={8} className="text-center py-6 text-slate-400">No loan records.</TableCell></TableRow>
+                                    ) : loans.map((loan, idx) => (
+                                      <TableRow key={loan.id} className={`hover:bg-amber-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                        <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{loan.employeeName}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-slate-600">{loan.loanType}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">{fmRaw(loan.principalAmount)}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-right text-slate-700">{fmRaw(loan.monthlyDeduction)}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-amber-700">{fmRaw(loan.remainingBalance)}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-center text-slate-600">{loan.duration}m</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{loan.startDate}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-center">
+                                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${loan.status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
+                                              loan.status === 'Completed' ? 'bg-slate-100 text-slate-500' :
+                                                loan.status === 'Approved' ? 'bg-blue-100 text-blue-700' :
+                                                  'bg-amber-100 text-amber-700'
+                                            }`}>{loan.status}</span>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Salary Advances table */}
+                          <div>
+                            <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-2 px-1">Salary Advances</div>
+                            <div className="rounded-md border border-slate-200 rounded-md overflow-hidden">
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-rose-700 text-white">
+                                      <TableHead className="text-white font-semibold py-2 px-3">Employee</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-right">Amount</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3">Request Date</TableHead>
+                                      <TableHead className="text-white font-semibold py-2 px-3 text-center">Status</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {salaryAdvances.length === 0 ? (
+                                      <TableRow><TableCell colSpan={4} className="text-center py-6 text-slate-400">No salary advance records.</TableCell></TableRow>
+                                    ) : salaryAdvances.map((adv, idx) => (
+                                      <TableRow key={adv.id} className={`hover:bg-rose-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                                        <TableCell className="py-1.5 px-3 text-sm font-medium text-slate-800">{adv.employeeName}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-right font-semibold text-rose-700">{fmRaw(adv.amount)}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-sm text-slate-600 whitespace-nowrap">{adv.requestDate}</TableCell>
+                                        <TableCell className="py-1.5 px-3 text-center">
+                                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${adv.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' :
+                                              adv.status === 'Deducted' ? 'bg-slate-100 text-slate-500' :
+                                                adv.status === 'Rejected' ? 'bg-red-100 text-red-700' :
+                                                  'bg-amber-100 text-amber-700'
+                                            }`}>{adv.status}</span>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()
+                )}
+              </CardContent>
+            </Card>
+
+          </>
+        )}
 
 
 

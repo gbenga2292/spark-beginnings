@@ -2,12 +2,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/src/components/ui/button';
 import { Badge } from '@/src/components/ui/badge';
 import { Input } from '@/src/components/ui/input';
-import { 
-  Download, 
-  Search, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Download,
+  Search,
+  CheckCircle2,
+  AlertCircle,
   History,
+  X,
+  Scale,
 } from 'lucide-react';
 import { useAppStore, type Invoice, type LedgerEntry, type Payment } from '@/src/store/appStore';
 import { supabase } from '@/src/integrations/supabase/client';
@@ -439,17 +441,168 @@ export function TrialBalanceReport({
       );
     }
 
-    // REVENUE (From Billed Invoices)
-    addRow('4000', 'Revenue — Dewatering Equipment Rental Fleet', 'INCOME', 'REVENUE',
-      0, sumLine('rental'), `${inPeriodInvoices.length} Client invoices — Equipment rental billing line`, lineEntries('rental', 'Equipment rental'));
-    addRow('4010', 'Revenue — Site Installation & Piping Setup', 'INCOME', 'REVENUE',
-      0, sumLine('installation'), 'Client invoices — Site installation & ground setup billing line', lineEntries('installation', 'Installation'));
-    addRow('4020', 'Revenue — Mobilization & Demobilization', 'INCOME', 'REVENUE',
-      0, sumLine('mob'), 'Client invoices — Mobilization & demobilization billing line', lineEntries('mob', 'Mob / Demob'));
-    addRow('4030', 'Revenue — Diesel Supply Billing', 'INCOME', 'REVENUE',
-      0, sumLine('diesel'), 'Client invoices — Site diesel supply billing line', lineEntries('diesel', 'Diesel supply'));
-    addRow('4040', 'Revenue — Field Operations & Technicians Fee', 'INCOME', 'REVENUE',
-      0, sumLine('tech'), 'Client invoices — Technical operator supervision billing line', lineEntries('tech', 'Technicians fee'));
+    // REVENUE (From Billed Invoices — Classified by Service Stream in accordance with Statutory CoA)
+    const pendingSites = (useAppStore.getState() as any).pendingSites || [];
+    const resolveServiceCode = (party?: string, siteNameOrProject?: string, siteId?: string, description?: string): { code: string; name: string } => {
+      const clientLow = (party || '').toLowerCase();
+      const siteLow = (siteNameOrProject || '').toLowerCase();
+      const descLow = (description || '').toLowerCase();
+
+      const siteObj = sites.find(s => (siteId && s.id === siteId) || s.name.trim().toLowerCase() === siteLow);
+      if (siteObj?.projectType && siteObj.projectType.trim().toUpperCase() !== 'DEWATERING') {
+        const pt = siteObj.projectType.trim().toUpperCase();
+        if (pt.includes('WATERPROOF')) return { code: '4010', name: 'Revenue — Waterproofing Services' };
+        if (pt.includes('ALLIED') || pt.includes('TILING') || pt.includes('JETTING') || pt.includes('GROUND')) return { code: '4020', name: 'Revenue — Allied & Ground Improvement Services' };
+        if (pt.includes('SALES')) return { code: '4030', name: 'Revenue — Equipment Sales' };
+        if (pt.includes('MAINTENANCE')) return { code: '4040', name: 'Revenue — Equipment Maintenance & Overhaul' };
+      }
+
+      const q = pendingSites.find((ps: any) =>
+        (siteId && ps.siteId === siteId) ||
+        (ps.siteName?.trim().toLowerCase() === siteLow && ps.clientName?.trim().toLowerCase() === clientLow) ||
+        (ps.siteName?.trim().toLowerCase() === siteLow)
+      );
+      const qBuilt = (
+        q?.phase1?.whatIsBeingBuilt ||
+        q?.service ||
+        q?.serviceName ||
+        q?.data?.phase1?.whatIsBeingBuilt ||
+        ''
+      ).toLowerCase();
+      if (qBuilt.includes('waterproof')) return { code: '4010', name: 'Revenue — Waterproofing Services' };
+      if (qBuilt.includes('allied') || qBuilt.includes('tiling') || qBuilt.includes('jetting')) return { code: '4020', name: 'Revenue — Allied & Ground Improvement Services' };
+
+      if (clientLow.includes('first bank') || siteLow.includes('waterproof') || descLow.includes('waterproof')) {
+        return { code: '4010', name: 'Revenue — Waterproofing Services' };
+      }
+      if (descLow.includes('allied') || descLow.includes('ground improvement') || descLow.includes('jetting') || descLow.includes('tiling')) {
+        return { code: '4020', name: 'Revenue — Allied & Ground Improvement Services' };
+      }
+      if (descLow.includes('equipment sale') || descLow.includes('sale of equipment') || descLow.includes('pump sale')) {
+        return { code: '4030', name: 'Revenue — Equipment Sales' };
+      }
+      if (descLow.includes('maintenance') || descLow.includes('overhaul') || descLow.includes('repair service')) {
+        return { code: '4040', name: 'Revenue — Equipment Maintenance & Overhaul' };
+      }
+      if (descLow.includes('spare part') || descLow.includes('spares sale')) {
+        return { code: '4050', name: 'Revenue — Spare Parts Sales' };
+      }
+
+      return { code: '4000', name: 'Revenue — Dewatering Services' };
+    };
+
+    interface RevAccAccumulator {
+      code: string;
+      name: string;
+      credit: number;
+      entries: DrillEntry[];
+      count: number;
+    }
+
+    const revAccMap = new Map<string, RevAccAccumulator>();
+    const getRevAcc = (code: string, fallbackName: string) => {
+      if (!revAccMap.has(code)) {
+        const coaItem = activeCoaList.find(a => a.code === code);
+        revAccMap.set(code, {
+          code,
+          name: coaItem?.name || fallbackName,
+          credit: 0,
+          entries: [],
+          count: 0
+        });
+      }
+      return revAccMap.get(code)!;
+    };
+
+    // Ensure 4000 and 4010 are at least initialized if present in CoA
+    getRevAcc('4000', 'Revenue — Dewatering Services');
+    getRevAcc('4010', 'Revenue — Waterproofing Services');
+
+    lines.forEach(l => {
+      const { code, name } = resolveServiceCode(l.inv.client, l.inv.siteName, (l.inv as any).siteId, (l.inv as any).description);
+      const acc = getRevAcc(code, name);
+      acc.count += 1;
+
+      if (code === '4010') {
+        // Waterproofing project: itemize lines with waterproofing labels
+        if (l.installation > 0) {
+          acc.credit += l.installation;
+          acc.entries.push(invoiceToEntry(l.inv, l.installation, 'credit', 'Waterproofing Installation & Application'));
+        }
+        if (l.rental > 0) {
+          acc.credit += l.rental;
+          acc.entries.push(invoiceToEntry(l.inv, l.rental, 'credit', 'Waterproofing Materials & Equipment Billing'));
+        }
+        if (l.mob > 0) {
+          acc.credit += l.mob;
+          acc.entries.push(invoiceToEntry(l.inv, l.mob, 'credit', 'Mobilisation & Logistics'));
+        }
+        if (l.diesel > 0) {
+          acc.credit += l.diesel;
+          acc.entries.push(invoiceToEntry(l.inv, l.diesel, 'credit', 'Site Diesel Supply'));
+        }
+        if (l.tech > 0) {
+          acc.credit += l.tech;
+          acc.entries.push(invoiceToEntry(l.inv, l.tech, 'credit', 'Technician & Application Labor'));
+        }
+        const itemized = l.installation + l.rental + l.mob + l.diesel + l.tech;
+        const remainder = Math.max(0, (l.total - l.vat) - itemized);
+        if (remainder > 0) {
+          acc.credit += remainder;
+          acc.entries.push(invoiceToEntry(l.inv, remainder, 'credit', 'Waterproofing Contract Billing'));
+        }
+      } else if (code === '4000') {
+        // Dewatering project: dewatering installation stays strictly under 4000 Dewatering Services!
+        if (l.rental > 0) {
+          acc.credit += l.rental;
+          acc.entries.push(invoiceToEntry(l.inv, l.rental, 'credit', 'Dewatering Equipment Rental Fleet'));
+        }
+        if (l.installation > 0) {
+          acc.credit += l.installation;
+          acc.entries.push(invoiceToEntry(l.inv, l.installation, 'credit', 'Dewatering Installation & Piping Setup'));
+        }
+        if (l.mob > 0) {
+          acc.credit += l.mob;
+          acc.entries.push(invoiceToEntry(l.inv, l.mob, 'credit', 'Mobilisation & Demobilisation'));
+        }
+        if (l.diesel > 0) {
+          acc.credit += l.diesel;
+          acc.entries.push(invoiceToEntry(l.inv, l.diesel, 'credit', 'Site Diesel Supply'));
+        }
+        if (l.tech > 0) {
+          acc.credit += l.tech;
+          acc.entries.push(invoiceToEntry(l.inv, l.tech, 'credit', 'Field Operations & Technicians Fee'));
+        }
+        const itemized = l.rental + l.installation + l.mob + l.diesel + l.tech;
+        const remainder = Math.max(0, (l.total - l.vat) - itemized);
+        if (remainder > 0) {
+          acc.credit += remainder;
+          acc.entries.push(invoiceToEntry(l.inv, remainder, 'credit', 'General Dewatering Operations Billing'));
+        }
+      } else {
+        // Other services (Allied, Equipment Sales, Maintenance, Spare parts)
+        const netBilled = Math.max(0, l.total - l.vat);
+        acc.credit += netBilled;
+        acc.entries.push(invoiceToEntry(l.inv, netBilled, 'credit', name));
+      }
+    });
+
+    Array.from(revAccMap.values())
+      .filter(acc => acc.credit > 0 || acc.count > 0 || acc.code === '4000' || acc.code === '4010')
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .forEach(acc => {
+        addRow(
+          acc.code,
+          acc.name,
+          'INCOME',
+          'REVENUE',
+          0,
+          acc.credit,
+          `${acc.count} Client invoice(s) — ${acc.name}`,
+          acc.entries,
+          acc.count
+        );
+      });
 
     // EQUITY: balancing figure — B/F surplus when enabled, otherwise a suspense difference
     const currentDebits = rows.reduce((s, r) => s + r.netDebit, 0);
@@ -459,16 +612,16 @@ export function TrialBalanceReport({
 
     if (Math.abs(balancing) >= 0.01) {
       const label = includeBF
-        ? balancing > 0 
+        ? balancing > 0
           ? (hasPriorLedger ? 'Retained Earnings (Prior Year Surplus Brought Forward)' : 'Retained Earnings B/F (Estimated — Prior Ledger Missing)')
           : 'Retained Deficit / Prior Year Adjustment'
         : balancing > 0 ? 'Suspense — Unreconciled Credit Difference' : 'Suspense — Unreconciled Debit Difference';
       addRow('3100', label, 'EQUITY', 'EQUITY',
         balancing < 0 ? -balancing : 0, balancing > 0 ? balancing : 0,
         includeBF
-          ? (hasPriorLedger 
-              ? `Computed balancing figure${debtorsBF > 0 ? ` (includes ₦${(debtorsBF / 1e6).toFixed(2)}M Debtors B/F)` : ''}`
-              : 'Estimated figure from prior billing/collections only; prior year expense ledger is not in database')
+          ? (hasPriorLedger
+            ? `Computed balancing figure${debtorsBF > 0 ? ` (includes ₦${(debtorsBF / 1e6).toFixed(2)}M Debtors B/F)` : ''}`
+            : 'Estimated figure from prior billing/collections only; prior year expense ledger is not in database')
           : 'Computed balancing figure — Balance B/F excluded',
         [], undefined, plugNote);
     }
@@ -495,8 +648,8 @@ export function TrialBalanceReport({
       if (searchTerm) {
         const q = searchTerm.toLowerCase();
         if (
-          !r.code.includes(q) && 
-          !r.name.toLowerCase().includes(q) && 
+          !r.code.includes(q) &&
+          !r.name.toLowerCase().includes(q) &&
           !r.type.toLowerCase().includes(q) &&
           !r.auditSource.toLowerCase().includes(q)
         ) {
@@ -555,227 +708,208 @@ export function TrialBalanceReport({
   };
 
   return (
-    <div className="space-y-6">
-      {/* ── Formal Container ── */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm shadow-xs p-6 sm:p-8">
-        
-        {/* Header */}
-        <div className="border-b border-slate-300 dark:border-slate-700 pb-5 mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs uppercase tracking-widest font-mono text-slate-700 dark:text-slate-300 font-bold">
-                  {companyInfo.name}
-                </span>
-                {companyInfo.regNumber && (
-                  <span className="text-[10px] font-mono text-slate-400 font-medium">
-                    · {companyInfo.regNumber}
-                  </span>
-                )}
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight mt-1">
-                Trial Balance
-              </h2>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 font-mono mt-1">
-                <span>
-                  Period: {filterYears.length > 0 && !filterYears.includes('All') ? filterYears.join(', ') : 'All Time'} 
-                  {filterMonths.length > 0 && !filterMonths.includes('All') ? ` · Months: ${filterMonths.join(', ')}` : ''} 
-                  {filterClient && filterClient !== 'All' ? ` · Client: ${filterClient}` : ''}
-                </span>
-                {companyInfo.address && <span>· {companyInfo.address}</span>}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportTrialBalance}
-                className="h-8 text-xs font-semibold border-slate-300 dark:border-slate-700 gap-1.5 rounded-sm"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export Trial Balance</span>
-              </Button>
-            </div>
+    <div className="space-y-2 animate-in fade-in duration-150">
+      {/* ── Top Mode & Action Bar (Minimalist Single-Row Strip) ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm p-1.5 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 shadow-2xs">
+        {/* Left: View Identifier & Account Classification Pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View Pill */}
+          <div className="inline-flex rounded-sm bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 h-7 items-center">
+            <span className="px-2 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs flex items-center gap-1.5">
+              <Scale className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+              <span>Trial Balance</span>
+            </span>
           </div>
-        </div>
 
-        {/* ── Equilibrium Status Strip ── */}
-        <div className="mb-6 p-3.5 sm:p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                "p-2 rounded shrink-0",
-                isBalanced 
-                  ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300"
-                  : "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300"
-              )}>
-                {isBalanced ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    {isBalanced ? 'Trial Balance is in Perfect Equilibrium' : 'Trial Balance Variance Detected'}
-                  </span>
-                  <Badge variant="outline" className={cn(
-                    "text-[10px] font-mono",
-                    isBalanced 
-                      ? "border-emerald-300 text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40"
-                      : "border-amber-300 text-amber-800 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40"
-                  )}>
-                    {isBalanced ? 'Debits = Credits' : `Variance: ₦${difference.toLocaleString()}`}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500 font-mono mt-0.5">
-                  Total Debits of ₦{fmt(totalDebits)} reconcile against Total Credits. Click any account to see the vouchers, invoices and payments behind it.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-6 self-end md:self-auto border-t md:border-t-0 pt-2 md:pt-0 border-slate-200 dark:border-slate-700">
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Debits</span>
-                <span className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">
-                  ₦{fmt(totalDebits)}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-mono text-slate-400 block">Total Credits</span>
-                <span className="text-sm font-bold font-mono text-slate-900 dark:text-slate-100">
-                  ₦{fmt(totalCredits)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Filters & Controls Bar ── */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-sm">
-          {/* Account Classification Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 mr-1 font-mono">Class:</span>
-            {['ALL', 'ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'].map(cls => (
+          {/* Classification Filter Pills */}
+          <div className="inline-flex rounded-sm bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 h-7 items-center">
+            {(['ALL', 'ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const).map((cls) => (
               <button
                 key={cls}
                 type="button"
                 onClick={() => setSelectedType(cls)}
                 className={cn(
-                  "px-2.5 py-1 text-xs font-semibold rounded-xs transition-colors capitalize",
+                  'px-1.5 h-5 text-[10px] font-bold uppercase tracking-wider rounded-xs transition-colors',
                   selectedType === cls
-                    ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 )}
               >
-                {cls === 'ALL' ? 'All Accounts' : cls.toLowerCase()}
+                {cls === 'ALL' ? 'All' : cls.slice(0, 3)}
               </button>
             ))}
           </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            {/* Balance B/F toggle */}
-            <label
-              htmlFor="tb-include-bf"
-              className={cn(
-                "flex items-center gap-2 text-xs font-semibold cursor-pointer select-none px-2.5 py-1 rounded-sm border",
-                includeBF
-                  ? "border-slate-900 dark:border-slate-100 text-slate-900 dark:text-slate-100"
-                  : "border-slate-300 dark:border-slate-700 text-slate-500"
-              )}
-              title={
-                hasPriorLedger
-                  ? (includeBF ? 'Prior-year balances brought forward included' : 'Click to include prior-year balances brought forward')
-                  : 'Prior-year ledger vouchers are not yet in database. Kept off to maintain accurate in-period records.'
-              }
-            >
-              <input
-                id="tb-include-bf"
-                type="checkbox"
-                checked={includeBF}
-                onChange={e => setIncludeBF(e.target.checked)}
-                className="accent-slate-900"
-              />
-              <History className="w-3.5 h-3.5" />
-              Include Balance B/F
-            </label>
-
-            {/* Search Input */}
-            <div className="relative w-full md:w-72">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Search code, title, or audit source..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="h-8 pl-8 text-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 rounded-sm"
-              />
-            </div>
-          </div>
         </div>
 
-        {/* ── Trial Balance Table ── */}
+        {/* Right Toolbar Controls (Search, Balance B/F, Equilibrium Pill, Excel) */}
+        <div className="flex flex-wrap items-center gap-1.5 whitespace-nowrap">
+          {/* Compact Search Input */}
+          <div className="relative">
+            <Search className="h-3 w-3 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search accounts..."
+              className="h-7 w-28 xl:w-40 pl-6 pr-5 text-[11px] rounded-sm border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Balance B/F Toggle */}
+          <button
+            type="button"
+            onClick={() => setIncludeBF(!includeBF)}
+            title={
+              hasPriorLedger
+                ? (includeBF ? 'Prior-year balances brought forward included' : 'Click to include prior-year balances brought forward')
+                : 'Prior-year ledger vouchers are not yet in database.'
+            }
+            className={cn(
+              'h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border transition-colors',
+              includeBF
+                ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-slate-900 dark:border-slate-100 shadow-2xs'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+            )}
+          >
+            <History className="h-3 w-3 text-slate-400" />
+            <span>{includeBF ? 'B/F Included' : 'B/F Excluded'}</span>
+          </button>
+
+          {/* Equilibrium Status Pill */}
+          <div
+            className={cn(
+              'h-7 px-2 inline-flex items-center gap-1.5 rounded-sm border text-[11px] font-semibold transition-colors',
+              isBalanced
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+            )}
+            title={`Debits (₦${fmt(totalDebits)}) vs Credits (₦${fmt(totalCredits)})`}
+          >
+            {isBalanced ? (
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
+            ) : (
+              <AlertCircle className="h-3 w-3 shrink-0" />
+            )}
+            <span>{isBalanced ? 'Balanced' : `Variance: ₦${difference.toLocaleString()}`}</span>
+          </div>
+
+          {/* Export Excel Button */}
+          <button
+            type="button"
+            onClick={handleExportTrialBalance}
+            title="Export Trial Balance to Excel (.xlsx)"
+            className="h-7 px-2 inline-flex items-center gap-1 text-[11px] font-semibold rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Excel</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Metadata Strip (Clean Excel Style) ── */}
+      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-sm px-3 py-1.5 flex flex-wrap items-center justify-between text-[11px] font-mono text-slate-600 dark:text-slate-300 gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+          <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+            {companyInfo.name}
+          </span>
+          {companyInfo.regNumber && <span>· {companyInfo.regNumber}</span>}
+          <span>· Reporting: Years [{filterYears.join(', ')}] | Months [{filterMonths.join(', ')}]</span>
+          {filterClient && filterClient !== 'All' && <span>· Client: {filterClient}</span>}
+        </div>
+        <div className="flex items-center gap-4">
+          <span>Currency: NGN (₦)</span>
+          <span className="font-bold text-slate-900 dark:text-white">
+            Debits: ₦{fmt(totalDebits)}
+          </span>
+          <span className="font-bold text-slate-900 dark:text-white">
+            Credits: ₦{fmt(totalCredits)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Compact Minimalist Trial Balance Table ── */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-sm shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs min-w-[900px]">
+          <table className="w-full text-left border-collapse text-[12px] min-w-[850px]">
             <thead>
-              <tr className="border-b-2 border-slate-900 dark:border-slate-100 font-bold uppercase tracking-wider text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800">
-                <th className="py-2.5 px-3 w-16 font-mono">Code</th>
-                <th className="py-2.5 px-3 w-56">Account Title & Classification</th>
-                <th className="py-2.5 px-3">Audit Source & Ledger Justification</th>
-                <th className="py-2.5 px-3 w-24 text-center">Type</th>
-                <th className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 w-40">Debit Balance (₦)</th>
-                <th className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100 w-40">Credit Balance (₦)</th>
+              <tr className="bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[10px] uppercase font-bold tracking-wider text-slate-600 dark:text-slate-300">
+                <th className="py-1.5 px-3 w-16 font-mono">Code</th>
+                <th className="py-1.5 px-3 w-64">Account Title</th>
+                <th className="py-1.5 px-3">Audit Source &amp; Ledger Justification</th>
+                <th className="py-1.5 px-2 w-20 text-center">Type</th>
+                <th className="py-1.5 px-3 text-right font-mono font-bold w-36 text-slate-900 dark:text-slate-100">
+                  Debit (₦)
+                </th>
+                <th className="py-1.5 px-4 text-right font-mono font-bold w-36 text-slate-900 dark:text-slate-100">
+                  Credit (₦)
+                </th>
               </tr>
             </thead>
-
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
               {displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 italic">
-                    No active accounts found for the selected classification.
+                  <td colSpan={6} className="py-8 text-center text-slate-400 italic text-[11px]">
+                    No active accounts found matching the selected filter criteria.
                   </td>
                 </tr>
               ) : (
-                displayRows.map(row => (
-                  <tr 
+                displayRows.map((row, idx) => (
+                  <tr
                     key={row.code}
                     id={`tb-row-${row.code}`}
                     onClick={() => setDrillRow(row)}
-                    title="Click to view source vouchers"
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
+                    title="Click to view underlying source vouchers & audit rationale"
+                    className={cn(
+                      'hover:bg-blue-50/40 dark:hover:bg-slate-800/50 transition-colors cursor-pointer',
+                      idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-900/40'
+                    )}
                   >
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
+                    <td className="py-1.5 px-3 font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300">
                       {row.code}
                     </td>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="py-1.5 px-3 font-medium text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 underline decoration-dotted underline-offset-2">
                       {row.name}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                    <td className="py-1.5 px-3 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-slate-700 dark:text-slate-300">{row.auditSource}</span>
+                        <span className="text-slate-700 dark:text-slate-300 truncate max-w-md">
+                          {row.auditSource}
+                        </span>
                         {row.entries.length > 0 && (
-                          <Badge variant="outline" className="text-[9px] py-0 px-1 border-slate-300 dark:border-slate-700 font-mono text-slate-500 underline-offset-2 hover:underline">
+                          <span className="inline-block px-1 py-0.2 rounded-xs text-[9px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
                             {row.voucherCount ?? row.entries.length} records
-                          </Badge>
+                          </span>
                         )}
-                        {row.notes && <AlertCircle className="w-3 h-3 text-amber-500" />}
+                        {row.notes && <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-center">
-                      <span className={cn(
-                        "inline-block px-2 py-0.5 rounded-xs text-[10px] font-mono uppercase font-bold",
-                        row.type === 'ASSET' && "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
-                        row.type === 'LIABILITY' && "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300",
-                        row.type === 'EQUITY' && "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
-                        row.type === 'INCOME' && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300",
-                        row.type === 'EXPENSE' && "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-                      )}>
+                    <td className="py-1.5 px-2 text-center">
+                      <span
+                        className={cn(
+                          'inline-block px-1.5 py-0.2 rounded-xs text-[9px] font-mono uppercase font-bold',
+                          row.type === 'ASSET' && 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+                          row.type === 'LIABILITY' && 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+                          row.type === 'EQUITY' && 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+                          row.type === 'INCOME' && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+                          row.type === 'EXPENSE' && 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        )}
+                      >
                         {row.type}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-right font-mono text-slate-900 dark:text-slate-100 font-semibold tabular-nums hover:underline">
+                    <td className="py-1.5 px-3 text-right font-mono tabular-nums text-slate-900 dark:text-slate-100 font-medium">
                       {row.netDebit > 0 ? `₦${fmt(row.netDebit)}` : '—'}
                     </td>
-                    <td className="py-2.5 px-4 text-right font-mono text-slate-900 dark:text-slate-100 font-semibold tabular-nums hover:underline">
+                    <td className="py-1.5 px-4 text-right font-mono tabular-nums text-slate-900 dark:text-slate-100 font-medium">
                       {row.netCredit > 0 ? `₦${fmt(row.netCredit)}` : '—'}
                     </td>
                   </tr>
@@ -783,14 +917,14 @@ export function TrialBalanceReport({
               )}
 
               {/* Total Double-Underline Balancing Row */}
-              <tr className="border-t-2 border-b-4 border-double border-slate-900 dark:border-slate-100 font-black bg-slate-100 dark:bg-slate-800 text-xs">
-                <td colSpan={4} className="py-3 px-3 uppercase tracking-wider text-slate-900 dark:text-slate-100">
+              <tr className="border-t-2 border-b-4 border-double border-slate-900 dark:border-slate-100 font-black bg-slate-100 dark:bg-slate-800 text-[12px]">
+                <td colSpan={4} className="py-2.5 px-3 uppercase tracking-wider text-slate-900 dark:text-slate-100">
                   TRIAL BALANCE TOTALS
                 </td>
-                <td className="py-3 px-4 text-right font-mono text-sm text-slate-900 dark:text-slate-100">
+                <td className="py-2.5 px-3 text-right font-mono text-sm text-slate-900 dark:text-slate-100 tabular-nums">
                   ₦{fmt(totalDebits)}
                 </td>
-                <td className="py-3 px-4 text-right font-mono text-sm text-slate-900 dark:text-slate-100">
+                <td className="py-2.5 px-4 text-right font-mono text-sm text-slate-900 dark:text-slate-100 tabular-nums">
                   ₦{fmt(totalCredits)}
                 </td>
               </tr>
@@ -799,11 +933,12 @@ export function TrialBalanceReport({
         </div>
 
         {/* Footnote */}
-        <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-400 font-mono flex flex-col sm:flex-row justify-between gap-2">
+        <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 font-mono flex flex-wrap items-center justify-between gap-2">
           <span>* Standard 4-digit chart of accounts built from General Ledger vouchers, billed invoices and client payments. Balance B/F {includeBF ? 'included' : 'excluded'}.</span>
           <span>{companyInfo.name}</span>
         </div>
       </div>
+
 
       {drillRow && (
         <TransactionDrilldownDialog

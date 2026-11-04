@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/src
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2, Truck } from 'lucide-react';
+import { Plus, Trash2, Save, Download, Upload, BookOpen, Settings2, Briefcase, X, ChevronRight, Edit2, Truck, UserCheck, Users } from 'lucide-react';
+import { useAppData } from '@/src/contexts/AppDataContext';
 import { useAppStore, Employee, AttendanceRecord, Site, Invoice, PendingInvoice, LeaveRecord, LedgerEntry, CompanyExpense, CommLog, DEFAULT_LEAVE_TYPES } from '@/src/store/appStore';
 import { NairaSign } from '@/src/components/ui/naira-sign';
 import { computeWorkDays, computeWorkDaysInRange, MONTH_INDEX } from '@/src/lib/workdays';
@@ -20,6 +21,8 @@ import { ChartAccount, AccountType, AccountCategory, DCEL_CHART_OF_ACCOUNTS, DEF
 import * as XLSX from 'xlsx';
 
 export function Variables() {
+  const { users } = useAppData();
+  const activeUsers = useMemo(() => (users || []).filter(u => u.isActive !== false), [users]);
   const [newDate, setNewDate] = useState('');
   const [newName, setNewName] = useState('');
 
@@ -226,9 +229,9 @@ export function Variables() {
 
   // Top-level section switch: 'system' | 'ledger' | 'services' | 'operations'
   const [varSection, setVarSection] = useState<'system' | 'ledger' | 'services' | 'operations'>('system');
-  
-  const { 
-    vehicleDocumentTypes, addVehicleDocumentType, deleteVehicleDocumentType 
+
+  const {
+    vehicleDocumentTypes, addVehicleDocumentType, deleteVehicleDocumentType
   } = useOperations();
   const [newVehicleDocType, setNewVehicleDocType] = useState('');
 
@@ -244,7 +247,7 @@ export function Variables() {
     // Filter out "Dewatering" from the variables page as it's built-in and constant
     return getServiceTemplates().filter(s => s.serviceName.toLowerCase() !== 'dewatering');
   }, [departmentTasksList]);
-  
+
   const [selectedService, setSelectedService] = useState('');
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceTaskTitle, setNewServiceTaskTitle] = useState('');
@@ -440,7 +443,7 @@ export function Variables() {
     const { type, id, oldValue, date } = editingVar;
     const newValue = renameInput.trim();
     const newDate = renameDateInput;
-    
+
     if (oldValue === newValue && date === newDate) {
       setEditingVar(null);
       return;
@@ -458,14 +461,14 @@ export function Variables() {
         if (propagate) {
           const empIds = state.employees.filter(e => e.department === oldValue).map(e => e.id);
           if (empIds.length > 0) state.bulkUpdateEmployees(empIds, { department: newValue });
-          
+
           state.employees.forEach(e => {
             if (e.secondaryDepartments?.includes(oldValue)) {
               const newSec = e.secondaryDepartments.map(d => d === oldValue ? newValue : d);
               state.updateEmployee(e.id, { secondaryDepartments: newSec });
             }
           });
-          
+
           const taskMatch = (state.departmentTasksList || []).find(t => t.department === oldValue);
           if (taskMatch) state.updateDepartmentTasks({ ...taskMatch, department: newValue });
         }
@@ -474,7 +477,7 @@ export function Variables() {
         if (propagate) {
           const empIds = state.employees.filter(e => e.position === oldValue).map(e => e.id);
           if (empIds.length > 0) state.bulkUpdateEmployees(empIds, { position: newValue });
-          
+
           // Attendance records propagation (can be thousands, usually done via DB)
           // But store logic call db.updateX for each usually. 
           // For simplicity we try store functions if they exist.
@@ -494,7 +497,7 @@ export function Variables() {
       } else if (type === 'leaveType') {
         state.setLeaveTypes(useAppStore.getState().leaveTypes.map(lt => lt.name === oldValue ? { ...lt, name: newValue } : lt));
         if (propagate) {
-           (state.leaves || []).filter(l => l.leaveType === oldValue).forEach(l => state.updateLeave?.(l.id, { leaveType: newValue }));
+          (state.leaves || []).filter(l => l.leaveType === oldValue).forEach(l => state.updateLeave?.(l.id, { leaveType: newValue }));
         }
       } else if (type === 'ledgerCategory') {
         state.updateLedgerCategory(id!, { name: newValue });
@@ -628,11 +631,11 @@ export function Variables() {
         i === self.findIndex(x => x.title === t.title && x.assignee === t.assignee)
       )
     }));
-    
+
     // Check if anything was actually removed
     const totalOriginal = departmentTasksList.reduce((acc, d) => acc + d.onboardingTasks.length + d.offboardingTasks.length, 0);
     const totalCleaned = cleaned.reduce((acc, d) => acc + d.onboardingTasks.length + d.offboardingTasks.length, 0);
-    
+
     if (totalOriginal === totalCleaned) {
       toast.info("No duplicates found to clean.");
       return;
@@ -649,7 +652,7 @@ export function Variables() {
     const fields = [...(template.phases[phaseKey]?.fields || [])];
     const idx = fields.findIndex(f => f.id === id);
     if (idx === -1) return;
-    
+
     if (direction === 'up' && idx > 0) {
       [fields[idx - 1], fields[idx]] = [fields[idx], fields[idx - 1]];
     } else if (direction === 'down' && idx < fields.length - 1) {
@@ -657,7 +660,7 @@ export function Variables() {
     } else {
       return;
     }
-    
+
     updateOnboardingTemplate({
       ...template,
       phases: { ...template.phases, [phaseKey]: { ...template.phases[phaseKey], fields } }
@@ -758,7 +761,9 @@ export function Variables() {
       XLSX.utils.book_append_sheet(wb, srvSheet, 'Service_Templates');
 
       // Ledger Categories
-      const lCatData = ledgerCategories.map(c => ({ Category: c.name }));
+      const lCatData = ledgerCategories.map(c => ({ Category: c.name, CoA_Code: resolveCategoryAccountCode(c.name, activeCategoryCoaMap) || '' }));
+      const coaSheetData = activeChartOfAccounts.map(a => ({ Code: a.code, Name: a.name, Type: a.type, Category: a.category }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(coaSheetData, { header: ['Code', 'Name', 'Type', 'Category'] }), 'Chart_Of_Accounts');
       const lCatSheet = lCatData.length > 0 ? XLSX.utils.json_to_sheet(lCatData, { header: ['Category'] }) : XLSX.utils.aoa_to_sheet([['Category']]);
       XLSX.utils.book_append_sheet(wb, lCatSheet, 'Ledger_Categories');
 
@@ -847,7 +852,7 @@ export function Variables() {
 
     showConfirm(
       'Ready to import variables. Would you like to OVERWRITE existing data? (No will APPEND new entries instead)',
-      { 
+      {
         title: 'Import Variables',
         confirmLabel: 'Overwrite All',
         cancelLabel: 'Append New'
@@ -1024,7 +1029,7 @@ export function Variables() {
                 if (row.Key.includes('Rent Relief Rate')) newPayeVar.rentReliefRate = val / 100;
               }
             });
-            
+
             if (wb.SheetNames.includes('PAYE_Tax_Brackets')) {
               const tbData = XLSX.utils.sheet_to_json<any>(wb.Sheets['PAYE_Tax_Brackets']);
               if (tbData.length > 0) {
@@ -1121,7 +1126,7 @@ export function Variables() {
               if (!exists) list.onboardingTasks.push({ title: String(row.TaskTitle), assignee: String(row.Assignee) });
             });
           }
-          
+
           if (wb.SheetNames.includes('Task_Templates') || wb.SheetNames.includes('Service_Templates')) {
             await setDepartmentTasksList(newTaskLists);
           }
@@ -1153,9 +1158,9 @@ export function Variables() {
         </label>
       )}
       {priv.canExport && (
-        <Button 
-          variant="outline" 
-          onClick={handleExportVariables} 
+        <Button
+          variant="outline"
+          onClick={handleExportVariables}
           className="gap-2 h-9 px-3 border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold text-[11px] uppercase tracking-tight"
         >
           <Upload className="h-3.5 w-3.5 text-emerald-500" />
@@ -1179,44 +1184,40 @@ export function Variables() {
       <div className="flex gap-1 bg-slate-100 rounded-md p-1 self-start">
         <button
           onClick={() => setVarSection('system')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-            varSection === 'system'
-              ? 'bg-white text-slate-900 '
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${varSection === 'system'
+            ? 'bg-white text-slate-900 '
+            : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Settings2 className="h-4 w-4" />
           System Variables
         </button>
         <button
           onClick={() => setVarSection('ledger')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-            varSection === 'ledger'
-              ? 'bg-white text-slate-900 '
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${varSection === 'ledger'
+            ? 'bg-white text-slate-900 '
+            : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           <BookOpen className="h-4 w-4" />
           Ledger Variables
         </button>
         <button
           onClick={() => setVarSection('services')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-            varSection === 'services'
-              ? 'bg-white text-slate-900 '
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${varSection === 'services'
+            ? 'bg-white text-slate-900 '
+            : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Briefcase className="h-4 w-4" />
           Project Services
         </button>
         <button
           onClick={() => setVarSection('operations')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${
-            varSection === 'operations'
-              ? 'bg-white text-slate-900 '
-              : 'text-slate-500 hover:text-slate-700'
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all ${varSection === 'operations'
+            ? 'bg-white text-slate-900 '
+            : 'text-slate-500 hover:text-slate-700'
+            }`}
         >
           <Truck className="h-4 w-4" />
           Operations
@@ -1232,18 +1233,18 @@ export function Variables() {
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2">
-                <Input 
-                  value={newVehicleDocType} 
-                  onChange={e => setNewVehicleDocType(e.target.value)} 
-                  placeholder="New Document Type" 
+                <Input
+                  value={newVehicleDocType}
+                  onChange={e => setNewVehicleDocType(e.target.value)}
+                  placeholder="New Document Type"
                 />
-                <Button 
-                  disabled={!priv.canEdit} 
-                  onClick={() => { 
-                    if(newVehicleDocType) { 
-                      addVehicleDocumentType(newVehicleDocType); 
-                      setNewVehicleDocType(''); 
-                    } 
+                <Button
+                  disabled={!priv.canEdit}
+                  onClick={() => {
+                    if (newVehicleDocType) {
+                      addVehicleDocumentType(newVehicleDocType);
+                      setNewVehicleDocType('');
+                    }
                   }}
                 >
                   Add
@@ -1251,32 +1252,32 @@ export function Variables() {
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
-                <Table>
-                  <TableBody>
-                    {vehicleDocumentTypes.map(type => (
-                      <TableRow key={type.id}>
-                        <TableCell className="font-medium text-slate-700">{type.name}</TableCell>
-                        <TableCell className="w-[50px]">
-                          {priv.canEdit && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={async () => { 
-                                const conf = await showConfirm(`Delete document type "${type.name}"?`, { variant: 'danger' }); 
-                                if (conf) deleteVehicleDocumentType(type.id); 
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-rose-500" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {vehicleDocumentTypes.length === 0 && (
-                      <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No document types defined.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                  <Table>
+                    <TableBody>
+                      {vehicleDocumentTypes.map(type => (
+                        <TableRow key={type.id}>
+                          <TableCell className="font-medium text-slate-700">{type.name}</TableCell>
+                          <TableCell className="w-[50px]">
+                            {priv.canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async () => {
+                                  const conf = await showConfirm(`Delete document type "${type.name}"?`, { variant: 'danger' });
+                                  if (conf) deleteVehicleDocumentType(type.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-rose-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {vehicleDocumentTypes.length === 0 && (
+                        <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No document types defined.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </CardContent>
@@ -1292,21 +1293,21 @@ export function Variables() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4 space-y-6">
-              
+
               {/* Add New Service */}
               {priv.canEdit && (
                 <div className="flex gap-2">
-                  <Input 
-                    placeholder="New Service Name (e.g. Dewatering)" 
-                    value={newServiceName} 
-                    onChange={e => setNewServiceName(e.target.value)} 
+                  <Input
+                    placeholder="New Service Name (e.g. Dewatering)"
+                    value={newServiceName}
+                    onChange={e => setNewServiceName(e.target.value)}
                     className="flex-1 max-w-sm"
                   />
-                  <Button 
+                  <Button
                     variant="outline"
                     onClick={() => {
                       if (!newServiceName) return;
-                      
+
                       // Block adding "Dewatering" (case-insensitive)
                       if (newServiceName.trim().toLowerCase() === 'dewatering') {
                         toast.error('The Dewatering service is a built-in system preset and cannot be modified here.');
@@ -1336,8 +1337,8 @@ export function Variables() {
                     key={s.serviceName}
                     onClick={() => setSelectedService(s.serviceName === selectedService ? '' : s.serviceName)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
-                      ${selectedService === s.serviceName 
-                        ? 'bg-cyan-600 text-white border-cyan-700 ' 
+                      ${selectedService === s.serviceName
+                        ? 'bg-cyan-600 text-white border-cyan-700 '
                         : 'bg-white text-slate-700 hover:bg-slate-50'}`}
                   >
                     {s.serviceName}
@@ -1389,15 +1390,15 @@ export function Variables() {
                   <div className="p-4 space-y-4">
                     {priv.canEdit && (
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-md border border-cyan-100">
-                        <Input 
-                          placeholder="Task Title (e.g. Site Visitation)" 
-                          value={newServiceTaskTitle} 
-                          onChange={(e) => setNewServiceTaskTitle(e.target.value)} 
-                          className="md:col-span-6 h-9" 
+                        <Input
+                          placeholder="Task Title (e.g. Site Visitation)"
+                          value={newServiceTaskTitle}
+                          onChange={(e) => setNewServiceTaskTitle(e.target.value)}
+                          className="md:col-span-6 h-9"
                         />
-                        <select 
-                          className="md:col-span-4 h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" 
-                          value={newServiceTaskAssignee} 
+                        <select
+                          className="md:col-span-4 h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm"
+                          value={newServiceTaskAssignee}
                           onChange={(e) => setNewServiceTaskAssignee(e.target.value)}
                         >
                           <option value="">-- Default Assignee Team --</option>
@@ -1407,8 +1408,8 @@ export function Variables() {
                           <option value="Site Manager">Site Manager</option>
                           {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                         </select>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           onClick={() => {
                             if (!newServiceTaskTitle) return;
                             const srv = serviceTemplates.find(s => s.serviceName === selectedService);
@@ -1416,8 +1417,8 @@ export function Variables() {
                               updateServiceTemplate({ ...srv, subtasks: [...srv.subtasks, { title: newServiceTaskTitle, assignee: newServiceTaskAssignee }] });
                               setNewServiceTaskTitle('');
                             }
-                          }} 
-                          className="md:col-span-2 gap-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50 h-9" 
+                          }}
+                          className="md:col-span-2 gap-1 border-cyan-300 text-cyan-700 hover:bg-cyan-50 h-9"
                           disabled={!newServiceTaskTitle}
                         >
                           <Plus className="h-4 w-4" /> Add Task
@@ -1436,10 +1437,10 @@ export function Variables() {
                             {t.assignee && <p className="text-[11px] text-slate-500 mt-0.5">Assigned to: {t.assignee}</p>}
                           </div>
                           {priv.canEdit && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 shrink-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                               onClick={() => {
                                 const srv = serviceTemplates.find(s => s.serviceName === selectedService);
                                 if (srv) updateServiceTemplate({ ...srv, subtasks: srv.subtasks.filter((_, i) => i !== idx) });
@@ -1475,11 +1476,10 @@ export function Variables() {
                         <button
                           key={phase}
                           onClick={() => setActiveBuilderPhase(phase as any)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                            activeBuilderPhase === phase 
-                              ? 'bg-blue-600 text-white border-blue-700' 
-                              : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                          }`}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${activeBuilderPhase === phase
+                            ? 'bg-blue-600 text-white border-blue-700'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                            }`}
                         >
                           Phase {phase}
                         </button>
@@ -1489,15 +1489,15 @@ export function Variables() {
                     {/* New Field Form */}
                     {priv.canEdit && (
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-white rounded-md border border-slate-200 items-center">
-                        <Input 
-                          placeholder="Field Label (e.g. Dimensions)" 
-                          value={newFieldLabel} 
-                          onChange={(e) => setNewFieldLabel(e.target.value)} 
-                          className="md:col-span-3 h-9" 
+                        <Input
+                          placeholder="Field Label (e.g. Dimensions)"
+                          value={newFieldLabel}
+                          onChange={(e) => setNewFieldLabel(e.target.value)}
+                          className="md:col-span-3 h-9"
                         />
-                        <select 
-                          className="md:col-span-2 h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" 
-                          value={newFieldType} 
+                        <select
+                          className="md:col-span-2 h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm"
+                          value={newFieldType}
                           onChange={(e) => setNewFieldType(e.target.value as any)}
                         >
                           <option value="text">Text Input</option>
@@ -1507,23 +1507,23 @@ export function Variables() {
                           <option value="select">Dropdown</option>
                         </select>
                         {newFieldType === 'select' && (
-                          <Input 
-                            placeholder="Options (comma separated)" 
-                            value={newFieldOptions} 
-                            onChange={(e) => setNewFieldOptions(e.target.value)} 
-                            className="md:col-span-3 h-9" 
+                          <Input
+                            placeholder="Options (comma separated)"
+                            value={newFieldOptions}
+                            onChange={(e) => setNewFieldOptions(e.target.value)}
+                            className="md:col-span-3 h-9"
                           />
                         )}
                         <label className="md:col-span-2 flex items-center gap-2 text-sm text-slate-700 pl-2">
-                          <input 
-                            type="checkbox" 
-                            checked={newFieldRequired} 
-                            onChange={e => setNewFieldRequired(e.target.checked)} 
+                          <input
+                            type="checkbox"
+                            checked={newFieldRequired}
+                            onChange={e => setNewFieldRequired(e.target.checked)}
                             className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                           /> Required
                         </label>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           onClick={() => {
                             if (!newFieldLabel) return;
                             const phaseKey = `phase${activeBuilderPhase}` as 'phase1' | 'phase2' | 'phase3' | 'phase4' | 'phase5';
@@ -1536,7 +1536,7 @@ export function Variables() {
                             };
                             const currentTemplate = onboardingTemplates.find(t => t.serviceName === selectedService) || { serviceName: selectedService, phases: emptyPhases };
                             const currentPhase = currentTemplate.phases[phaseKey] || { title: `Phase ${activeBuilderPhase}`, fields: [] };
-                            
+
                             const fieldData = {
                               id: editingFieldId || Math.random().toString(36).slice(2),
                               label: newFieldLabel,
@@ -1568,7 +1568,7 @@ export function Variables() {
                             setNewFieldRequired(false);
                             setNewFieldType('text');
                             setEditingFieldId(null);
-                          }} 
+                          }}
                           className={`gap-1 border-blue-300 text-blue-700 hover:bg-blue-50 rounded-sm h-9 ${newFieldType === 'select' ? 'md:col-span-2' : 'md:col-span-4'}`}
                           disabled={!newFieldLabel || (newFieldType === 'select' && !newFieldOptions)}
                         >
@@ -1614,15 +1614,15 @@ export function Variables() {
                           if (isEditing) {
                             return (
                               <div key={f.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 p-3 bg-blue-50/40 rounded-sm border border-blue-300 items-center">
-                                <Input 
-                                  placeholder="Label" 
-                                  value={newFieldLabel} 
-                                  onChange={(e) => setNewFieldLabel(e.target.value)} 
-                                  className="md:col-span-3 h-8 text-xs" 
+                                <Input
+                                  placeholder="Label"
+                                  value={newFieldLabel}
+                                  onChange={(e) => setNewFieldLabel(e.target.value)}
+                                  className="md:col-span-3 h-8 text-xs"
                                 />
-                                <select 
-                                  className="md:col-span-2 h-8 rounded-md border border-slate-200 bg-white px-2 text-xs" 
-                                  value={newFieldType} 
+                                <select
+                                  className="md:col-span-2 h-8 rounded-md border border-slate-200 bg-white px-2 text-xs"
+                                  value={newFieldType}
                                   onChange={(e) => setNewFieldType(e.target.value as any)}
                                 >
                                   <option value="text">Text</option>
@@ -1632,23 +1632,23 @@ export function Variables() {
                                   <option value="select">Dropdown</option>
                                 </select>
                                 {newFieldType === 'select' && (
-                                  <Input 
-                                    placeholder="Options" 
-                                    value={newFieldOptions} 
-                                    onChange={(e) => setNewFieldOptions(e.target.value)} 
-                                    className="md:col-span-3 h-8 text-xs" 
+                                  <Input
+                                    placeholder="Options"
+                                    value={newFieldOptions}
+                                    onChange={(e) => setNewFieldOptions(e.target.value)}
+                                    className="md:col-span-3 h-8 text-xs"
                                   />
                                 )}
                                 <label className="md:col-span-1 flex items-center gap-1 text-[10px] text-slate-700 pl-1">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={newFieldRequired} 
-                                    onChange={e => setNewFieldRequired(e.target.checked)} 
+                                  <input
+                                    type="checkbox"
+                                    checked={newFieldRequired}
+                                    onChange={e => setNewFieldRequired(e.target.checked)}
                                     className="h-3 w-3 rounded border-slate-300 text-blue-600"
                                   /> Req
                                 </label>
                                 <div className="md:col-span-3 flex items-center gap-1 justify-end">
-                                  <Button 
+                                  <Button
                                     size="sm"
                                     onClick={() => {
                                       if (!newFieldLabel) return;
@@ -1656,7 +1656,7 @@ export function Variables() {
                                       const template = onboardingTemplates.find(t => t.serviceName === selectedService);
                                       if (!template) return;
                                       const currentPhase = template.phases[phaseKey];
-                                      
+
                                       const fieldData = {
                                         id: f.id,
                                         label: newFieldLabel,
@@ -1682,12 +1682,12 @@ export function Variables() {
                                       setNewFieldPlaceholder('');
                                       setNewFieldRequired(false);
                                       setNewFieldType('text');
-                                    }} 
+                                    }}
                                     className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px]"
                                   >
                                     Save
                                   </Button>
-                                  <Button 
+                                  <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => {
@@ -1710,16 +1710,16 @@ export function Variables() {
                           return (
                             <div key={f.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-md group hover:border-blue-300 transition-all">
                               <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
-                                  onClick={() => handleMoveOnboardingField(f.id, 'up')} 
+                                <button
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]"
+                                  onClick={() => handleMoveOnboardingField(f.id, 'up')}
                                   disabled={idx === 0}
                                 >
                                   &#9650;
                                 </button>
-                                <button 
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" 
-                                  onClick={() => handleMoveOnboardingField(f.id, 'down')} 
+                                <button
+                                  className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]"
+                                  onClick={() => handleMoveOnboardingField(f.id, 'down')}
                                   disabled={idx === phaseFields.length - 1}
                                 >
                                   &#9660;
@@ -1730,17 +1730,17 @@ export function Variables() {
                               </span>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-slate-800 flex items-center gap-2">
-                                  {f.label} 
+                                  {f.label}
                                   {f.requiredForActivation && <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Required</span>}
                                 </p>
                                 <p className="text-[11px] text-slate-500 mt-0.5 capitalize">Type: {f.type}</p>
                               </div>
                               {priv.canEdit && (
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
                                     onClick={() => {
                                       setNewFieldLabel(f.label);
                                       setNewFieldType(f.type as any);
@@ -1752,10 +1752,10 @@ export function Variables() {
                                   >
                                     <Edit2 className="h-4 w-4" />
                                   </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                     onClick={() => {
                                       const template = onboardingTemplates.find(t => t.serviceName === selectedService);
                                       if (template) {
@@ -1853,83 +1853,82 @@ export function Variables() {
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
-                <Table>
-                  <TableBody>
-                    {ledgerCategories.map(c => (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium text-slate-700 py-2">
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-semibold text-slate-800 text-xs">{c.name}</span>
-                              {priv.canEdit && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenRename('ledgerCategory', c.name, c.id)}
-                                  className="text-[10px] text-slate-400 hover:text-blue-600 inline-flex items-center gap-0.5"
-                                  title="Rename category"
-                                >
-                                  <Edit2 className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
-                            <select
-                              value={resolveCategoryAccountCode(c.name, activeCategoryCoaMap) || ''}
-                              onChange={e => handleAssignCategoryToCoa(c.name, e.target.value)}
-                              disabled={!priv.canEdit}
-                              className={`h-7 w-full rounded border px-1.5 text-[11px] font-medium transition-colors ${
-                                resolveCategoryAccountCode(c.name, activeCategoryCoaMap)
+                  <Table>
+                    <TableBody>
+                      {ledgerCategories.map(c => (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium text-slate-700 py-2">
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold text-slate-800 text-xs">{c.name}</span>
+                                {priv.canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenRename('ledgerCategory', c.name, c.id)}
+                                    className="text-[10px] text-slate-400 hover:text-blue-600 inline-flex items-center gap-0.5"
+                                    title="Rename category"
+                                  >
+                                    <Edit2 className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                              <select
+                                value={resolveCategoryAccountCode(c.name, activeCategoryCoaMap) || ''}
+                                onChange={e => handleAssignCategoryToCoa(c.name, e.target.value)}
+                                disabled={!priv.canEdit}
+                                className={`h-7 w-full rounded border px-1.5 text-[11px] font-medium transition-colors ${resolveCategoryAccountCode(c.name, activeCategoryCoaMap)
                                   ? 'border-blue-200 bg-blue-50/50 text-blue-800'
                                   : 'border-amber-300 bg-amber-50 text-amber-800'
-                              }`}
-                            >
-                              <option value="">⚠ Unallocated — Select CoA Account</option>
-                              <optgroup label="Direct Costs / COGS (5000s)">
-                                {activeChartOfAccounts.filter(a => a.category === 'DIRECT_COST').map(a => (
-                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Operating Expenses / OPEX (5100s)">
-                                {activeChartOfAccounts.filter(a => a.category === 'OPERATING_EXPENSE').map(a => (
-                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Fixed Assets &amp; CapEx (1300s)">
-                                {activeChartOfAccounts.filter(a => a.category === 'FIXED_ASSET').map(a => (
-                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Tax &amp; Liabilities (2000s)">
-                                {activeChartOfAccounts.filter(a => a.type === 'LIABILITY').map(a => (
-                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Revenue / Income (4000s)">
-                                {activeChartOfAccounts.filter(a => a.type === 'INCOME').map(a => (
-                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="Current Assets &amp; Equity">
-                                {activeChartOfAccounts.filter(a => a.category === 'CURRENT_ASSET' || a.type === 'EQUITY').map(a => (
-                                  <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-[50px]">
-                          {priv.canEdit && (
-                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete category "${c.name}"?`, { variant: 'danger' }); if (conf) removeLedgerCategory(c.id); }}>
-                              <Trash2 className="h-4 w-4 text-rose-500" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {ledgerCategories.length === 0 && (
-                      <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No categories yet.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                                  }`}
+                              >
+                                <option value="">⚠ Unallocated — Select CoA Account</option>
+                                <optgroup label="Direct Costs / COGS (5000s)">
+                                  {activeChartOfAccounts.filter(a => a.category === 'DIRECT_COST').map(a => (
+                                    <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Operating Expenses / OPEX (5100s)">
+                                  {activeChartOfAccounts.filter(a => a.category === 'OPERATING_EXPENSE').map(a => (
+                                    <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Fixed Assets &amp; CapEx (1300s)">
+                                  {activeChartOfAccounts.filter(a => a.category === 'FIXED_ASSET').map(a => (
+                                    <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Tax &amp; Liabilities (2000s)">
+                                  {activeChartOfAccounts.filter(a => a.type === 'LIABILITY').map(a => (
+                                    <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Revenue / Income (4000s)">
+                                  {activeChartOfAccounts.filter(a => a.type === 'INCOME').map(a => (
+                                    <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Current Assets &amp; Equity">
+                                  {activeChartOfAccounts.filter(a => a.category === 'CURRENT_ASSET' || a.type === 'EQUITY').map(a => (
+                                    <option key={a.code} value={a.code}>[{a.code}] {a.name}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+                            </div>
+                          </TableCell>
+                          <TableCell className="w-[50px]">
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete category "${c.name}"?`, { variant: 'danger' }); if (conf) removeLedgerCategory(c.id); }}>
+                                <Trash2 className="h-4 w-4 text-rose-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {ledgerCategories.length === 0 && (
+                        <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No categories yet.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </CardContent>
@@ -1943,29 +1942,29 @@ export function Variables() {
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2">
                 <Input value={newBank} onChange={e => setNewBank(e.target.value)} placeholder="New Bank Name" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newBank) { addLedgerBank({id: generateId(), name: newBank}); setNewBank(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if (newBank) { addLedgerBank({ id: generateId(), name: newBank }); setNewBank(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
-                <Table>
-                  <TableBody>
-                    {ledgerBanks.map(b => (
-                      <TableRow key={b.id}>
-                        <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
-                        <TableCell className="w-[50px]">
-                          {priv.canEdit && (
-                            <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBank(b.id); }}>
-                              <Trash2 className="h-4 w-4 text-rose-500" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {ledgerBanks.length === 0 && (
-                      <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No banks yet.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                  <Table>
+                    <TableBody>
+                      {ledgerBanks.map(b => (
+                        <TableRow key={b.id}>
+                          <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
+                          <TableCell className="w-[50px]">
+                            {priv.canEdit && (
+                              <Button variant="ghost" size="icon" onClick={async () => { const conf = await showConfirm(`Delete bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBank(b.id); }}>
+                                <Trash2 className="h-4 w-4 text-rose-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {ledgerBanks.length === 0 && (
+                        <TableRow><TableCell className="text-slate-400 text-center text-sm py-6 italic">No banks yet.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </CardContent>
@@ -2117,11 +2116,10 @@ export function Variables() {
                       key={tab}
                       type="button"
                       onClick={() => setCoaTypeFilter(tab)}
-                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
-                        coaTypeFilter === tab
-                          ? 'bg-white text-slate-900 shadow-xs'
-                          : 'text-slate-500 hover:text-slate-700'
-                      }`}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${coaTypeFilter === tab
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-700'
+                        }`}
                     >
                       {tab === 'ALL' ? 'All Accounts' : tab}
                     </button>
@@ -2183,29 +2181,29 @@ export function Variables() {
                             acc.category === 'DIRECT_COST'
                               ? 'bg-amber-50 text-amber-800 border-amber-200'
                               : acc.category === 'OPERATING_EXPENSE'
-                              ? 'bg-rose-50 text-rose-800 border-rose-200'
-                              : acc.category === 'REVENUE'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : acc.type === 'ASSET'
-                              ? 'bg-blue-50 text-blue-800 border-blue-200'
-                              : acc.type === 'LIABILITY'
-                              ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200';
+                                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                : acc.category === 'REVENUE'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : acc.type === 'ASSET'
+                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                    : acc.type === 'LIABILITY'
+                                      ? 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200';
 
                           const sectionLabel =
                             acc.category === 'DIRECT_COST'
                               ? 'P&L • Direct Cost (COGS)'
                               : acc.category === 'OPERATING_EXPENSE'
-                              ? 'P&L • Operating Expense'
-                              : acc.category === 'REVENUE'
-                              ? 'P&L • Operating Revenue'
-                              : acc.category === 'FIXED_ASSET'
-                              ? 'BS • Fixed Asset (CapEx)'
-                              : acc.category === 'CURRENT_ASSET'
-                              ? 'BS • Current Asset'
-                              : acc.category === 'CURRENT_LIABILITY'
-                              ? 'BS • Current Liability'
-                              : 'BS • Equity';
+                                ? 'P&L • Operating Expense'
+                                : acc.category === 'REVENUE'
+                                  ? 'P&L • Operating Revenue'
+                                  : acc.category === 'FIXED_ASSET'
+                                    ? 'BS • Fixed Asset (CapEx)'
+                                    : acc.category === 'CURRENT_ASSET'
+                                      ? 'BS • Current Asset'
+                                      : acc.category === 'CURRENT_LIABILITY'
+                                        ? 'BS • Current Liability'
+                                        : 'BS • Equity';
 
                           return (
                             <TableRow key={acc.code} className="hover:bg-slate-50/70">
@@ -2387,39 +2385,39 @@ export function Variables() {
                 <Input value={newVendorName} onChange={e => setNewVendorName(e.target.value)} placeholder="Vendor Name" className="flex-1" />
                 <Input value={newVendorServices} onChange={e => setNewVendorServices(e.target.value)} placeholder="Services Rendered" className="flex-1" />
                 <Input value={newVendorTin} onChange={e => setNewVendorTin(e.target.value)} placeholder="TIN" className="w-[100px]" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newVendorName) { addLedgerVendor({id: generateId(), name: newVendorName, tinNumber: newVendorTin || undefined, servicesRendered: newVendorServices || undefined}); setNewVendorName(''); setNewVendorTin(''); setNewVendorServices(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if (newVendorName) { addLedgerVendor({ id: generateId(), name: newVendorName, tinNumber: newVendorTin || undefined, servicesRendered: newVendorServices || undefined }); setNewVendorName(''); setNewVendorTin(''); setNewVendorServices(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Vendor</TableHead><TableHead>Services</TableHead><TableHead>TIN</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {ledgerVendors.map(v => (
-                      <TableRow key={v.id}>
-                        <TableCell className="font-medium text-slate-700">{v.name}</TableCell>
-                        <TableCell className="text-sm text-slate-600">{v.servicesRendered || '—'}</TableCell>
-                        <TableCell className="text-sm text-slate-500">{v.tinNumber || '—'}</TableCell>
-                        <TableCell className="w-[80px]">
-                          <div className="flex items-center gap-1">
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleOpenRename('ledgerVendor', v.name, v.id)}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={async () => { const conf = await showConfirm(`Delete vendor "${v.name}"?`, { variant: 'danger' }); if (conf) removeLedgerVendor(v.id); }}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {ledgerVendors.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-slate-400 text-center text-sm py-6 italic">No vendors yet.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                  <Table>
+                    <TableHeader className="bg-slate-50"><TableRow><TableHead>Vendor</TableHead><TableHead>Services</TableHead><TableHead>TIN</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {ledgerVendors.map(v => (
+                        <TableRow key={v.id}>
+                          <TableCell className="font-medium text-slate-700">{v.name}</TableCell>
+                          <TableCell className="text-sm text-slate-600">{v.servicesRendered || '—'}</TableCell>
+                          <TableCell className="text-sm text-slate-500">{v.tinNumber || '—'}</TableCell>
+                          <TableCell className="w-[80px]">
+                            <div className="flex items-center gap-1">
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleOpenRename('ledgerVendor', v.name, v.id)}>
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={async () => { const conf = await showConfirm(`Delete vendor "${v.name}"?`, { variant: 'danger' }); if (conf) removeLedgerVendor(v.id); }}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {ledgerVendors.length === 0 && (
+                        <TableRow><TableCell colSpan={4} className="text-slate-400 text-center text-sm py-6 italic">No vendors yet.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </CardContent>
@@ -2433,214 +2431,348 @@ export function Variables() {
             <CardContent className="space-y-4 pt-6">
               <div className="flex gap-2 w-full">
                 <Input value={newBenBankName} onChange={e => setNewBenBankName(e.target.value)} placeholder="Bank Name" className="flex-1" />
-                <Button disabled={!priv.canEdit} onClick={() => { if(newBenBankName) { addLedgerBeneficiaryBank({id: generateId(), name: newBenBankName, accountNo: ''}); setNewBenBankName(''); } }}>Add</Button>
+                <Button disabled={!priv.canEdit} onClick={() => { if (newBenBankName) { addLedgerBeneficiaryBank({ id: generateId(), name: newBenBankName, accountNo: '' }); setNewBenBankName(''); } }}>Add</Button>
               </div>
               <div className="border border-slate-200 rounded-md overflow-hidden max-h-72 overflow-y-auto">
                 <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50"><TableRow><TableHead>Bank</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {ledgerBeneficiaryBanks.map(b => (
-                      <TableRow key={b.id}>
-                        <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
-                        <TableCell className="w-[80px]">
-                          <div className="flex items-center gap-1">
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleOpenRename('ledgerBenBank', b.name, b.id)}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={async () => { const conf = await showConfirm(`Delete beneficiary bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBeneficiaryBank(b.id); }}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {ledgerBeneficiaryBanks.length === 0 && (
-                      <TableRow><TableCell colSpan={2} className="text-slate-400 text-center text-sm py-6 italic">No beneficiary banks yet.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                  <Table>
+                    <TableHeader className="bg-slate-50"><TableRow><TableHead>Bank</TableHead><TableHead></TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {ledgerBeneficiaryBanks.map(b => (
+                        <TableRow key={b.id}>
+                          <TableCell className="font-medium text-slate-700">{b.name}</TableCell>
+                          <TableCell className="w-[80px]">
+                            <div className="flex items-center gap-1">
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleOpenRename('ledgerBenBank', b.name, b.id)}>
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              {priv.canEdit && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-500" onClick={async () => { const conf = await showConfirm(`Delete beneficiary bank "${b.name}"?`, { variant: 'danger' }); if (conf) removeLedgerBeneficiaryBank(b.id); }}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {ledgerBeneficiaryBanks.length === 0 && (
+                        <TableRow><TableCell colSpan={2} className="text-slate-400 text-center text-sm py-6 italic">No beneficiary banks yet.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       ) : (
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
-        {/* --- LEFT COLUMN --- */}
-        <div className="flex flex-col gap-6">
-          <Card className="border-slate-200">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
-              <CardTitle className="text-slate-800">Public Holidays</CardTitle>
-              <CardDescription>Dates defined here are used to calculate OT in the Daily Register.</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {priv.canEdit && (
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    type="date"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    className="w-40"
-                  />
-                  <Input
-                    placeholder="Holiday Name"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleAddHoliday} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                </div>
-              )}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+          {/* --- LEFT COLUMN --- */}
+          <div className="flex flex-col gap-6">
+            <Card className="border-slate-200">
+              <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+                <CardTitle className="text-slate-800">Public Holidays</CardTitle>
+                <CardDescription>Dates defined here are used to calculate OT in the Daily Register.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {priv.canEdit && (
+                  <div className="flex gap-2 mb-4">
+                    <Input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="w-40"
+                    />
+                    <Input
+                      placeholder="Holiday Name"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleAddHoliday} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                )}
 
-              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
-                <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0">
-                    <TableRow>
-                      <TableHead className="w-32">Date</TableHead>
-                      <TableHead>Holiday Name</TableHead>
-                      <TableHead className="w-16 text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {publicHolidays.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-slate-500 py-4">No holidays defined.</TableCell>
-                      </TableRow>
-                    ) : (
-                      publicHolidays.map((holiday) => (
-                        <TableRow key={holiday.id}>
-                          <TableCell className="font-medium">{formatDisplayDate(holiday.date)}</TableCell>
-                          <TableCell>{holiday.name}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {priv.canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenRename('holiday', holiday.name, holiday.id, holiday.date)}
-                                  className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              {priv.canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveHoliday(holiday.id)}
-                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+                <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-slate-50 sticky top-0">
+                        <TableRow>
+                          <TableHead className="w-32">Date</TableHead>
+                          <TableHead>Holiday Name</TableHead>
+                          <TableHead className="w-16 text-right">Action</TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {publicHolidays.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-slate-500 py-4">No holidays defined.</TableCell>
+                          </TableRow>
+                        ) : (
+                          publicHolidays.map((holiday) => (
+                            <TableRow key={holiday.id}>
+                              <TableCell className="font-medium">{formatDisplayDate(holiday.date)}</TableCell>
+                              <TableCell>{holiday.name}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {priv.canEdit && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleOpenRename('holiday', holiday.name, holiday.id, holiday.date)}
+                                      className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
+                                    >
+                                      <Edit2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                  {priv.canEdit && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleRemoveHoliday(holiday.id)}
+                                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* --- MOVED POSITIONS --- */}
-          <Card className="border-slate-200">
-            <CardHeader>
-              <CardTitle>Positions</CardTitle>
-              <CardDescription>Manage available job positions for employees.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {priv.canEdit && (
-                 <div className="flex gap-2 mb-4">
-                  <Input placeholder="New Position" value={newPosition} onChange={(e) => setNewPosition(e.target.value)} className="flex-1" />
-                  <select
-                    className="h-10 rounded border border-slate-200 px-3 w-40 text-sm bg-white"
-                    value={newPosDeptId}
-                    onChange={(e) => setNewPosDeptId(e.target.value)}
-                  >
-                    <option value="">-- Dept --</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                  <Button onClick={handleAddPosition} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
+            {/* --- MOVED POSITIONS --- */}
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle>Positions</CardTitle>
+                <CardDescription>Manage available job positions for employees.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {priv.canEdit && (
+                  <div className="flex gap-2 mb-4">
+                    <Input placeholder="New Position" value={newPosition} onChange={(e) => setNewPosition(e.target.value)} className="flex-1" />
+                    <select
+                      className="h-10 rounded border border-slate-200 px-3 w-40 text-sm bg-white"
+                      value={newPosDeptId}
+                      onChange={(e) => setNewPosDeptId(e.target.value)}
+                    >
+                      <option value="">-- Dept --</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                    <Button onClick={handleAddPosition} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                )}
+                <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto w-full">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-slate-50 sticky top-0">
+                        <TableRow>
+                          <TableHead>Position Title</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="w-[80px] text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {positions.length === 0 ? (
+                          <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4 italic">No positions defined.</TableCell></TableRow>
+                        ) : (
+                          positions.map(pos => {
+                            return (
+                              <TableRow key={pos.id}>
+                                <TableCell className="align-middle">
+                                  {priv.canEdit ? (
+                                    <Input
+                                      value={pos.title}
+                                      onChange={(e) => updatePosition(pos.id, { title: e.target.value })}
+                                      className="h-8 max-w-[250px]"
+                                    />
+                                  ) : (
+                                    <span className="font-medium text-slate-800">{pos.title}</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="align-middle bg-transparent">
+                                  {priv.canEdit ? (
+                                    <select
+                                      className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[120px]"
+                                      value={pos.departmentId || ''}
+                                      onChange={(e) => updatePosition(pos.id, { departmentId: e.target.value })}
+                                    >
+                                      <option value="">Unassigned</option>
+                                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    </select>
+                                  ) : (
+                                    <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md">
+                                      {departments.find(d => d.id === pos.departmentId)?.name || 'Unassigned'}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="align-middle bg-transparent">
+                                  {(() => {
+                                    const dept = departments.find(d => d.id === pos.departmentId);
+                                    if (!dept) return <span className="text-[10px] font-bold text-slate-300">N/A</span>;
+                                    if (dept.staffType === 'NON-EMPLOYEE')
+                                      return <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>;
+                                    return (
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dept.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700 border border-blue-200 rounded-sm'}`}>
+                                        {dept.staffType} Staff
+                                      </span>
+                                    );
+                                  })()}
+                                </TableCell>
+                                <TableCell className="text-right align-middle">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {priv.canEdit && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleOpenRename('position', pos.title, pos.id)}
+                                        className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                    {priv.canEdit && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removePosition(pos.id)}
+                                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-              )}
-              <div className="border rounded-md overflow-hidden max-h-[400px] overflow-y-auto w-full">
-                <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0">
-                    <TableRow>
-                      <TableHead>Position Title</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="w-[80px] text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {positions.length === 0 ? (
-                      <TableRow><TableCell colSpan={3} className="text-center text-slate-500 py-4 italic">No positions defined.</TableCell></TableRow>
-                    ) : (
-                      positions.map(pos => {
+              </CardContent>
+            </Card>
+
+            {/* --- MOVED DEPARTMENTS --- */}
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle>Departments</CardTitle>
+                <CardDescription>Manage available departments and their hierarchy.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {priv.canEdit && (
+                  <div className="flex gap-2 mb-4">
+                    <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
+                    <div className="flex flex-col gap-1.5 w-40">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Dept Category</label>
+                      <select
+                        className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
+                        value={newDeptStaffType}
+                        onChange={(e) => setNewDeptStaffType(e.target.value as any)}
+                      >
+                        <option value="OFFICE">Office Staff</option>
+                        <option value="FIELD">Field Staff</option>
+                        <option value="NON-EMPLOYEE">Non-Employee</option>
+                      </select>
+                    </div>
+                    <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                )}
+                <div className="border rounded-md overflow-hidden overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead>Department</TableHead>
+                        <TableHead>Parent Dept</TableHead>
+                        <TableHead>Category (Routing)</TableHead>
+                        <TableHead className="w-32 text-center">Work Days/Wk</TableHead>
+                        <TableHead className="w-[80px] text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {departments.map(dep => {
                         return (
-                          <TableRow key={pos.id}>
-                            <TableCell className="align-middle">
-                              {priv.canEdit ? (
-                                <Input 
-                                  value={pos.title}
-                                  onChange={(e) => updatePosition(pos.id, { title: e.target.value })}
-                                  className="h-8 max-w-[250px]"
-                                />
-                              ) : (
-                                <span className="font-medium text-slate-800">{pos.title}</span>
-                              )}
+                          <TableRow key={dep.id}>
+                            <TableCell className="font-medium text-slate-800">
+                              {dep.name}
                             </TableCell>
-                            <TableCell className="align-middle bg-transparent">
+                            <TableCell>
                               {priv.canEdit ? (
                                 <select
-                                  className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[120px]"
-                                  value={pos.departmentId || ''}
-                                  onChange={(e) => updatePosition(pos.id, { departmentId: e.target.value })}
+                                  className="h-8 rounded border border-slate-200 px-2 text-sm bg-white w-full"
+                                  value={dep.parentDepartmentId || ''}
+                                  onChange={(e) => updateDepartment(dep.id, { parentDepartmentId: e.target.value || null })}
                                 >
-                                  <option value="">Unassigned</option>
-                                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                  <option value="">None (Top Level)</option>
+                                  {departments.filter(d => d.id !== dep.id).map(d => (
+                                    <option key={d.id} value={d.id}>{d.name}</option>
+                                  ))}
                                 </select>
                               ) : (
-                                <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md">
-                                  {departments.find(d => d.id === pos.departmentId)?.name || 'Unassigned'}
+                                <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
+                                  {departments.find(d => d.id === dep.parentDepartmentId)?.name || 'None'}
                                 </span>
                               )}
                             </TableCell>
-                            <TableCell className="align-middle bg-transparent">
-                              {(() => {
-                                const dept = departments.find(d => d.id === pos.departmentId);
-                                if (!dept) return <span className="text-[10px] font-bold text-slate-300">N/A</span>;
-                                if (dept.staffType === 'NON-EMPLOYEE') 
-                                  return <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>;
-                                return (
-                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dept.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700 border border-blue-200 rounded-sm'}`}>
-                                    {dept.staffType} Staff
-                                  </span>
-                                );
-                              })()}
+                            <TableCell>
+                              {priv.canEdit ? (
+                                <select
+                                  className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[140px] focus:ring-2 focus:ring-blue-400 outline-none"
+                                  value={dep.staffType}
+                                  onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
+                                >
+                                  <option value="OFFICE">Office Staff</option>
+                                  <option value="FIELD">Field Staff</option>
+                                  <option value="NON-EMPLOYEE">Non-Employee</option>
+                                </select>
+                              ) : (
+                                <div className="flex">
+                                  {dep.staffType === 'NON-EMPLOYEE' ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>
+                                  ) : (
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dep.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700 border border-blue-200 rounded-sm'}`}>
+                                      {dep.staffType} Staff
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </TableCell>
-                            <TableCell className="text-right align-middle">
+                            <TableCell className="text-center">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={7}
+                                value={dep.workDaysPerWeek}
+                                onChange={(e) => {
+                                  updateDepartment(dep.id, { workDaysPerWeek: Math.max(1, Math.min(7, Number(e.target.value))) });
+                                }}
+                                className="h-8 w-16 mx-auto text-center"
+                                disabled={!priv.canEdit}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
                                 {priv.canEdit && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleOpenRename('position', pos.title, pos.id)}
+                                    onClick={() => handleOpenRename('department', dep.name, dep.id)}
                                     className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
                                   >
                                     <Edit2 className="h-3.5 w-3.5" />
@@ -2650,7 +2782,7 @@ export function Variables() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => removePosition(pos.id)}
+                                    onClick={() => removeDepartment(dep.id)}
                                     className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -2660,379 +2792,245 @@ export function Variables() {
                             </TableCell>
                           </TableRow>
                         );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* --- MOVED DEPARTMENTS --- */}
-          <Card className="border-slate-200">
-            <CardHeader>
-              <CardTitle>Departments</CardTitle>
-              <CardDescription>Manage available departments and their hierarchy.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {priv.canEdit && (
-                <div className="flex gap-2 mb-4">
-                  <Input placeholder="New Department" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} className="flex-1" />
-                  <div className="flex flex-col gap-1.5 w-40">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase px-1">Dept Category</label>
-                    <select 
-                       className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
-                       value={newDeptStaffType}
-                       onChange={(e) => setNewDeptStaffType(e.target.value as any)}
+
+
+            {/* ——— LEAVE TYPES ——— */}
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle>Leave Types</CardTitle>
+                <CardDescription>Manage the types of leave available on employee leave forms.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {priv.canEdit && (
+                  <div className="flex gap-2 mb-4">
+                    <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
+                    <Button onClick={() => { if (newLeaveType && !leaveTypes.some(lt => lt.name === newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        const ok = await showConfirm('Reset all leave types to system defaults? This will delete custom types you have added.', { title: 'Reset Defaults' });
+                        if (ok) setLeaveTypes([...DEFAULT_LEAVE_TYPES]);
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="ml-auto text-slate-400 hover:text-slate-600 text-xs"
                     >
-                       <option value="OFFICE">Office Staff</option>
-                       <option value="FIELD">Field Staff</option>
-                       <option value="NON-EMPLOYEE">Non-Employee</option>
-                    </select>
+                      Reset Defaults
+                    </Button>
                   </div>
-                  <Button onClick={handleAddDepartment} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                </div>
-              )}
-              <div className="border rounded-md overflow-hidden overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Parent Dept</TableHead>
-                      <TableHead>Category (Routing)</TableHead>
-                      <TableHead className="w-32 text-center">Work Days/Wk</TableHead>
-                      <TableHead className="w-[80px] text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {departments.map(dep => {
-                      return (
-                        <TableRow key={dep.id}>
-                          <TableCell className="font-medium text-slate-800">
-                            {dep.name}
-                          </TableCell>
+                )}
+                <div className="border border-slate-200 rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead>Leave Type</TableHead>
+                        <TableHead className="w-24">Default Days</TableHead>
+                        <TableHead className="w-16 text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {leaveTypes.map(lt => (
+                        <TableRow key={lt.name}>
+                          <TableCell className="font-medium text-slate-700">{lt.name}</TableCell>
                           <TableCell>
-                            {priv.canEdit ? (
-                              <select
-                                className="h-8 rounded border border-slate-200 px-2 text-sm bg-white w-full"
-                                value={dep.parentDepartmentId || ''}
-                                onChange={(e) => updateDepartment(dep.id, { parentDepartmentId: e.target.value || null })}
-                              >
-                                <option value="">None (Top Level)</option>
-                                {departments.filter(d => d.id !== dep.id).map(d => (
-                                  <option key={d.id} value={d.id}>{d.name}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded-md block truncate">
-                                {departments.find(d => d.id === dep.parentDepartmentId)?.name || 'None'}
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {priv.canEdit ? (
-                              <select 
-                                 className="h-8 rounded border border-slate-200 px-2 text-sm bg-white min-w-[140px] focus:ring-2 focus:ring-blue-400 outline-none"
-                                 value={dep.staffType}
-                                 onChange={(e) => updateDepartment(dep.id, { staffType: e.target.value as any })}
-                              >
-                                 <option value="OFFICE">Office Staff</option>
-                                 <option value="FIELD">Field Staff</option>
-                                 <option value="NON-EMPLOYEE">Non-Employee</option>
-                              </select>
-                            ) : (
-                               <div className="flex">
-                                 {dep.staffType === 'NON-EMPLOYEE' ? (
-                                   <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-700 rounded-full uppercase">Non-Employee</span>
-                                 ) : (
-                                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${dep.staffType === 'FIELD' ? 'bg-amber-100 text-amber-700' : 'bg-blue-50 text-blue-700 border border-blue-200 rounded-sm'}`}>
-                                     {dep.staffType} Staff
-                                   </span>
-                                 )}
-                               </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">
                             <Input
                               type="number"
-                              min={1}
-                              max={7}
-                              value={dep.workDaysPerWeek}
-                              onChange={(e) => {
-                                updateDepartment(dep.id, { workDaysPerWeek: Math.max(1, Math.min(7, Number(e.target.value))) });
-                              }}
-                              className="h-8 w-16 mx-auto text-center"
-                              disabled={!priv.canEdit}
+                              value={lt.defaultDays || 0}
+                              onChange={(e) => updateLeaveType(lt.name, parseInt(e.target.value) || 0)}
+                              className="h-8 w-20 text-center"
                             />
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               {priv.canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenRename('department', dep.name, dep.id)}
-                                  className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-slate-50"
-                                >
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenRename('leaveType', lt.name)} className="h-8 w-8 text-slate-400 hover:text-blue-600">
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </Button>
                               )}
                               {priv.canEdit && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeDepartment(dep.id)}
-                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
+                                <Button variant="ghost" size="icon" onClick={() => removeLeaveType(lt.name)} className="h-8 w-8 text-rose-500 hover:bg-rose-50">
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               )}
                             </div>
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-
-
-          {/* ——— LEAVE TYPES ——— */}
-          <Card className="border-slate-200">
-            <CardHeader>
-              <CardTitle>Leave Types</CardTitle>
-              <CardDescription>Manage the types of leave available on employee leave forms.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {priv.canEdit && (
-                <div className="flex gap-2 mb-4">
-                  <Input placeholder="e.g. Compassionate Leave" value={newLeaveType} onChange={(e) => setNewLeaveType(e.target.value)} className="flex-1" />
-                  <Button onClick={() => { if (newLeaveType && !leaveTypes.some(lt => lt.name === newLeaveType)) { addLeaveType(newLeaveType); setNewLeaveType(''); } }} variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                  <Button 
-                    onClick={async () => {
-                      const ok = await showConfirm('Reset all leave types to system defaults? This will delete custom types you have added.', { title: 'Reset Defaults' });
-                      if (ok) setLeaveTypes([...DEFAULT_LEAVE_TYPES]);
-                    }} 
-                    variant="ghost" 
-                    size="sm"
-                    className="ml-auto text-slate-400 hover:text-slate-600 text-xs"
-                  >
-                    Reset Defaults
-                  </Button>
+                      ))}
+                      {leaveTypes.length === 0 && (
+                        <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No leave types yet.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
-              <div className="border border-slate-200 rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Leave Type</TableHead>
-                      <TableHead className="w-24">Default Days</TableHead>
-                      <TableHead className="w-16 text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {leaveTypes.map(lt => (
-                      <TableRow key={lt.name}>
-                        <TableCell className="font-medium text-slate-700">{lt.name}</TableCell>
-                        <TableCell>
-                          <Input 
-                            type="number" 
-                            value={lt.defaultDays || 0} 
-                            onChange={(e) => updateLeaveType(lt.name, parseInt(e.target.value) || 0)}
-                            className="h-8 w-20 text-center"
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" onClick={() => handleOpenRename('leaveType', lt.name)} className="h-8 w-8 text-slate-400 hover:text-blue-600">
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            {priv.canEdit && (
-                              <Button variant="ghost" size="icon" onClick={() => removeLeaveType(lt.name)} className="h-8 w-8 text-rose-500 hover:bg-rose-50">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {leaveTypes.length === 0 && (
-                      <TableRow><TableCell colSpan={3} className="text-slate-400 text-center text-sm py-6 italic">No leave types yet.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* ——— PAYEE TYPES ——— */}
-          <Card className="border-slate-200">
-            <CardHeader>
-              <CardTitle>Payee Types</CardTitle>
-              <CardDescription>Define categories for non-employees (e.g. Director, Contractor).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {priv.canEdit && (
-                <div className="flex gap-2 mb-4">
-                  <Input 
-                    placeholder="e.g. Volunteer" 
-                    value={newPayeeType} 
-                    onChange={(e) => setNewPayeeType(e.target.value)} 
-                    className="flex-1" 
-                  />
-                  <Button 
-                    onClick={() => { 
-                      if (newPayeeType && !(localHrVars.payeeTypes || []).includes(newPayeeType)) { 
-                        const newTypes = [...(localHrVars.payeeTypes || []), newPayeeType];
-                        updateHrVariables({ payeeTypes: newTypes });
-                        updateLocalHrVariables({ payeeTypes: newTypes }); 
-                        setNewPayeeType(''); 
-                      } 
-                    }} 
-                    variant="outline" 
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {(localHrVars.payeeTypes || []).map(pt => (
-                  <div key={pt} className="bg-blue-50 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-slate-800">
-                    {pt}
-                    {priv.canEdit && (
-                      <button 
-                        onClick={() => {
-                          const newTypes = (localHrVars.payeeTypes || []).filter(t => t !== pt);
+            {/* ——— PAYEE TYPES ——— */}
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle>Payee Types</CardTitle>
+                <CardDescription>Define categories for non-employees (e.g. Director, Contractor).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {priv.canEdit && (
+                  <div className="flex gap-2 mb-4">
+                    <Input
+                      placeholder="e.g. Volunteer"
+                      value={newPayeeType}
+                      onChange={(e) => setNewPayeeType(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={() => {
+                        if (newPayeeType && !(localHrVars.payeeTypes || []).includes(newPayeeType)) {
+                          const newTypes = [...(localHrVars.payeeTypes || []), newPayeeType];
                           updateHrVariables({ payeeTypes: newTypes });
                           updateLocalHrVariables({ payeeTypes: newTypes });
-                        }} 
-                        className="text-blue-400 hover:text-rose-500"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
+                          setNewPayeeType('');
+                        }
+                      }}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Task Templates */}
-          <Card className="border-slate-200 border-t-4 border-t-blue-600">
-            <CardHeader className="bg-slate-50 rounded-t-md border-b border-slate-200 flex-row items-center justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-slate-900">Onboarding Task Templates</CardTitle>
-                <CardDescription>
-                  <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
-                  Add <strong>custom extra tasks</strong> below and choose where they slot in.
-                </CardDescription>
-              </div>
-              {priv.canEdit && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="bg-blue-600 text-white hover:bg-blue-700 border-none h-8 gap-2 ml-4 px-4 rounded-sm"
-                  onClick={handleDeduplicateAllTasks}
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Clean Duplicate Tasks
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="pt-4 space-y-4">
-              {/* Department filter */}
-              <div className="flex gap-2">
-                <select className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDeptFilter} onChange={(e) => setTaskDeptFilter(e.target.value)}>
-                  <option value="ALL">ALL DEPARTMENTS (always applied)</option>
-                  {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                </select>
-              </div>
-
-              {/* Unified Onboarding Tasks */}
-              <div className="rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-100 border-b border-slate-200">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-800">Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ' (All Departments)'}</span>
-                  <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-0.5 font-semibold">{taskDeptFilter === 'ALL' ? 7 + currentTaskView.onboardingTasks.length : currentTaskView.onboardingTasks.length} tasks</span>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {(localHrVars.payeeTypes || []).map(pt => (
+                    <div key={pt} className="bg-blue-50 border border-slate-200 rounded-full px-3 py-1 text-sm flex items-center gap-2 text-slate-800">
+                      {pt}
+                      {priv.canEdit && (
+                        <button
+                          onClick={() => {
+                            const newTypes = (localHrVars.payeeTypes || []).filter(t => t !== pt);
+                            updateHrVariables({ payeeTypes: newTypes });
+                            updateLocalHrVariables({ payeeTypes: newTypes });
+                          }}
+                          className="text-blue-400 hover:text-rose-500"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className="p-3 space-y-3">
-                  
-                  {/* System Base Tasks (Only shown in ALL DEPARTMENTS) */}
-                  {taskDeptFilter === 'ALL' && (
-                    <div className="space-y-1.5 mb-4">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Core System Stages (Hardcoded Flow)</p>
-                      {[
-                        { step: '1', key: '1', defaultLabel: 'Send Necessary Information (Forms)' },
-                        { step: '2', key: '2', defaultLabel: 'Return of Forms' },
-                        { step: '3', key: '3', defaultLabel: 'Verification of Documents' },
-                        { step: '4', key: '4', defaultLabel: 'Resumption — Verified Start Date' },
-                        { step: '5', key: '5', defaultLabel: 'Employment Letters' },
-                        { step: '6', key: '6', defaultLabel: 'Orientation (HR, Department, Site, HSE)' },
-                        { step: '7', key: '7', defaultLabel: 'Provision of PPE, Handbook & Requirements' },
-                      ].map(item => (
-                        <div key={item.step} className="flex gap-2 p-2 rounded-md bg-white border border-slate-200 items-center">
-                          <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">{item.step}</span>
-                          <div className="flex-1">
-                            {priv.canEdit ? (
-                               <input 
-                                 className="text-sm font-semibold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 outline-none w-full transition-colors"
-                                 value={localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}
-                                 onChange={(e) => updateLocalHrVariables({ onboardingStageLabels: { ...(localHrVars.onboardingStageLabels || {}), [item.key]: e.target.value } })}
-                               />
-                            ) : (
-                               <p className="text-sm font-semibold text-slate-700">{localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}</p>
-                            )}
-                          </div>
-                          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">System Flow</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              </CardContent>
+            </Card>
 
-                  {priv.canEdit && (
-                    <div className="space-y-2 p-3 bg-white rounded-md border border-slate-200">
-                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Add Custom Onboarding Task</p>
-                      <Input placeholder="Task title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="text-sm h-9" />
-                      <div className="grid grid-cols-2 gap-2">
-                        <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
-                          <option value="">-- Select Assignee Dept --</option>
-                          <option value="HR">HR</option>
-                          <option value="IT">IT</option>
-                          <option value="Finance">Finance</option>
-                          <option value="Management">Management</option>
-                          {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                        </select>
-                        <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskPosition} onChange={e => setNewTaskPosition(e.target.value)}>
-                          <option value="start">Insert before Step 1</option>
-                          <option value="after-1">After Step 1 (Send Forms)</option>
-                          <option value="after-2">After Step 2 (Return of Forms)</option>
-                          <option value="after-3">After Step 3 (Verification)</option>
-                          <option value="after-4">After Step 4 (Start Date)</option>
-                          <option value="after-5">After Step 5 (Letters)</option>
-                          <option value="after-6">After Step 6 (Orientation)</option>
-                          <option value="end">At End (after all steps)</option>
-                          {currentTaskView.onboardingTasks.map((t, i) => (
-                            <option key={i} value={`custom-after-${i}`}>After custom: "{t.title.slice(0, 22)}{t.title.length > 22 ? '...' : ''}"</option>
-                          ))}
-                        </select>
+            {/* Task Templates */}
+            <Card className="border-slate-200 border-t-4 border-t-blue-600">
+              <CardHeader className="bg-slate-50 rounded-t-md border-b border-slate-200 flex-row items-center justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-slate-900">Onboarding Task Templates</CardTitle>
+                  <CardDescription>
+                    <strong>System Default Tasks</strong> (Steps 1–8) are built-in for all departments and cannot be removed.
+                    Add <strong>custom extra tasks</strong> below and choose where they slot in.
+                  </CardDescription>
+                </div>
+                {priv.canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-blue-600 text-white hover:bg-blue-700 border-none h-8 gap-2 ml-4 px-4 rounded-sm"
+                    onClick={handleDeduplicateAllTasks}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Clean Duplicate Tasks
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                {/* Department filter */}
+                <div className="flex gap-2">
+                  <select className="flex-1 h-10 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer" value={taskDeptFilter} onChange={(e) => setTaskDeptFilter(e.target.value)}>
+                    <option value="ALL">ALL DEPARTMENTS (always applied)</option>
+                    {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Unified Onboarding Tasks */}
+                <div className="rounded-md border border-slate-200 bg-slate-50/40 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-100 border-b border-slate-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">Onboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ' (All Departments)'}</span>
+                    <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 rounded px-2 py-0.5 font-semibold">{taskDeptFilter === 'ALL' ? 7 + currentTaskView.onboardingTasks.length : currentTaskView.onboardingTasks.length} tasks</span>
+                  </div>
+                  <div className="p-3 space-y-3">
+
+                    {/* System Base Tasks (Only shown in ALL DEPARTMENTS) */}
+                    {taskDeptFilter === 'ALL' && (
+                      <div className="space-y-1.5 mb-4">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Core System Stages (Hardcoded Flow)</p>
+                        {[
+                          { step: '1', key: '1', defaultLabel: 'Send Necessary Information (Forms)' },
+                          { step: '2', key: '2', defaultLabel: 'Return of Forms' },
+                          { step: '3', key: '3', defaultLabel: 'Verification of Documents' },
+                          { step: '4', key: '4', defaultLabel: 'Resumption — Verified Start Date' },
+                          { step: '5', key: '5', defaultLabel: 'Employment Letters' },
+                          { step: '6', key: '6', defaultLabel: 'Orientation (HR, Department, Site, HSE)' },
+                          { step: '7', key: '7', defaultLabel: 'Provision of PPE, Handbook & Requirements' },
+                        ].map(item => (
+                          <div key={item.step} className="flex gap-2 p-2 rounded-md bg-white border border-slate-200 items-center">
+                            <span className="h-6 w-6 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">{item.step}</span>
+                            <div className="flex-1">
+                              {priv.canEdit ? (
+                                <input
+                                  className="text-sm font-semibold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 outline-none w-full transition-colors"
+                                  value={localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}
+                                  onChange={(e) => updateLocalHrVariables({ onboardingStageLabels: { ...(localHrVars.onboardingStageLabels || {}), [item.key]: e.target.value } })}
+                                />
+                              ) : (
+                                <p className="text-sm font-semibold text-slate-700">{localHrVars.onboardingStageLabels?.[item.key] ?? item.defaultLabel}</p>
+                              )}
+                            </div>
+                            <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">System Flow</span>
+                          </div>
+                        ))}
                       </div>
-                      <Button variant="outline" onClick={handleAddTask} className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 rounded-sm w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
-                        <Plus className="h-4 w-4" /> Add Task
-                      </Button>
-                    </div>
-                  )}
-                  {currentTaskView.onboardingTasks.length === 0
-                    ? <p className="text-xs text-slate-400 text-center py-4 italic">No custom tasks added for this department context.</p>
-                    : <div className="space-y-1.5">{currentTaskView.onboardingTasks.map((t, idx) => (
+                    )}
+
+                    {priv.canEdit && (
+                      <div className="space-y-2 p-3 bg-white rounded-md border border-slate-200">
+                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">Add Custom Onboarding Task</p>
+                        <Input placeholder="Task title (e.g. Provide Laptop)" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} className="text-sm h-9" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskAssignee} onChange={(e) => setNewTaskAssignee(e.target.value)}>
+                            <option value="">-- Select Assignee Dept --</option>
+                            <option value="HR">HR</option>
+                            <option value="IT">IT</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Management">Management</option>
+                            {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                          </select>
+                          <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm" value={newTaskPosition} onChange={e => setNewTaskPosition(e.target.value)}>
+                            <option value="start">Insert before Step 1</option>
+                            <option value="after-1">After Step 1 (Send Forms)</option>
+                            <option value="after-2">After Step 2 (Return of Forms)</option>
+                            <option value="after-3">After Step 3 (Verification)</option>
+                            <option value="after-4">After Step 4 (Start Date)</option>
+                            <option value="after-5">After Step 5 (Letters)</option>
+                            <option value="after-6">After Step 6 (Orientation)</option>
+                            <option value="end">At End (after all steps)</option>
+                            {currentTaskView.onboardingTasks.map((t, i) => (
+                              <option key={i} value={`custom-after-${i}`}>After custom: "{t.title.slice(0, 22)}{t.title.length > 22 ? '...' : ''}"</option>
+                            ))}
+                          </select>
+                        </div>
+                        <Button variant="outline" onClick={handleAddTask} className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 rounded-sm w-full h-9" disabled={!newTaskTitle || !newTaskAssignee}>
+                          <Plus className="h-4 w-4" /> Add Task
+                        </Button>
+                      </div>
+                    )}
+                    {currentTaskView.onboardingTasks.length === 0
+                      ? <p className="text-xs text-slate-400 text-center py-4 italic">No custom tasks added for this department context.</p>
+                      : <div className="space-y-1.5">{currentTaskView.onboardingTasks.map((t, idx) => (
                         <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-md border border-slate-200 group hover:border-blue-300 transition-colors">
                           <div className="flex flex-col gap-0.5">
                             <button className="h-5 w-5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
@@ -3050,36 +3048,36 @@ export function Variables() {
                           )}
                         </div>
                       ))}</div>
-                  }
+                    }
+                  </div>
                 </div>
-              </div>
 
-              {/* Offboarding tasks */}
-              <div className="rounded-md border border-rose-200 bg-rose-50/20 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-rose-100/60 border-b border-rose-200">
-                  <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Offboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
-                  <span className="text-[10px] text-rose-600 bg-rose-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.offboardingTasks.length} task{currentTaskView.offboardingTasks.length !== 1 ? 's' : ''}</span>
-                </div>
-                <div className="p-3 space-y-2">
-                  {priv.canEdit && (
-                    <div className="flex gap-2 p-2 bg-white rounded-md border border-rose-100">
-                      <Input placeholder="Task title" value={newOffTaskTitle} onChange={e => setNewOffTaskTitle(e.target.value)} className="flex-1 text-sm h-9" />
-                      <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm w-44 shrink-0" value={newOffTaskAssignee} onChange={e => setNewOffTaskAssignee(e.target.value)}>
-                        <option value="">-- Assignee Dept --</option>
-                        <option value="HR">HR</option>
-                        <option value="IT">IT</option>
-                        <option value="Finance">Finance</option>
-                        <option value="Management">Management</option>
-                        {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                      </select>
-                      <Button variant="outline" onClick={handleAddOffboardingTask} className="gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 shrink-0 h-9" disabled={!newOffTaskTitle || !newOffTaskAssignee}>
-                        <Plus className="h-3.5 w-3.5" /> Add
-                      </Button>
-                    </div>
-                  )}
-                  {currentTaskView.offboardingTasks.length === 0
-                    ? <p className="text-xs text-slate-400 text-center py-4 italic">No offboarding tasks configured.</p>
-                    : currentTaskView.offboardingTasks.map((t, idx) => (
+                {/* Offboarding tasks */}
+                <div className="rounded-md border border-rose-200 bg-rose-50/20 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-rose-100/60 border-b border-rose-200">
+                    <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Offboarding Tasks{taskDeptFilter !== 'ALL' ? ` — ${taskDeptFilter}` : ''}</span>
+                    <span className="text-[10px] text-rose-600 bg-rose-100 rounded px-2 py-0.5 font-semibold">{currentTaskView.offboardingTasks.length} task{currentTaskView.offboardingTasks.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {priv.canEdit && (
+                      <div className="flex gap-2 p-2 bg-white rounded-md border border-rose-100">
+                        <Input placeholder="Task title" value={newOffTaskTitle} onChange={e => setNewOffTaskTitle(e.target.value)} className="flex-1 text-sm h-9" />
+                        <select className="h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm w-44 shrink-0" value={newOffTaskAssignee} onChange={e => setNewOffTaskAssignee(e.target.value)}>
+                          <option value="">-- Assignee Dept --</option>
+                          <option value="HR">HR</option>
+                          <option value="IT">IT</option>
+                          <option value="Finance">Finance</option>
+                          <option value="Management">Management</option>
+                          {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                        </select>
+                        <Button variant="outline" onClick={handleAddOffboardingTask} className="gap-1 border-rose-300 text-rose-700 hover:bg-rose-50 shrink-0 h-9" disabled={!newOffTaskTitle || !newOffTaskAssignee}>
+                          <Plus className="h-3.5 w-3.5" /> Add
+                        </Button>
+                      </div>
+                    )}
+                    {currentTaskView.offboardingTasks.length === 0
+                      ? <p className="text-xs text-slate-400 text-center py-4 italic">No offboarding tasks configured.</p>
+                      : currentTaskView.offboardingTasks.map((t, idx) => (
                         <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-md border border-rose-100 group hover:border-rose-300 transition-colors">
                           <div className="flex flex-col gap-0.5">
                             <button className="h-5 w-5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center disabled:opacity-30 text-[10px]" onClick={() => handleMoveOffTask(idx, 'up')} disabled={idx === 0}>&#9650;</button>
@@ -3096,82 +3094,82 @@ export function Variables() {
                           )}
                         </div>
                       ))
-                  }
+                    }
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          {/* Performance & Conduct Variables */}
-          <Card className="border-slate-200 border-t-4 border-t-rose-500">
-            <CardHeader className="bg-rose-50/30 rounded-t-lg border-b border-rose-100">
-              <CardTitle className="text-rose-900">Performance & Conduct Configuration</CardTitle>
-              <CardDescription>
-                Configure point weights, categories, and policy enforcement for the professional ledger.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Merit Point Weight (Default)</label>
-                  <Input 
-                    type="number" 
-                    value={localHrVars.meritWeight ?? 1} 
-                    onChange={e => updateLocalHrVariables({ meritWeight: Number(e.target.value) })}
-                    className="h-10 border-slate-200"
-                  />
-                  <p className="text-[10px] text-slate-400">Default points for positive accolades.</p>
+              </CardContent>
+            </Card>
+            {/* Performance & Conduct Variables */}
+            <Card className="border-slate-200 border-t-4 border-t-rose-500">
+              <CardHeader className="bg-rose-50/30 rounded-t-lg border-b border-rose-100">
+                <CardTitle className="text-rose-900">Performance & Conduct Configuration</CardTitle>
+                <CardDescription>
+                  Configure point weights, categories, and policy enforcement for the professional ledger.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Merit Point Weight (Default)</label>
+                    <Input
+                      type="number"
+                      value={localHrVars.meritWeight ?? 1}
+                      onChange={e => updateLocalHrVariables({ meritWeight: Number(e.target.value) })}
+                      className="h-10 border-slate-200"
+                    />
+                    <p className="text-[10px] text-slate-400">Default points for positive accolades.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Demerit Point Weight (Default)</label>
+                    <Input
+                      type="number"
+                      value={localHrVars.demeritWeight ?? -1}
+                      onChange={e => updateLocalHrVariables({ demeritWeight: Number(e.target.value) })}
+                      className="h-10 border-slate-200"
+                    />
+                    <p className="text-[10px] text-slate-400">Default points for disciplinary cases.</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Demerit Point Weight (Default)</label>
-                  <Input 
-                    type="number" 
-                    value={localHrVars.demeritWeight ?? -1} 
-                    onChange={e => updateLocalHrVariables({ demeritWeight: Number(e.target.value) })}
-                    className="h-10 border-slate-200"
-                  />
-                  <p className="text-[10px] text-slate-400">Default points for disciplinary cases.</p>
-                </div>
-              </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase">Performance Categories</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).map((cat, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600">
-                      {cat}
-                      {priv.canEdit && (
-                        <button onClick={() => {
-                          const newCats = (localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).filter(c => c !== cat);
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Performance Categories</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).map((cat, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600">
+                        {cat}
+                        {priv.canEdit && (
+                          <button onClick={() => {
+                            const newCats = (localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']).filter(c => c !== cat);
+                            updateHrVariables({ performanceCategories: newCats });
+                            updateLocalHrVariables({ performanceCategories: newCats });
+                          }} className="text-slate-300 hover:text-rose-500 transition-colors">
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {priv.canEdit && (
+                    <div className="flex gap-2">
+                      <Input id="newPerformanceCat" placeholder="Add category (e.g. HSE)" className="h-9 border-slate-100" />
+                      <Button size="sm" onClick={() => {
+                        const inp = document.getElementById('newPerformanceCat') as HTMLInputElement;
+                        if (inp.value) {
+                          const newCats = [...(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']), inp.value];
                           updateHrVariables({ performanceCategories: newCats });
                           updateLocalHrVariables({ performanceCategories: newCats });
-                        }} className="text-slate-300 hover:text-rose-500 transition-colors">
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
+                          inp.value = '';
+                        }
+                      }} className="bg-slate-800 hover:bg-black text-white px-4">Add</Button>
                     </div>
-                  ))}
+                  )}
                 </div>
-                {priv.canEdit && (
-                  <div className="flex gap-2">
-                    <Input id="newPerformanceCat" placeholder="Add category (e.g. HSE)" className="h-9 border-slate-100" />
-                    <Button size="sm" onClick={() => {
-                      const inp = document.getElementById('newPerformanceCat') as HTMLInputElement;
-                      if (inp.value) {
-                        const newCats = [...(localHrVars.performanceCategories || ['Attendance', 'Behavioral', 'Performance', 'Safety/PPE', 'Accolade', 'Clarity']), inp.value];
-                        updateHrVariables({ performanceCategories: newCats });
-                        updateLocalHrVariables({ performanceCategories: newCats });
-                        inp.value = '';
-                      }
-                    }} className="bg-slate-800 hover:bg-black text-white px-4">Add</Button>
-                  </div>
-                )}
-              </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase">Suspension Cap (Days)</label>
-                  <Input 
-                    type="number" 
-                    value={localHrVars.suspensionCapDays ?? 30} 
+                  <Input
+                    type="number"
+                    value={localHrVars.suspensionCapDays ?? 30}
                     onChange={e => updateLocalHrVariables({ suspensionCapDays: Number(e.target.value) })}
                     className="h-10 border-slate-200"
                   />
@@ -3180,9 +3178,9 @@ export function Variables() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500 uppercase">Task Archive Retention (Days)</label>
-                  <Input 
-                    type="number" 
-                    value={localHrVars.taskArchiveRetentionDays ?? 30} 
+                  <Input
+                    type="number"
+                    value={localHrVars.taskArchiveRetentionDays ?? 30}
                     onChange={e => updateLocalHrVariables({ taskArchiveRetentionDays: Number(e.target.value) })}
                     className="h-10 border-slate-200"
                   />
@@ -3193,657 +3191,751 @@ export function Variables() {
                   <label className="text-xs font-bold text-slate-500 uppercase">Sanction Thresholds (Points based)</label>
                   <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
                     <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-slate-50/80">
-                        <TableRow>
-                          <TableHead className="text-[10px] font-bold uppercase py-2">Sanction Level</TableHead>
-                          <TableHead className="text-[10px] font-bold uppercase py-2 w-32">Points Target</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(localHrVars.sanctionThresholds || [
-                          { action: 'Verbal Warning', points: -1 },
-                          { action: 'Written Warning', points: -3 },
-                          { action: 'Final Warning', points: -5 },
-                          { action: 'Suspension', points: -8 },
-                          { action: 'Termination', points: -12 }
-                        ]).map((st, idx) => (
-                          <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors">
-                            <TableCell className="text-sm font-semibold text-slate-700">{st.action}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Input 
-                                  type="number" 
-                                  value={st.points} 
-                                  onChange={e => {
-                                    const newThresholds = [...(localHrVars.sanctionThresholds || [])];
-                                    newThresholds[idx] = { ...st, points: Number(e.target.value) };
-                                    updateLocalHrVariables({ sanctionThresholds: newThresholds });
-                                  }}
-                                  className="h-8 text-sm font-mono text-center bg-slate-50"
-                                />
-                                <span className="text-[10px] font-bold text-rose-500">PTS</span>
-                              </div>
-                            </TableCell>
+                      <Table>
+                        <TableHeader className="bg-slate-50/80">
+                          <TableRow>
+                            <TableHead className="text-[10px] font-bold uppercase py-2">Sanction Level</TableHead>
+                            <TableHead className="text-[10px] font-bold uppercase py-2 w-32">Points Target</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {(localHrVars.sanctionThresholds || [
+                            { action: 'Verbal Warning', points: -1 },
+                            { action: 'Written Warning', points: -3 },
+                            { action: 'Final Warning', points: -5 },
+                            { action: 'Suspension', points: -8 },
+                            { action: 'Termination', points: -12 }
+                          ]).map((st, idx) => (
+                            <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors">
+                              <TableCell className="text-sm font-semibold text-slate-700">{st.action}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    value={st.points}
+                                    onChange={e => {
+                                      const newThresholds = [...(localHrVars.sanctionThresholds || [])];
+                                      newThresholds[idx] = { ...st, points: Number(e.target.value) };
+                                      updateLocalHrVariables({ sanctionThresholds: newThresholds });
+                                    }}
+                                    className="h-8 text-sm font-mono text-center bg-slate-50"
+                                  />
+                                  <span className="text-[10px] font-bold text-rose-500">PTS</span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-400 italic">Thresholds define when HR should automatically review and issue the next level of disciplinary action.</p>
                 </div>
-            </CardContent>
-          </Card>
-        </div> {/* END LEFT COLUMN */}
+              </CardContent>
+            </Card>
+          </div> {/* END LEFT COLUMN */}
 
 
-        {/* --- RIGHT COLUMN --- */}
-        <div className="flex flex-col gap-6">
-          <Card className="border-slate-200">
-            <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
-              <CardTitle className="text-slate-800 flex items-center gap-2">Payroll Breakdown Variables (<NairaSign className="h-4 w-4" />)</CardTitle>
-              <CardDescription>Adjust the percentage breakdown for components of basic salary and automated deductions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-md space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Salary Components Breakdown</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">Combined components should correctly total 100%.</p>
+          {/* --- RIGHT COLUMN --- */}
+          <div className="flex flex-col gap-6">
+            <Card className="border-slate-200">
+              <CardHeader className="bg-slate-50/50 rounded-t-xl border-b border-slate-100">
+                <CardTitle className="text-slate-800 flex items-center gap-2">Payroll Breakdown Variables (<NairaSign className="h-4 w-4" />)</CardTitle>
+                <CardDescription>Adjust the percentage breakdown for components of basic salary and automated deductions.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-8 p-5 bg-slate-50 border border-slate-200 rounded-md space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Salary Components Breakdown</h3>
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">Combined components should correctly total 100%.</p>
+                    </div>
+                    {(() => {
+                      const total = Number(localPayrollVars.basic || 0) + Number(localPayrollVars.housing || 0) + Number(localPayrollVars.transport || 0) + Number(localPayrollVars.otherAllowances || 0);
+                      const isPerfect = total === 100;
+                      const isOver = total > 100;
+                      return (
+                        <div className={`px-4 py-2 rounded-md border flex flex-col items-end justify-center transition-colors  ${isPerfect ? 'bg-emerald-50 border-emerald-200' : isOver ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'
+                          }`}>
+                          <span className={`text-xl font-black leading-none ${isPerfect ? 'text-emerald-600' : isOver ? 'text-rose-600' : 'text-amber-600'}`}>
+                            {total}%
+                          </span>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${isPerfect ? 'text-emerald-500' : isOver ? 'text-rose-500' : 'text-amber-500'}`}>
+                            Total
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
+
                   {(() => {
                     const total = Number(localPayrollVars.basic || 0) + Number(localPayrollVars.housing || 0) + Number(localPayrollVars.transport || 0) + Number(localPayrollVars.otherAllowances || 0);
-                    const isPerfect = total === 100;
-                    const isOver = total > 100;
+                    const denom = Math.max(100, total);
+                    const b = (Number(localPayrollVars.basic || 0) / denom) * 100;
+                    const h = (Number(localPayrollVars.housing || 0) / denom) * 100;
+                    const t = (Number(localPayrollVars.transport || 0) / denom) * 100;
+                    const o = (Number(localPayrollVars.otherAllowances || 0) / denom) * 100;
+
                     return (
-                      <div className={`px-4 py-2 rounded-md border flex flex-col items-end justify-center transition-colors  ${
-                        isPerfect ? 'bg-emerald-50 border-emerald-200' : isOver ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'
-                      }`}>
-                        <span className={`text-xl font-black leading-none ${isPerfect ? 'text-emerald-600' : isOver ? 'text-rose-600' : 'text-amber-600'}`}>
-                          {total}%
-                        </span>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isPerfect ? 'text-emerald-500' : isOver ? 'text-rose-500' : 'text-amber-500'}`}>
-                          Total
-                        </span>
+                      <div className="h-3.5 w-full bg-slate-200 rounded-full overflow-hidden flex border border-slate-300/50 shadow-inner">
+                        {b > 0 && <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${b}%` }} title={`Basic: ${localPayrollVars.basic}%`} />}
+                        {h > 0 && <div className="bg-emerald-500 h-full transition-all duration-300" style={{ width: `${h}%` }} title={`Housing: ${localPayrollVars.housing}%`} />}
+                        {t > 0 && <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${t}%` }} title={`Transport: ${localPayrollVars.transport}%`} />}
+                        {o > 0 && <div className="bg-rose-500 h-full transition-all duration-300" style={{ width: `${o}%` }} title={`Other: ${localPayrollVars.otherAllowances}%`} />}
                       </div>
                     );
                   })()}
-                </div>
 
-                {(() => {
-                  const total = Number(localPayrollVars.basic || 0) + Number(localPayrollVars.housing || 0) + Number(localPayrollVars.transport || 0) + Number(localPayrollVars.otherAllowances || 0);
-                  const denom = Math.max(100, total);
-                  const b = (Number(localPayrollVars.basic || 0) / denom) * 100;
-                  const h = (Number(localPayrollVars.housing || 0) / denom) * 100;
-                  const t = (Number(localPayrollVars.transport || 0) / denom) * 100;
-                  const o = (Number(localPayrollVars.otherAllowances || 0) / denom) * 100;
-
-                  return (
-                    <div className="h-3.5 w-full bg-slate-200 rounded-full overflow-hidden flex border border-slate-300/50 shadow-inner">
-                      {b > 0 && <div className="bg-blue-600 h-full transition-all duration-300" style={{ width: `${b}%` }} title={`Basic: ${localPayrollVars.basic}%`} />}
-                      {h > 0 && <div className="bg-emerald-500 h-full transition-all duration-300" style={{ width: `${h}%` }} title={`Housing: ${localPayrollVars.housing}%`} />}
-                      {t > 0 && <div className="bg-amber-500 h-full transition-all duration-300" style={{ width: `${t}%` }} title={`Transport: ${localPayrollVars.transport}%`} />}
-                      {o > 0 && <div className="bg-rose-500 h-full transition-all duration-300" style={{ width: `${o}%` }} title={`Other: ${localPayrollVars.otherAllowances}%`} />}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
+                        <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-blue-600 block shrink-0"></span>
+                        Basic Salary
+                      </label>
+                      <Input
+                        type="number"
+                        className="font-mono text-sm h-9"
+                        value={localPayrollVars.basic}
+                        onChange={e => updateLocalPayrollVariables({ basic: Number(e.target.value) })}
+                      />
                     </div>
-                  );
-                })()}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
+                        <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-emerald-500 block shrink-0"></span>
+                        Housing
+                      </label>
+                      <Input
+                        type="number"
+                        className="font-mono text-sm h-9"
+                        value={localPayrollVars.housing}
+                        onChange={e => updateLocalPayrollVariables({ housing: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
+                        <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-amber-500 block shrink-0"></span>
+                        Transport
+                      </label>
+                      <Input
+                        type="number"
+                        className="font-mono text-sm h-9"
+                        value={localPayrollVars.transport}
+                        onChange={e => updateLocalPayrollVariables({ transport: Number(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5 leading-tight">
+                        <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-rose-500 block shrink-0"></span>
+                        Other Allowances
+                      </label>
+                      <Input
+                        type="number"
+                        className="font-mono text-sm h-9"
+                        value={localPayrollVars.otherAllowances}
+                        onChange={e => updateLocalPayrollVariables({ otherAllowances: Number(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
-                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-blue-600 block shrink-0"></span>
-                      Basic Salary
-                    </label>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Employee Pension Rate (%)</label>
                     <Input
                       type="number"
-                      className="font-mono text-sm h-9"
-                      value={localPayrollVars.basic}
-                      onChange={e => updateLocalPayrollVariables({ basic: Number(e.target.value) })}
+                      step="0.01"
+                      value={localPayrollVars.employeePensionRate}
+                      onChange={e => updateLocalPayrollVariables({ employeePensionRate: Number(e.target.value) })}
                     />
+                    <p className="text-xs text-slate-400">Deducted from employee salary (default 8%)</p>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
-                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-emerald-500 block shrink-0"></span>
-                      Housing
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Employer Pension Rate (%)</label>
                     <Input
                       type="number"
-                      className="font-mono text-sm h-9"
-                      value={localPayrollVars.housing}
-                      onChange={e => updateLocalPayrollVariables({ housing: Number(e.target.value) })}
+                      step="0.01"
+                      value={localPayrollVars.employerPensionRate}
+                      onChange={e => updateLocalPayrollVariables({ employerPensionRate: Number(e.target.value) })}
                     />
+                    <p className="text-xs text-slate-400">Company's contribution to pension (default 10%)</p>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5">
-                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-amber-500 block shrink-0"></span>
-                      Transport
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase">NSITF Rate (%)</label>
                     <Input
                       type="number"
-                      className="font-mono text-sm h-9"
-                      value={localPayrollVars.transport}
-                      onChange={e => updateLocalPayrollVariables({ transport: Number(e.target.value) })}
+                      step="0.01"
+                      value={localPayrollVars.nsitfRate}
+                      onChange={e => updateLocalPayrollVariables({ nsitfRate: Number(e.target.value) })}
                     />
+                    <p className="text-xs text-slate-400">Company's NSITF contribution (1% by default)</p>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-600 uppercase flex items-start gap-1.5 leading-tight">
-                      <span className="w-2.5 h-2.5 mt-0.5 rounded-sm bg-rose-500 block shrink-0"></span>
-                      Other Allowances
-                    </label>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase">VAT Rate (%)</label>
                     <Input
                       type="number"
-                      className="font-mono text-sm h-9"
-                      value={localPayrollVars.otherAllowances}
-                      onChange={e => updateLocalPayrollVariables({ otherAllowances: Number(e.target.value) })}
+                      step="0.1"
+                      value={localPayrollVars.vatRate}
+                      onChange={e => updateLocalPayrollVariables({ vatRate: Number(e.target.value) })}
                     />
+                    <p className="text-xs text-slate-400">Value Added Tax (7.5% by default)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase">WHT Rate (%)</label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={localPayrollVars.withholdingTaxRate}
+                      onChange={e => updateLocalPayrollVariables({ withholdingTaxRate: Number(e.target.value) })}
+                    />
+                    <p className="text-xs text-slate-400">Withholding Tax (5% by default)</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Payroll Period Start Day</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={localPayrollVars.periodStartDay}
+                      onChange={e => updateLocalPayrollVariables({ periodStartDay: Number(e.target.value) })}
+                    />
+                    <p className="text-xs text-slate-400">Day the payroll cycle begins (default 1)</p>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Employee Pension Rate (%)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={localPayrollVars.employeePensionRate}
-                    onChange={e => updateLocalPayrollVariables({ employeePensionRate: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-400">Deducted from employee salary (default 8%)</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Employer Pension Rate (%)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={localPayrollVars.employerPensionRate}
-                    onChange={e => updateLocalPayrollVariables({ employerPensionRate: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-400">Company's contribution to pension (default 10%)</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">NSITF Rate (%)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={localPayrollVars.nsitfRate}
-                    onChange={e => updateLocalPayrollVariables({ nsitfRate: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-400">Company's NSITF contribution (1% by default)</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">VAT Rate (%)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={localPayrollVars.vatRate}
-                    onChange={e => updateLocalPayrollVariables({ vatRate: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-400">Value Added Tax (7.5% by default)</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">WHT Rate (%)</label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={localPayrollVars.withholdingTaxRate}
-                    onChange={e => updateLocalPayrollVariables({ withholdingTaxRate: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-400">Withholding Tax (5% by default)</p>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-700 uppercase">Payroll Period Start Day</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={localPayrollVars.periodStartDay}
-                    onChange={e => updateLocalPayrollVariables({ periodStartDay: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-400">Day the payroll cycle begins (default 1)</p>
-                </div>
-              </div>
-
-              {/* Default Vatable Sections for New Invoices */}
-              <div className="mt-6 pt-5 border-t border-slate-200/80">
-                <div className="mb-3">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Default Vatable Sections (New Invoices)</h4>
-                  <p className="text-xs text-slate-500">Choose which billing components are taxable by default when creating new invoices in Per-Section mode.</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    { key: 'equipment', label: 'Equipment & Machinery Lease', desc: 'Pump rental & equipment' },
-                    { key: 'technicians', label: 'Dewatering Crew & Personnel', desc: 'Day and night shift site crew' },
-                    { key: 'accommodation', label: 'Crew Accommodation & Lodging', desc: 'Technician housing & accommodation' },
-                    { key: 'diesel', label: 'Consumables & Diesel', desc: 'Fuel liters & consumption' },
-                    { key: 'mobDemob', label: 'Mobilization & Demob', desc: 'Logistics delivery & transport' },
-                    { key: 'installation', label: 'Installation Fee', desc: 'Rigging & site installation' },
-                    { key: 'damages', label: 'Repairs & Damages', desc: 'Equipment repair & penalty fees' },
-                  ].map((sec) => {
-                    const currentDefaults = localPayrollVars.defaultVatableSections || {
-                      equipment: true,
-                      technicians: false,
-                      accommodation: false,
-                      diesel: true,
-                      mobDemob: true,
-                      installation: true,
-                      damages: false,
-                    };
-                    const isChecked = !!(currentDefaults as any)[sec.key];
-                    return (
-                      <label
-                        key={sec.key}
-                        className={`flex items-start gap-3 p-3 rounded-md border transition-all cursor-pointer select-none ${
-                          isChecked
+                {/* Default Vatable Sections for New Invoices */}
+                <div className="mt-6 pt-5 border-t border-slate-200/80">
+                  <div className="mb-3">
+                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Default Vatable Sections (New Invoices)</h4>
+                    <p className="text-xs text-slate-500">Choose which billing components are taxable by default when creating new invoices in Per-Section mode.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {[
+                      { key: 'equipment', label: 'Equipment & Machinery Lease', desc: 'Pump rental & equipment' },
+                      { key: 'technicians', label: 'Dewatering Crew & Personnel', desc: 'Day and night shift site crew' },
+                      { key: 'accommodation', label: 'Crew Accommodation & Lodging', desc: 'Technician housing & accommodation' },
+                      { key: 'diesel', label: 'Consumables & Diesel', desc: 'Fuel liters & consumption' },
+                      { key: 'mobDemob', label: 'Mobilization & Demob', desc: 'Logistics delivery & transport' },
+                      { key: 'installation', label: 'Installation Fee', desc: 'Rigging & site installation' },
+                      { key: 'damages', label: 'Repairs & Damages', desc: 'Equipment repair & penalty fees' },
+                    ].map((sec) => {
+                      const currentDefaults = localPayrollVars.defaultVatableSections || {
+                        equipment: true,
+                        technicians: false,
+                        accommodation: false,
+                        diesel: true,
+                        mobDemob: true,
+                        installation: true,
+                        damages: false,
+                      };
+                      const isChecked = !!(currentDefaults as any)[sec.key];
+                      return (
+                        <label
+                          key={sec.key}
+                          className={`flex items-start gap-3 p-3 rounded-md border transition-all cursor-pointer select-none ${isChecked
                             ? 'bg-blue-50/60 border-slate-200 text-slate-900 '
                             : 'bg-slate-50/70 border-slate-200/80 text-slate-600 hover:bg-slate-100/60'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const updated = {
-                              ...currentDefaults,
-                              [sec.key]: e.target.checked,
-                            };
-                            updateLocalPayrollVariables({ defaultVatableSections: updated });
-                          }}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-xs font-bold block leading-tight">{sec.label}</span>
-                          <span className="text-[10.5px] text-slate-400 block leading-tight mt-0.5">{sec.desc}</span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Monthly Config (Workdays &amp; OT Rate)</CardTitle>
-              <CardDescription>
-                Work days are <strong>auto-computed</strong> per department and year ({payrollYear}), excluding Sundays, holidays, and off-days based on each department's configured days/week.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Department picker */}
-              <div className="flex items-center gap-2 mb-4">
-                <label className="text-xs font-semibold text-slate-600 uppercase">Department:</label>
-                <select
-                  value={monthConfigDept}
-                  onChange={e => setMonthConfigDept(e.target.value)}
-                  className="h-8 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
-                >
-                  <option value="">— All (6 days/wk default) —</option>
-                  {departments.map(d => (
-                    <option key={d.id} value={d.name}>{d.name}</option>
-                  ))}
-                </select>
-                {monthConfigDept && (() => {
-                  const deptObj = departments.find(d => d.name === monthConfigDept);
-                  const effective = deptObj?.workDaysPerWeek ?? (deptObj?.staffType === 'FIELD' ? 6 : 5);
-                  return <span className="text-xs text-blue-600 font-medium bg-blue-50 rounded-full px-2 py-0.5">{effective} days/week</span>;
-                })()}
-              </div>
-              <div className="border rounded-md overflow-hidden">
-                <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Start of Mth</TableHead>
-                      <TableHead>End of Mth</TableHead>
-                      <TableHead className="text-center">Work Days</TableHead>
-                      <TableHead>OT Rate</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {monthsList.map(({ key, label }) => {
-                      const monthNum = MONTH_INDEX[key];
-                      // The Monthly Config table ALWAYS shows the calendar month (1st to end)
-                      // so users can configure workdays per calendar month.
-                      const { start: startDate, end: endDate } = getPayrollPeriodDates(payrollYear, monthNum, 1);
-
-                      // Compute workdays using the department's workDaysPerWeek from the departments table
-                      const selectedDefaultDays = monthConfigDept
-                        ? (() => { const d = departments.find(dep => dep.name === monthConfigDept); return d?.workDaysPerWeek ?? (d?.staffType === 'FIELD' ? 6 : 5); })()
-                        : 6;
-                      const deptWorkDaysPerWeek = monthConfigDept ? selectedDefaultDays : 6;
-                      const computedWorkDays = computeWorkDaysInRange(startDate, endDate, holidayDateStrings, deptWorkDaysPerWeek);
-
-                      const data = localMonthVals[key] || { workDays: 0, overtimeRate: 0.5 };
-                      const formatDate = (d: Date) =>
-                        `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-                      return (
-                        <TableRow key={key}>
-                          <TableCell className="font-medium">{label}</TableCell>
-                          <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(startDate)}</TableCell>
-                          <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(endDate)}</TableCell>
-                          <TableCell className="text-center">
-                            <span className="inline-flex items-center justify-center h-8 w-16 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-sm text-sm">
-                              {computedWorkDays}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              className="w-24 h-8"
-                              value={data.overtimeRate}
-                              onChange={e => updateLocalMonthValue(key, { workDays: computedWorkDays, overtimeRate: Number(e.target.value) })}
-                            />
-                          </TableCell>
-                        </TableRow>
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const updated = {
+                                ...currentDefaults,
+                                [sec.key]: e.target.checked,
+                              };
+                              updateLocalPayrollVariables({ defaultVatableSections: updated });
+                            }}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-bold block leading-tight">{sec.label}</span>
+                            <span className="text-[10.5px] text-slate-400 block leading-tight mt-0.5">{sec.desc}</span>
+                          </div>
+                        </label>
                       );
                     })}
-                  </TableBody>
-                </Table>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── PAYE Tax Variables ─────────────────────────────────── */}
-          <Card className="border-amber-200">
-            <CardHeader className="bg-amber-50/50 rounded-t-lg border-b border-amber-100">
-              <CardTitle className="text-amber-900">PAYE Tax Variables (NIGERIATAX)</CardTitle>
-              <CardDescription>
-                These values drive the payroll calculation system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-6">
-              
-              <div className="bg-amber-50/50 border border-amber-100 rounded-md p-4 flex flex-col gap-3">
-                <h4 className="text-xs font-bold text-amber-800 uppercase tracking-tighter">Calculation Logic Reference</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase">1. Gross Revenue</p>
-                    <p className="text-xs text-slate-700 font-medium">(Monthly Salary × 12) + Overtime</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase">2. Reliefs (CRA)</p>
-                    <p className="text-xs text-slate-700 font-medium">Base CRA + Rent Relief (Max 500k) + Pension</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase">3. Taxable Income</p>
-                    <p className="text-xs text-slate-700 font-medium">Gross Revenue &minus; Total Reliefs</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase">4. Monthly PAYE</p>
-                    <p className="text-xs text-slate-700 font-medium">(Annual Tax from Brackets) &divide; 12</p>
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* CRA & Pension Rate */}
-              <div>
-                <p className="text-xs font-bold text-slate-500 uppercase mb-3">Consolidated Relief Allowance (CRA)</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">CRA Base (₦)</label>
-                    <Input type="number" value={localPayeVars.craBase}
-                      onChange={e => updateLocalPayeVars({ craBase: Number(e.target.value) })} />
-                    <p className="text-xs text-slate-400">Fixed statutory amount (default ₦800,000)</p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Rent Relief Rate (%)</label>
-                    <Input type="number" step="0.1" value={(localPayeVars.rentReliefRate * 100).toFixed(1)}
-                      onChange={e => updateLocalPayeVars({ rentReliefRate: Number(e.target.value) / 100 })} />
-                    <p className="text-xs text-slate-400">Applied to input Rent to compute Relief (default 20%)</p>
-                  </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Monthly Config (Workdays &amp; OT Rate)</CardTitle>
+                <CardDescription>
+                  Work days are <strong>auto-computed</strong> per department and year ({payrollYear}), excluding Sundays, holidays, and off-days based on each department's configured days/week.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Department picker */}
+                <div className="flex items-center gap-2 mb-4">
+                  <label className="text-xs font-semibold text-slate-600 uppercase">Department:</label>
+                  <select
+                    value={monthConfigDept}
+                    onChange={e => setMonthConfigDept(e.target.value)}
+                    className="h-8 rounded-md border border-slate-200 bg-white px-3 text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 outline-none"
+                  >
+                    <option value="">— All (6 days/wk default) —</option>
+                    {departments.map(d => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+                  {monthConfigDept && (() => {
+                    const deptObj = departments.find(d => d.name === monthConfigDept);
+                    const effective = deptObj?.workDaysPerWeek ?? (deptObj?.staffType === 'FIELD' ? 6 : 5);
+                    return <span className="text-xs text-blue-600 font-medium bg-blue-50 rounded-full px-2 py-0.5">{effective} days/week</span>;
+                  })()}
                 </div>
-              </div>
-
-              {/* Tax Brackets — fully dynamic, add/remove/edit */}
-              <div>
-                <p className="text-xs font-bold text-slate-500 uppercase mb-3">Tax Brackets (Annual Taxable Income)</p>
-                <div className="border rounded-md overflow-hidden mb-3">
+                <div className="border rounded-md overflow-hidden">
                   <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead>Label</TableHead>
-                        <TableHead>Up To (₦) <span className="text-slate-400 font-normal text-xs italic">— blank = top bracket</span></TableHead>
-                        <TableHead>Rate (%)</TableHead>
-                        <TableHead className="w-10"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...localPayeVars.taxBrackets]
-                        .sort((a, b) => {
-                          if (a.upTo === null) return 1;
-                          if (b.upTo === null) return -1;
-                          return a.upTo - b.upTo;
-                        })
-                        .map(b => (
-                          <TableRow key={b.id}>
-                            <TableCell>
-                              <Input className="h-8 w-36" value={b.label}
-                                onChange={e => updateLocalTaxBracket(b.id, { label: e.target.value })} />
-                            </TableCell>
-                            <TableCell>
-                              <Input type="number" className="h-8 w-36"
-                                placeholder="(top bracket)"
-                                value={b.upTo !== null ? b.upTo : ''}
-                                onChange={e => updateLocalTaxBracket(b.id, { upTo: e.target.value === '' ? null : Number(e.target.value) })} />
-                            </TableCell>
-                            <TableCell>
-                              <Input type="number" step="0.1" className="h-8 w-24"
-                                value={(b.rate * 100).toFixed(1)}
-                                onChange={e => updateLocalTaxBracket(b.id, { rate: Number(e.target.value) / 100 })} />
-                            </TableCell>
-                            <TableCell>
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                  onClick={() => removeLocalTaxBracket(b.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                  </div>
-                </div>
-                {/* Add new bracket row */}
-                <div className="flex gap-2 items-end">
-                  <div className="flex-1 space-y-1">
-                    <label className="text-xs font-semibold text-slate-600">Label</label>
-                    <Input placeholder="e.g. Next ₦9m" value={newBracketLabel}
-                      onChange={e => setNewBracketLabel(e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-600">Up To (₦) <span className="text-slate-400 font-normal italic">blank=top</span></label>
-                    <Input type="number" placeholder="11200000" className="w-36" value={newBracketUpTo}
-                      onChange={e => setNewBracketUpTo(e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-600">Rate (%)</label>
-                    <Input type="number" step="0.1" placeholder="18" className="w-24" value={newBracketRate}
-                      onChange={e => setNewBracketRate(e.target.value)} />
-                  </div>
-                  <Button variant="outline" className="gap-1 shrink-0" onClick={() => {
-                    if (!newBracketLabel || !newBracketRate) return;
-                    addLocalTaxBracket({
-                      id: Math.random().toString(36).slice(2),
-                      label: newBracketLabel,
-                      upTo: newBracketUpTo !== '' ? Number(newBracketUpTo) : null,
-                      rate: Number(newBracketRate) / 100,
-                    });
-                    setNewBracketLabel(''); setNewBracketUpTo(''); setNewBracketRate('');
-                  }}>
-                    <Plus className="h-4 w-4" /> Add Bracket
-                  </Button>
-                </div>
-              </div>
-
-              {/* Extra Conditions */}
-              <div>
-                <p className="text-xs font-bold text-slate-500 uppercase mb-3">Extra CRA Conditions / Allowable Deductions</p>
-                <p className="text-xs text-slate-400 mb-3">Amounts here are added to the CRA (reduce taxable income) when enabled.</p>
-                <div className="flex gap-2 mb-3">
-                  <Input placeholder="Label (e.g. Life Insurance Relief)" value={newExtraLabel}
-                    onChange={e => setNewExtraLabel(e.target.value)} className="flex-1" />
-                  <Input type="number" placeholder="₦ Amount" value={newExtraAmount}
-                    onChange={e => setNewExtraAmount(e.target.value)} className="w-36" />
-                  <Button variant="outline" className="gap-1" onClick={() => {
-                    if (!newExtraLabel || !newExtraAmount) return;
-                    addLocalExtraCond({ id: Math.random().toString(36).slice(2), label: newExtraLabel, amount: Number(newExtraAmount), enabled: true });
-                    setNewExtraLabel(''); setNewExtraAmount('');
-                  }}><Plus className="h-4 w-4" /> Add</Button>
-                </div>
-                {localPayeVars.extraConditions.length === 0 ? (
-                  <p className="text-center text-slate-400 text-sm py-4 border rounded-md">No extra conditions. Add one above.</p>
-                ) : (
-                  <div className="border rounded-md overflow-hidden">
-                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-slate-50">
                         <TableRow>
-                          <TableHead>Label</TableHead>
-                          <TableHead>Amount (₦)</TableHead>
-                          <TableHead className="text-center">Enabled</TableHead>
-                          <TableHead className="w-12"></TableHead>
+                          <TableHead>Month</TableHead>
+                          <TableHead>Start of Mth</TableHead>
+                          <TableHead>End of Mth</TableHead>
+                          <TableHead className="text-center">Work Days</TableHead>
+                          <TableHead>OT Rate</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {localPayeVars.extraConditions.map(cond => (
-                          <TableRow key={cond.id}>
-                            <TableCell className="font-medium">{cond.label}</TableCell>
-                            <TableCell>
-                              <Input type="number" className="w-32 h-8" value={cond.amount}
-                                onChange={e => updateLocalExtraCond(cond.id, { amount: Number(e.target.value) })} />
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <input type="checkbox" checked={cond.enabled}
-                                onChange={e => updateLocalExtraCond(cond.id, { enabled: e.target.checked })}
-                                className="h-4 w-4 accent-blue-600" />
-                            </TableCell>
-                            <TableCell>
-                              {priv.canEdit && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
-                                  onClick={() => removeLocalExtraCond(cond.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {monthsList.map(({ key, label }) => {
+                          const monthNum = MONTH_INDEX[key];
+                          // The Monthly Config table ALWAYS shows the calendar month (1st to end)
+                          // so users can configure workdays per calendar month.
+                          const { start: startDate, end: endDate } = getPayrollPeriodDates(payrollYear, monthNum, 1);
+
+                          // Compute workdays using the department's workDaysPerWeek from the departments table
+                          const selectedDefaultDays = monthConfigDept
+                            ? (() => { const d = departments.find(dep => dep.name === monthConfigDept); return d?.workDaysPerWeek ?? (d?.staffType === 'FIELD' ? 6 : 5); })()
+                            : 6;
+                          const deptWorkDaysPerWeek = monthConfigDept ? selectedDefaultDays : 6;
+                          const computedWorkDays = computeWorkDaysInRange(startDate, endDate, holidayDateStrings, deptWorkDaysPerWeek);
+
+                          const data = localMonthVals[key] || { workDays: 0, overtimeRate: 0.5 };
+                          const formatDate = (d: Date) =>
+                            `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                          return (
+                            <TableRow key={key}>
+                              <TableCell className="font-medium">{label}</TableCell>
+                              <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(startDate)}</TableCell>
+                              <TableCell className="text-slate-500 text-xs font-mono">{formatDisplayDate(endDate)}</TableCell>
+                              <TableCell className="text-center">
+                                <span className="inline-flex items-center justify-center h-8 w-16 rounded bg-blue-50 text-blue-700 border border-blue-200 font-bold rounded-sm text-sm">
+                                  {computedWorkDays}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  className="w-24 h-8"
+                                  value={data.overtimeRate}
+                                  onChange={e => updateLocalMonthValue(key, { workDays: computedWorkDays, overtimeRate: Number(e.target.value) })}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-            </CardContent>
-          </Card>
-          
-          {/* --- HR Module & Disciplinary Settings --- */}
-          <Card className="border-slate-200">
-            <CardHeader className="bg-slate-50 rounded-t-md border-b border-slate-200">
-              <CardTitle className="text-slate-900">HR, Disciplinary &amp; Lifecycle Settings (Due Process)</CardTitle>
-              <CardDescription>
-                Configure thresholds, time-frames, and policies applied automatically by the system. Includes specific "Due Process" variables such as the investigation timeframe and appeal allowance periods.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-6">
-              
-              <div className="space-y-4">
-                <p className="text-xs font-bold text-slate-500 uppercase">Attendance &amp; Disciplinary Auto-Triggers</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Flagged Absence Threshold</label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" value={localHrVars.flaggedAbsenceThreshold}
-                        onChange={e => updateLocalHrVariables({ flaggedAbsenceThreshold: parseInt(e.target.value) || 0 })} />
-                      <span className="text-sm text-slate-500 whitespace-nowrap">flagged days</span>
-                    </div>
-                    <p className="text-xs text-slate-400">Absences generating auto-warning (e.g. 3)</p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Disciplinary Expiration/Rolling Period</label>
-                    <div className="flex items-center gap-2">
-                       <Input type="number" value={localHrVars.disciplinaryExpirationMonths}
-                        onChange={e => updateLocalHrVariables({ disciplinaryExpirationMonths: parseInt(e.target.value) || 0 })} />
-                       <span className="text-sm text-slate-500 whitespace-nowrap">months</span>
-                    </div>
-                    <p className="text-xs text-slate-400">Duration a record stays active</p>
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              <div className="space-y-4">
-                <p className="text-xs font-bold text-slate-500 uppercase">Evaluations &amp; Lifecycle Checks</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Office Staff Probation Period</label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" value={localHrVars.officeProbationDays ?? 90}
-                        onChange={e => updateLocalHrVariables({ officeProbationDays: parseInt(e.target.value) || 0 })} />
-                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+            {/* ── PAYE Tax Variables ─────────────────────────────────── */}
+            <Card className="border-amber-200">
+              <CardHeader className="bg-amber-50/50 rounded-t-lg border-b border-amber-100">
+                <CardTitle className="text-amber-900">PAYE Tax Variables (NIGERIATAX)</CardTitle>
+                <CardDescription>
+                  These values drive the payroll calculation system.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-6">
+
+                <div className="bg-amber-50/50 border border-amber-100 rounded-md p-4 flex flex-col gap-3">
+                  <h4 className="text-xs font-bold text-amber-800 uppercase tracking-tighter">Calculation Logic Reference</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase">1. Gross Revenue</p>
+                      <p className="text-xs text-slate-700 font-medium">(Monthly Salary × 12) + Overtime</p>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Field Staff Probation Period</label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" value={localHrVars.fieldProbationDays ?? 90}
-                        onChange={e => updateLocalHrVariables({ fieldProbationDays: parseInt(e.target.value) || 0 })} />
-                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase">2. Reliefs (CRA)</p>
+                      <p className="text-xs text-slate-700 font-medium">Base CRA + Rent Relief (Max 500k) + Pension</p>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Global Default Probation</label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" value={localHrVars.defaultProbationDays}
-                        onChange={e => updateLocalHrVariables({ defaultProbationDays: parseInt(e.target.value) || 0 })} />
-                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase">3. Taxable Income</p>
+                      <p className="text-xs text-slate-700 font-medium">Gross Revenue &minus; Total Reliefs</p>
                     </div>
-                    <p className="text-[10px] text-slate-400">Fallback if staff type specific period is not set.</p>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-bold text-slate-500 uppercase">4. Monthly PAYE</p>
+                      <p className="text-xs text-slate-700 font-medium">(Annual Tax from Brackets) &divide; 12</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="space-y-4 border-t pt-4 border-slate-100">
-                <p className="text-xs font-bold text-blue-600 uppercase">Due Process Settings</p>
-                <p className="text-xs text-slate-500 leading-relaxed max-w-lg mb-2">
-                  Legally compliant HR actions require allowing the employee time to investigate notes or make appeals before termination or suspension takes final effect.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Investigation Response Period</label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" value={localHrVars.investigationPeriodDays}
-                        onChange={e => updateLocalHrVariables({ investigationPeriodDays: parseInt(e.target.value) || 0 })} />
-                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+
+                {/* CRA & Pension Rate */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-3">Consolidated Relief Allowance (CRA)</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">CRA Base (₦)</label>
+                      <Input type="number" value={localPayeVars.craBase}
+                        onChange={e => updateLocalPayeVars({ craBase: Number(e.target.value) })} />
+                      <p className="text-xs text-slate-400">Fixed statutory amount (default ₦800,000)</p>
                     </div>
-                    <p className="text-[11px] text-slate-400">Time to reply to a disciplinary query</p>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Appeal Window</label>
-                    <div className="flex items-center gap-2">
-                      <Input type="number" value={localHrVars.appealPeriodDays}
-                        onChange={e => updateLocalHrVariables({ appealPeriodDays: parseInt(e.target.value) || 0 })} />
-                      <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Rent Relief Rate (%)</label>
+                      <Input type="number" step="0.1" value={(localPayeVars.rentReliefRate * 100).toFixed(1)}
+                        onChange={e => updateLocalPayeVars({ rentReliefRate: Number(e.target.value) / 100 })} />
+                      <p className="text-xs text-slate-400">Applied to input Rent to compute Relief (default 20%)</p>
                     </div>
-                    <p className="text-[11px] text-slate-400">Time allowed to appeal an action</p>
                   </div>
                 </div>
-              </div>
 
-            </CardContent>
-          </Card>
+                {/* Tax Brackets — fully dynamic, add/remove/edit */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-3">Tax Brackets (Annual Taxable Income)</p>
+                  <div className="border rounded-md overflow-hidden mb-3">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader className="bg-slate-50">
+                          <TableRow>
+                            <TableHead>Label</TableHead>
+                            <TableHead>Up To (₦) <span className="text-slate-400 font-normal text-xs italic">— blank = top bracket</span></TableHead>
+                            <TableHead>Rate (%)</TableHead>
+                            <TableHead className="w-10"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {[...localPayeVars.taxBrackets]
+                            .sort((a, b) => {
+                              if (a.upTo === null) return 1;
+                              if (b.upTo === null) return -1;
+                              return a.upTo - b.upTo;
+                            })
+                            .map(b => (
+                              <TableRow key={b.id}>
+                                <TableCell>
+                                  <Input className="h-8 w-36" value={b.label}
+                                    onChange={e => updateLocalTaxBracket(b.id, { label: e.target.value })} />
+                                </TableCell>
+                                <TableCell>
+                                  <Input type="number" className="h-8 w-36"
+                                    placeholder="(top bracket)"
+                                    value={b.upTo !== null ? b.upTo : ''}
+                                    onChange={e => updateLocalTaxBracket(b.id, { upTo: e.target.value === '' ? null : Number(e.target.value) })} />
+                                </TableCell>
+                                <TableCell>
+                                  <Input type="number" step="0.1" className="h-8 w-24"
+                                    value={(b.rate * 100).toFixed(1)}
+                                    onChange={e => updateLocalTaxBracket(b.id, { rate: Number(e.target.value) / 100 })} />
+                                </TableCell>
+                                <TableCell>
+                                  {priv.canEdit && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                      onClick={() => removeLocalTaxBracket(b.id)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                  {/* Add new bracket row */}
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-xs font-semibold text-slate-600">Label</label>
+                      <Input placeholder="e.g. Next ₦9m" value={newBracketLabel}
+                        onChange={e => setNewBracketLabel(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-600">Up To (₦) <span className="text-slate-400 font-normal italic">blank=top</span></label>
+                      <Input type="number" placeholder="11200000" className="w-36" value={newBracketUpTo}
+                        onChange={e => setNewBracketUpTo(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-600">Rate (%)</label>
+                      <Input type="number" step="0.1" placeholder="18" className="w-24" value={newBracketRate}
+                        onChange={e => setNewBracketRate(e.target.value)} />
+                    </div>
+                    <Button variant="outline" className="gap-1 shrink-0" onClick={() => {
+                      if (!newBracketLabel || !newBracketRate) return;
+                      addLocalTaxBracket({
+                        id: Math.random().toString(36).slice(2),
+                        label: newBracketLabel,
+                        upTo: newBracketUpTo !== '' ? Number(newBracketUpTo) : null,
+                        rate: Number(newBracketRate) / 100,
+                      });
+                      setNewBracketLabel(''); setNewBracketUpTo(''); setNewBracketRate('');
+                    }}>
+                      <Plus className="h-4 w-4" /> Add Bracket
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Extra Conditions */}
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-3">Extra CRA Conditions / Allowable Deductions</p>
+                  <p className="text-xs text-slate-400 mb-3">Amounts here are added to the CRA (reduce taxable income) when enabled.</p>
+                  <div className="flex gap-2 mb-3">
+                    <Input placeholder="Label (e.g. Life Insurance Relief)" value={newExtraLabel}
+                      onChange={e => setNewExtraLabel(e.target.value)} className="flex-1" />
+                    <Input type="number" placeholder="₦ Amount" value={newExtraAmount}
+                      onChange={e => setNewExtraAmount(e.target.value)} className="w-36" />
+                    <Button variant="outline" className="gap-1" onClick={() => {
+                      if (!newExtraLabel || !newExtraAmount) return;
+                      addLocalExtraCond({ id: Math.random().toString(36).slice(2), label: newExtraLabel, amount: Number(newExtraAmount), enabled: true });
+                      setNewExtraLabel(''); setNewExtraAmount('');
+                    }}><Plus className="h-4 w-4" /> Add</Button>
+                  </div>
+                  {localPayeVars.extraConditions.length === 0 ? (
+                    <p className="text-center text-slate-400 text-sm py-4 border rounded-md">No extra conditions. Add one above.</p>
+                  ) : (
+                    <div className="border rounded-md overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader className="bg-slate-50">
+                            <TableRow>
+                              <TableHead>Label</TableHead>
+                              <TableHead>Amount (₦)</TableHead>
+                              <TableHead className="text-center">Enabled</TableHead>
+                              <TableHead className="w-12"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {localPayeVars.extraConditions.map(cond => (
+                              <TableRow key={cond.id}>
+                                <TableCell className="font-medium">{cond.label}</TableCell>
+                                <TableCell>
+                                  <Input type="number" className="w-32 h-8" value={cond.amount}
+                                    onChange={e => updateLocalExtraCond(cond.id, { amount: Number(e.target.value) })} />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <input type="checkbox" checked={cond.enabled}
+                                    onChange={e => updateLocalExtraCond(cond.id, { enabled: e.target.checked })}
+                                    className="h-4 w-4 accent-blue-600" />
+                                </TableCell>
+                                <TableCell>
+                                  {priv.canEdit && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50"
+                                      onClick={() => removeLocalExtraCond(cond.id)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </CardContent>
+            </Card>
+
+            {/* --- HR Module & Disciplinary Settings --- */}
+            <Card className="border-slate-200">
+              <CardHeader className="bg-slate-50 rounded-t-md border-b border-slate-200">
+                <CardTitle className="text-slate-900">HR, Disciplinary &amp; Lifecycle Settings (Due Process)</CardTitle>
+                <CardDescription>
+                  Configure thresholds, time-frames, and policies applied automatically by the system. Includes specific "Due Process" variables such as the investigation timeframe and appeal allowance periods.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-6">
+
+                <div className="space-y-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase">Attendance &amp; Disciplinary Auto-Triggers</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Flagged Absence Threshold</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.flaggedAbsenceThreshold}
+                          onChange={e => updateLocalHrVariables({ flaggedAbsenceThreshold: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">flagged days</span>
+                      </div>
+                      <p className="text-xs text-slate-400">Absences generating auto-warning (e.g. 3)</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Disciplinary Expiration/Rolling Period</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.disciplinaryExpirationMonths}
+                          onChange={e => updateLocalHrVariables({ disciplinaryExpirationMonths: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">months</span>
+                      </div>
+                      <p className="text-xs text-slate-400">Duration a record stays active</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase">Evaluations &amp; Lifecycle Checks</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Office Staff Probation Period</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.officeProbationDays ?? 90}
+                          onChange={e => updateLocalHrVariables({ officeProbationDays: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Field Staff Probation Period</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.fieldProbationDays ?? 90}
+                          onChange={e => updateLocalHrVariables({ fieldProbationDays: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Global Default Probation</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.defaultProbationDays}
+                          onChange={e => updateLocalHrVariables({ defaultProbationDays: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400">Fallback if staff type specific period is not set.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t pt-4 border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Probation Task Assignment</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Designate who should be assigned automated probation evaluation tasks for each department, or set a company-wide default evaluator.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {/* Global Fallback */}
+                    <div className="max-w-md space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Company Default Evaluator (Fallback)</label>
+                      <select
+                        value={localHrVars.defaultProbationAssigneeId || ''}
+                        onChange={e => updateLocalHrVariables({ defaultProbationAssigneeId: e.target.value })}
+                        className="w-full text-xs h-9 px-3 py-1.5 rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700"
+                      >
+                        <option value="">Auto (Line Manager &gt; HR Team &gt; Senior Staff)</option>
+                        {activeUsers.map(u => (
+                          <option key={u.id} value={u.id}>
+                            {u.name} {u.department ? `(${u.department})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-slate-400">Used if an employee's department has no specific evaluator assigned below.</p>
+                    </div>
+
+                    {/* Department Mapping Table */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-xs font-semibold text-slate-700">Department Assignees</label>
+                      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white max-w-2xl">
+                        <Table>
+                          <TableHeader className="bg-slate-50">
+                            <TableRow>
+                              <TableHead className="text-xs font-bold text-slate-600 py-2.5">Department</TableHead>
+                              <TableHead className="text-xs font-bold text-slate-600 py-2.5">Assigned Evaluator</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {departments.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={2} className="text-center text-xs text-slate-400 py-4 italic">
+                                  No departments found. Add departments under the Department tab first.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              departments.map(dept => {
+                                const deptName = dept.name;
+                                const assignedUserId = (localHrVars.probationDepartmentAssignees || {})[deptName] || '';
+                                return (
+                                  <TableRow key={dept.id} className="hover:bg-slate-50/50">
+                                    <TableCell className="text-xs font-medium text-slate-800 py-2">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700 font-semibold">
+                                        {deptName}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="py-2">
+                                      <select
+                                        value={assignedUserId}
+                                        onChange={e => {
+                                          const val = e.target.value;
+                                          const current = { ...(localHrVars.probationDepartmentAssignees || {}) };
+                                          if (val) {
+                                            current[deptName] = val;
+                                          } else {
+                                            delete current[deptName];
+                                          }
+                                          updateLocalHrVariables({ probationDepartmentAssignees: current });
+                                        }}
+                                        className="text-xs h-8 px-2.5 py-1 rounded border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 w-full max-w-[280px]"
+                                      >
+                                        <option value="">(Use Company Default / Line Manager)</option>
+                                        {activeUsers.map(u => (
+                                          <option key={u.id} value={u.id}>
+                                            {u.name} {u.department ? `(${u.department})` : ''}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        When a probation evaluation task is automatically created, it will be assigned directly to the chosen evaluator for that employee's department.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t pt-4 border-slate-100">
+                  <p className="text-xs font-bold text-blue-600 uppercase">Due Process Settings</p>
+                  <p className="text-xs text-slate-500 leading-relaxed max-w-lg mb-2">
+                    Legally compliant HR actions require allowing the employee time to investigate notes or make appeals before termination or suspension takes final effect.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Investigation Response Period</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.investigationPeriodDays}
+                          onChange={e => updateLocalHrVariables({ investigationPeriodDays: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">Time to reply to a disciplinary query</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">Appeal Window</label>
+                      <div className="flex items-center gap-2">
+                        <Input type="number" value={localHrVars.appealPeriodDays}
+                          onChange={e => updateLocalHrVariables({ appealPeriodDays: parseInt(e.target.value) || 0 })} />
+                        <span className="text-sm text-slate-500 whitespace-nowrap">days</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">Time allowed to appeal an action</p>
+                    </div>
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
       )}
-      <RenameVariableDialog 
+      <RenameVariableDialog
         isOpen={!!editingVar}
         onClose={() => setEditingVar(null)}
         editingVar={editingVar}
@@ -3859,17 +3951,17 @@ export function Variables() {
   );
 }
 
-function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRenameInput, renameDateInput, setRenameDateInput, usageCounts, isPropagating, onConfirm }: { 
-  isOpen: boolean, 
-  onClose: () => void, 
-  editingVar: any, 
-  renameInput: string, 
-  setRenameInput: (v: string) => void, 
-  renameDateInput?: string, 
-  setRenameDateInput?: (v: string) => void, 
-  usageCounts: Record<string, number>, 
-  isPropagating: boolean, 
-  onConfirm: (shouldProp: boolean) => void 
+function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRenameInput, renameDateInput, setRenameDateInput, usageCounts, isPropagating, onConfirm }: {
+  isOpen: boolean,
+  onClose: () => void,
+  editingVar: any,
+  renameInput: string,
+  setRenameInput: (v: string) => void,
+  renameDateInput?: string,
+  setRenameDateInput?: (v: string) => void,
+  usageCounts: Record<string, number>,
+  isPropagating: boolean,
+  onConfirm: (shouldProp: boolean) => void
 }) {
   const [shouldPropagate, setShouldPropagate] = useState(true);
   const totalRefs = Object.values(usageCounts || {}).reduce((a: number, b: number) => a + b, 0);
@@ -3906,7 +3998,7 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
             {getTitle()}
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase">Old Value</label>
@@ -3918,7 +4010,7 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
           {editingVar.type === 'holiday' && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase">Holiday Date</label>
-              <Input 
+              <Input
                 type="date"
                 value={renameDateInput}
                 onChange={e => setRenameDateInput?.(e.target.value)}
@@ -3929,7 +4021,7 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
 
           <div className="space-y-2">
             <label className="text-xs font-bold text-slate-500 uppercase">New Value</label>
-            <Input 
+            <Input
               value={renameInput}
               onChange={e => setRenameInput(e.target.value)}
               placeholder="Enter new name..."
@@ -3956,8 +4048,8 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-amber-200">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   id="propagateCheck"
                   checked={shouldPropagate}
                   onChange={e => setShouldPropagate(e.target.checked)}
@@ -3976,8 +4068,8 @@ function RenameVariableDialog({ isOpen, onClose, editingVar, renameInput, setRen
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" onClick={onClose} disabled={isPropagating}>Cancel</Button>
-          <Button 
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-sm" 
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-sm"
             onClick={() => onConfirm(shouldPropagate)}
             disabled={isPropagating || !renameInput.trim()}
           >

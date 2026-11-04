@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useCallback, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  BarChart3, Fuel, Clock, AlertTriangle, Activity, 
-  CheckCircle2, Check, ArrowLeft, Calendar, Wrench, Sparkles, 
+import {
+  BarChart3, Fuel, Clock, AlertTriangle, Activity,
+  CheckCircle2, Check, ArrowLeft, Calendar, Wrench, Sparkles,
   Download, ExternalLink, ChevronDown, Layers, Filter,
   ShieldAlert, Droplets, Zap, TrendingUp, AlertCircle, HardHat,
   RefreshCw, ArrowRight, X, Globe, Archive, Search, LayoutGrid, List,
   SlidersHorizontal, Bell, Maximize2, Minimize2
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, BarChart, Bar, 
+import {
+  ResponsiveContainer, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell,
   ComposedChart, Line, ReferenceLine
 } from 'recharts';
@@ -32,6 +32,7 @@ import {
 } from '@/src/components/ui/dropdown-menu';
 import { DailyLogManager } from './DailyLogManager';
 import { cn } from '@/src/lib/utils';
+import { toast } from '@/src/components/ui/toast';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
 import { RefillForecastModal } from '@/src/components/analytics/RefillForecastModal';
 import { useRefillForecast } from '@/src/hooks/useRefillForecast';
@@ -205,12 +206,12 @@ export function ActiveSiteAnalytics() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { isDark } = useTheme();
 
-  const { sites, pendingSites = [] } = useAppStore();
-  const { 
-    dailyMachineLogs = [], 
-    sitePumpDates = [], 
-    waybills = [], 
-    assets = [], 
+  const { sites, pendingSites = [], invoices = [], updateInvoice } = useAppStore();
+  const {
+    dailyMachineLogs = [],
+    sitePumpDates = [],
+    waybills = [],
+    assets = [],
     maintenanceAssets = [],
     siteHoldPeriods = [],
     persistSitePumpDates
@@ -358,7 +359,7 @@ export function ActiveSiteAnalytics() {
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | 'year' | 'all'>('all');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [fleetChartFilter, setFleetChartFilter] = useState<'all' | 'active' | 'offsite'>('all');
-  
+
   // Historical Archive Search, Filter, View Mode, and Pagination States
   const [archiveSearch, setArchiveSearch] = useState('');
   const deferredArchiveSearch = useDeferredValue(archiveSearch);
@@ -373,14 +374,14 @@ export function ActiveSiteAnalytics() {
   const toggleFullScreenChart = async (chartId: string) => {
     if (fullScreenChart === chartId) {
       if (document.fullscreenElement) {
-        await document.exitFullscreen().catch(() => {});
+        await document.exitFullscreen().catch(() => { });
       }
       setFullScreenChart(null);
     } else {
       setFullScreenChart(chartId);
       const el = document.documentElement;
       if (el.requestFullscreen) {
-        await el.requestFullscreen().catch(() => {});
+        await el.requestFullscreen().catch(() => { });
       }
     }
   };
@@ -470,9 +471,9 @@ export function ActiveSiteAnalytics() {
   // All machines associated with this site (currently on site or logged in daily logs or pump dates)
   const siteMachines = useMemo(() => {
     if (!currentSite) return [];
-    const map = new Map<string, { 
-      id: string; 
-      name: string; 
+    const map = new Map<string, {
+      id: string;
+      name: string;
       isCurrentlyOnSite: boolean;
       startDate: string;
       stopDate: string | null;
@@ -484,9 +485,9 @@ export function ActiveSiteAnalytics() {
     (assets || [])
       .filter(a => a.type === 'equipment' && a.requiresLogging && (inventoryMap.get(a.id) || 0) > 0)
       .forEach(a => {
-        map.set(a.id, { 
-          id: a.id, 
-          name: a.name, 
+        map.set(a.id, {
+          id: a.id,
+          name: a.name,
           isCurrentlyOnSite: true,
           startDate: '',
           stopDate: null,
@@ -509,13 +510,13 @@ export function ActiveSiteAnalytics() {
 
         // Check if replaced
         const successorRecord = (sitePumpDates || []).find(p => p.siteId === currentSite.id && p.replacedAssetId === pd.assetId);
-        const successorAsset = successorRecord 
+        const successorAsset = successorRecord
           ? (assets || []).find(a => a.id === successorRecord.assetId) || (maintenanceAssets || []).find(m => m.id === successorRecord.assetId)
           : null;
 
-        map.set(pd.assetId, { 
-          id: pd.assetId, 
-          name, 
+        map.set(pd.assetId, {
+          id: pd.assetId,
+          name,
           isCurrentlyOnSite: isCurrentlyOnSite && !successorRecord,
           startDate: pd.pumpStartDate,
           stopDate: pd.pumpStopDate || null,
@@ -530,9 +531,9 @@ export function ActiveSiteAnalytics() {
       .forEach(l => {
         if (!map.has(l.assetId)) {
           const invQty = inventoryMap.get(l.assetId) || 0;
-          map.set(l.assetId, { 
-            id: l.assetId, 
-            name: l.assetName || 'Equipment', 
+          map.set(l.assetId, {
+            id: l.assetId,
+            name: l.assetName || 'Equipment',
             isCurrentlyOnSite: invQty > 0,
             startDate: '',
             stopDate: null,
@@ -743,7 +744,7 @@ export function ActiveSiteAnalytics() {
       });
 
       const totalDiesel = siteFilteredLogs.reduce((sum, l) => sum + (Number(l.dieselUsage) || 0), 0);
-      
+
       let fullDays = 0;
       let halfDays = 0;
       let offDays = 0;
@@ -1121,7 +1122,7 @@ export function ActiveSiteAnalytics() {
         (s.client && s.client.toLowerCase().includes(q)) ||
         (s.stage && s.stage.toLowerCase().includes(q));
 
-      const matchesStatus = 
+      const matchesStatus =
         archiveStatusFilter === 'all' ||
         (archiveStatusFilter === 'ended' && s.status === 'Ended') ||
         (archiveStatusFilter === 'onhold' && s.isOnHold);
@@ -1213,7 +1214,7 @@ export function ActiveSiteAnalytics() {
 
     return targetFleet.map(machine => {
       const mLogs = siteLogs.filter(l => l.assetId === machine.id);
-      
+
       // Calculate active operational days
       const activeDays = mLogs.reduce((acc, l) => {
         const opDay = l.operationalDay ?? (l.isActive ? 'full' : 'none');
@@ -1232,7 +1233,7 @@ export function ActiveSiteAnalytics() {
 
       // Pump dates & deployment configuration
       const pumpConfig = (sitePumpDates || []).find(pd => pd.siteId === currentSite.id && pd.assetId === machine.id);
-      
+
       // Check Machine Replacement Lineage (Predecessor & Successor)
       const predecessorId = pumpConfig?.replacedAssetId;
       const predecessorAsset = predecessorId
@@ -1263,17 +1264,17 @@ export function ActiveSiteAnalytics() {
         machine.isCurrentlyOnSite
       );
 
-      const status: 'active' | 'taken_out' | 'replaced' = isCurrentlyActive 
-        ? 'active' 
-        : isReplaced 
-        ? 'replaced' 
-        : 'taken_out';
+      const status: 'active' | 'taken_out' | 'replaced' = isCurrentlyActive
+        ? 'active'
+        : isReplaced
+          ? 'replaced'
+          : 'taken_out';
 
-      const statusLabel = status === 'active' 
-        ? 'Active on Site' 
-        : status === 'replaced' 
-        ? 'Replaced / Swapped Out' 
-        : 'Taken Out / Demobilized';
+      const statusLabel = status === 'active'
+        ? 'Active on Site'
+        : status === 'replaced'
+          ? 'Replaced / Swapped Out'
+          : 'Taken Out / Demobilized';
 
       // Calculate total calendar days on site
       let calendarDaysOnSite = 0;
@@ -1303,17 +1304,17 @@ export function ActiveSiteAnalytics() {
       });
 
       // Utilization rate
-      const utilization = calendarDaysOnSite > 0 
-        ? Math.min(100, Math.round((activeDays / calendarDaysOnSite) * 100)) 
+      const utilization = calendarDaysOnSite > 0
+        ? Math.min(100, Math.round((activeDays / calendarDaysOnSite) * 100))
         : 0;
 
       // Maintenance asset matching
-      const maintAsset = maintenanceAssets.find(ma => 
+      const maintAsset = maintenanceAssets.find(ma =>
         ma.id === machine.id || ma.name.toLowerCase().trim() === machine.name.toLowerCase().trim()
       );
 
       // Raw asset matching for benchmark metrics
-      const rawAsset = (assets || []).find(a => 
+      const rawAsset = (assets || []).find(a =>
         a.id === machine.id || a.name.toLowerCase().trim() === machine.name.toLowerCase().trim()
       );
 
@@ -1335,8 +1336,8 @@ export function ActiveSiteAnalytics() {
       const lastRefillLitres = Number(lastRefillLog?.dieselUsage) || 0;
       const wasLastRefillFull = !!lastRefillLog?.isTankFilledToFull;
 
-      const effectiveTankCapacity = tankCapacityLitres > 0 
-        ? tankCapacityLitres 
+      const effectiveTankCapacity = tankCapacityLitres > 0
+        ? tankCapacityLitres
         : (lastRefillLitres > 0 ? lastRefillLitres : (lastDipstickLitres || 0));
 
       let estimatedRemainingLitres = 0;
@@ -1361,7 +1362,7 @@ export function ActiveSiteAnalytics() {
           const burnedSinceDip = expectedDailyBurnRate > 0 ? (activeDaysSinceDip * expectedDailyBurnRate) : 0;
           estimatedRemainingLitres = Math.max(0, Math.min(effectiveTankCapacity, Math.round((lastDipstickLitres || 0) - burnedSinceDip)));
           isDipstickVerified = (activeDaysSinceDip === 0);
-        } 
+        }
         // Scenario B: Refill occurred after the last dipstick (or no dipstick available)
         else if (lastRefillDate) {
           let activeDaysSinceRefill = 0;
@@ -1378,7 +1379,7 @@ export function ActiveSiteAnalytics() {
             activeDaysSinceRefill += 1;
           }
           const burnedSinceRefill = expectedDailyBurnRate > 0 ? (activeDaysSinceRefill * expectedDailyBurnRate) : 0;
-          
+
           // Deplete previous dipstick reading by operational days before refill
           let remainingFromDipstick = 0;
           if (lastDipstickLitres != null && lastDipstickDate && lastDipstickDate < lastRefillDate) {
@@ -1395,12 +1396,12 @@ export function ActiveSiteAnalytics() {
 
           // If explicitly marked full tank, start from 100% capacity
           // Otherwise, if previous dipstick exists, add refill to depleted dipstick
-          const baseline = wasLastRefillFull 
-            ? effectiveTankCapacity 
-            : (lastDipstickLitres != null 
-                ? Math.min(effectiveTankCapacity, remainingFromDipstick + lastRefillLitres)
-                : (tankCapacityLitres > 0 ? Math.min(effectiveTankCapacity, lastRefillLitres) : effectiveTankCapacity));
-                
+          const baseline = wasLastRefillFull
+            ? effectiveTankCapacity
+            : (lastDipstickLitres != null
+              ? Math.min(effectiveTankCapacity, remainingFromDipstick + lastRefillLitres)
+              : (tankCapacityLitres > 0 ? Math.min(effectiveTankCapacity, lastRefillLitres) : effectiveTankCapacity));
+
           estimatedRemainingLitres = Math.max(0, Math.round(baseline - burnedSinceRefill));
         }
       }
@@ -1490,7 +1491,7 @@ export function ActiveSiteAnalytics() {
   // Aggregated Site Metrics
   const siteAggregates = useMemo(() => {
     const totalDiesel = filteredLogs.reduce((acc, l) => acc + (Number(l.dieselUsage) || 0), 0);
-    
+
     const activeDays = filteredLogs.reduce((acc, l) => {
       const opDay = l.operationalDay ?? (l.isActive ? 'full' : 'none');
       if (opDay === 'full') return acc + 1;
@@ -1697,6 +1698,30 @@ export function ActiveSiteAnalytics() {
         editingPumpDateMachine.replacedAssetId || null,
         editingPumpDateMachine.swapReason || null
       );
+
+      // Auto-sync initial/active invoice Day 1 to match pump startup date
+      if (editingPumpDateMachine.startDate && currentSite) {
+        const normSiteName = currentSite.name?.trim().toLowerCase();
+        const matchingInvoice = (invoices || []).find((inv) =>
+          inv.status !== 'Paid' &&
+          (inv.siteId === currentSite.id || (inv.siteName && inv.siteName.trim().toLowerCase() === normSiteName))
+        );
+        if (matchingInvoice && (!matchingInvoice.pumpStartDate || matchingInvoice.pumpStartDate !== editingPumpDateMachine.startDate)) {
+          const pStart = editingPumpDateMachine.startDate;
+          const dur = Number(matchingInvoice.duration) || 30;
+          const sDate = new Date(pStart);
+          if (!isNaN(sDate.getTime())) {
+            sDate.setDate(sDate.getDate() + dur - 1);
+            const newDueDate = sDate.toISOString().split('T')[0];
+            updateInvoice(matchingInvoice.id, {
+              pumpStartDate: pStart,
+              dueDate: newDueDate,
+            });
+            toast.success(`Synced Invoice #${matchingInvoice.invoiceNumber} Day 1 to ${formatDisplayDate(pStart)}`);
+          }
+        }
+      }
+
       setEditingPumpDateMachine(null);
     } catch (err: any) {
       setPumpDateModalError(err.message || 'Failed to update pump dates.');
@@ -1794,7 +1819,7 @@ export function ActiveSiteAnalytics() {
 
           {/* Historical & Inactive Sites Toggle & Archive List */}
           <DropdownMenuSeparator />
-          <div 
+          <div
             onClick={(e) => {
               e.preventDefault();
               setShowHistoricalSites(prev => {
@@ -1857,7 +1882,7 @@ export function ActiveSiteAnalytics() {
                           <span className="truncate font-semibold">{s.name}</span>
                           <span className={cn(
                             "text-[9px] px-1.5 py-0.2 rounded font-bold uppercase",
-                            s.status === 'Ended' 
+                            s.status === 'Ended'
                               ? "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
                               : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
                           )}>
@@ -1944,10 +1969,10 @@ export function ActiveSiteAnalytics() {
               selectedMachineId === 'active_only'
                 ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700 shadow-xs"
                 : selectedMachineId === 'offsite_only'
-                ? "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600 shadow-xs"
-                : selectedMachineId !== 'all'
-                ? "bg-cyan-50 text-cyan-800 border-cyan-300 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-700 shadow-xs"
-                : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                  ? "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600 shadow-xs"
+                  : selectedMachineId !== 'all'
+                    ? "bg-cyan-50 text-cyan-800 border-cyan-300 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-700 shadow-xs"
+                    : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
             )}
             title="Filter by machine or fleet status"
           >
@@ -2019,9 +2044,9 @@ export function ActiveSiteAnalytics() {
       </div>
 
       {/* Refill Forecast Notification Bell */}
-      <Button 
-        variant="outline" 
-        size="sm" 
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => {
           setRefillForecastScope(isPortfolioMode ? 'fleet' : 'current');
           setIsRefillForecastModalOpen(true);
@@ -2031,8 +2056,8 @@ export function ActiveSiteAnalytics() {
           urgentRefillCount > 0
             ? "border-rose-300 dark:border-rose-800 bg-rose-50/70 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100/80 shadow-xs"
             : tomorrowRefillCount > 0
-            ? "border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100/80 shadow-xs"
-            : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+              ? "border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100/80 shadow-xs"
+              : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60"
         )}
         title={
           urgentRefillCount > 0 || tomorrowRefillCount > 0
@@ -2041,12 +2066,12 @@ export function ActiveSiteAnalytics() {
         }
       >
         <Bell className={cn(
-          "w-3.5 h-3.5 shrink-0", 
-          urgentRefillCount > 0 
-            ? "text-rose-600 dark:text-rose-400 animate-bounce" 
+          "w-3.5 h-3.5 shrink-0",
+          urgentRefillCount > 0
+            ? "text-rose-600 dark:text-rose-400 animate-bounce"
             : tomorrowRefillCount > 0
-            ? "text-amber-500 dark:text-amber-400"
-            : "text-slate-400 dark:text-slate-500"
+              ? "text-amber-500 dark:text-amber-400"
+              : "text-slate-400 dark:text-slate-500"
         )} />
         <span className="hidden md:inline">Refill Forecast</span>
         {urgentRefillCount > 0 ? (
@@ -2062,9 +2087,9 @@ export function ActiveSiteAnalytics() {
 
       {/* Site 360 */}
       {selectedSiteId !== 'all' && currentSite && (
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           className="h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-lg text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/40"
           onClick={() => navigate(`/client-360?siteId=${currentSite.id}`)}
           title="Open Site 360"
@@ -2119,7 +2144,7 @@ export function ActiveSiteAnalytics() {
     }> = [];
 
     targetMachines.forEach(machine => {
-      const rawAsset = (assets || []).find(a => 
+      const rawAsset = (assets || []).find(a =>
         a.id === machine.id || a.name.toLowerCase().trim() === machine.name.toLowerCase().trim()
       );
       const benchmarkRate = Number(rawAsset?.expectedDailyBurnRate) || 18.0;
@@ -2142,10 +2167,10 @@ export function ActiveSiteAnalytics() {
 
       mLogs.forEach((l, idx) => {
         const refilled = Number(l.dieselUsage) || 0;
-        const dipstick = l.dipstickLevelLitres != null && Number(l.dipstickLevelLitres) > 0 
-          ? Number(l.dipstickLevelLitres) 
+        const dipstick = l.dipstickLevelLitres != null && Number(l.dipstickLevelLitres) > 0
+          ? Number(l.dipstickLevelLitres)
           : (l.isTankFilledToFull && tankCapacity > 0 ? tankCapacity : null);
-        
+
         if (refilled > 0) {
           refillEvents.push({
             logIndex: idx,
@@ -2163,7 +2188,7 @@ export function ActiveSiteAnalytics() {
         const prevRefill = i > 0 ? refillEvents[i - 1] : null;
 
         const prevDate = prevRefill ? prevRefill.date : (machine.startDate || mLogs[0]?.date || currentRefill.date);
-        
+
         const intervalLogs = mLogs.filter(l => {
           if (prevRefill) {
             return l.date > prevDate && l.date <= currentRefill.date;
@@ -2217,12 +2242,12 @@ export function ActiveSiteAnalytics() {
           status = 'optimal';
         }
 
-        const efficiencyPct = expectedBurn > 0 
+        const efficiencyPct = expectedBurn > 0
           ? Math.round((actualBurn / expectedBurn) * 100)
           : 100;
 
-        const intervalLabel = prevRefill 
-          ? `${formatDisplayDate(prevDate)} → ${formatDisplayDate(currentRefill.date)}` 
+        const intervalLabel = prevRefill
+          ? `${formatDisplayDate(prevDate)} → ${formatDisplayDate(currentRefill.date)}`
           : `Initial Tank Baseline (${formatDisplayDate(currentRefill.date)})`;
 
         cycles.push({
@@ -2494,8 +2519,8 @@ export function ActiveSiteAnalytics() {
                 </div>
                 <div className={cn(
                   "mt-2 text-2xl font-extrabold",
-                  historicalTotals.totalVariance > 0 
-                    ? "text-rose-600 dark:text-rose-400" 
+                  historicalTotals.totalVariance > 0
+                    ? "text-rose-600 dark:text-rose-400"
                     : "text-emerald-600 dark:text-emerald-400"
                 )}>
                   {historicalTotals.totalVariance > 0 ? `+${historicalTotals.totalVariance}` : historicalTotals.totalVariance} <span className="text-xs font-normal">L</span>
@@ -2602,8 +2627,8 @@ export function ActiveSiteAnalytics() {
                 </div>
                 <div className={cn(
                   "mt-2 text-2xl font-extrabold",
-                  allActiveSitesPortfolio.totals.netVarianceLitres > 0 
-                    ? "text-rose-600 dark:text-rose-400" 
+                  allActiveSitesPortfolio.totals.netVarianceLitres > 0
+                    ? "text-rose-600 dark:text-rose-400"
                     : "text-emerald-600 dark:text-emerald-400"
                 )}>
                   {allActiveSitesPortfolio.totals.netVarianceLitres > 0 ? `+${allActiveSitesPortfolio.totals.netVarianceLitres}` : allActiveSitesPortfolio.totals.netVarianceLitres} <span className="text-xs font-normal">L</span>
@@ -2713,8 +2738,8 @@ export function ActiveSiteAnalytics() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {allActiveSitesPortfolio.siteMetricsList.map(site => (
-                  <Card 
-                    key={site.id} 
+                  <Card
+                    key={site.id}
                     className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-2xl overflow-hidden flex flex-col justify-between"
                   >
                     <div>
@@ -2790,7 +2815,7 @@ export function ActiveSiteAnalytics() {
                               </span>
                             )}
                           </div>
-                          <span 
+                          <span
                             className="text-[10px] text-slate-400 block truncate"
                             title={site.earliestPumpStartDateFormatted ? `Earliest pump start date: ${site.earliestPumpStartDateFormatted}` : 'No pump logs on record'}
                           >
@@ -2841,166 +2866,166 @@ export function ActiveSiteAnalytics() {
                 ))}
               </div>
             ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Chart 1: Diesel Telemetry by Site */}
-              <Card 
-                style={fullScreenChart === 'portfolio-diesel' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 380px' }}
-                className={cn(
-                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
-                fullScreenChart === 'portfolio-diesel' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
-              )}>
-                {fullScreenChart === 'portfolio-diesel' && (
-                  <Button
-                    variant="default"
-                    size="icon"
-                    className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
-                    onClick={() => toggleFullScreenChart('portfolio-diesel')}
-                    title="Exit Full Screen"
-                  >
-                    <Minimize2 className="h-5 w-5" />
-                  </Button>
-                )}
-                <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <Fuel className="h-4 w-4 text-amber-500" />
-                    Cross-Site Diesel Refilled vs. Expected Burn (Litres)
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                    onClick={() => toggleFullScreenChart('portfolio-diesel')}
-                    title="Full Screen"
-                    aria-label="Full Screen"
-                  >
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent className={cn("p-5 pt-6", fullScreenChart === 'portfolio-diesel' && "flex-1 flex flex-col min-h-0")}>
-                  {allActiveSitesPortfolio.comparativeChartData.length > 0 ? (
-                    <div className={cn("w-full min-w-0", fullScreenChart === 'portfolio-diesel' ? "flex-1 min-h-[500px]" : "h-72")}>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                        <BarChart data={allActiveSitesPortfolio.comparativeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
-                          <XAxis 
-                            dataKey="name" 
-                            stroke={isDark ? '#94a3b8' : '#64748b'} 
-                            fontSize={11}
-                            tickLine={false}
-                            interval={0}
-                            angle={-15}
-                            textAnchor="end"
-                          />
-                          <YAxis 
-                            stroke={isDark ? '#94a3b8' : '#64748b'} 
-                            fontSize={11}
-                            tickLine={false}
-                            tickFormatter={v => `${v}L`}
-                          />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                              borderColor: isDark ? '#334155' : '#e2e8f0',
-                              borderRadius: '0.75rem',
-                              fontSize: '12px',
-                              color: isDark ? '#ffffff' : '#0f172a'
-                            }}
-                            formatter={(val: any, name: string) => [
-                              `${val} Litres`,
-                              name === 'dieselRefilled' ? 'Diesel Refilled' : 'Expected Burn'
-                            ]}
-                          />
-                          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px' }} />
-                          <Bar dataKey="dieselRefilled" name="Diesel Refilled (L)" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
-                          <Bar dataKey="expectedDiesel" name="Expected Burn (L)" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
-                      No site telemetry recorded yet.
-                    </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Chart 1: Diesel Telemetry by Site */}
+                <Card
+                  style={fullScreenChart === 'portfolio-diesel' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 380px' }}
+                  className={cn(
+                    "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                    fullScreenChart === 'portfolio-diesel' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+                  )}>
+                  {fullScreenChart === 'portfolio-diesel' && (
+                    <Button
+                      variant="default"
+                      size="icon"
+                      className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                      onClick={() => toggleFullScreenChart('portfolio-diesel')}
+                      title="Exit Full Screen"
+                    >
+                      <Minimize2 className="h-5 w-5" />
+                    </Button>
                   )}
-                </CardContent>
-              </Card>
+                  <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <Fuel className="h-4 w-4 text-amber-500" />
+                      Cross-Site Diesel Refilled vs. Expected Burn (Litres)
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                      onClick={() => toggleFullScreenChart('portfolio-diesel')}
+                      title="Full Screen"
+                      aria-label="Full Screen"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent className={cn("p-5 pt-6", fullScreenChart === 'portfolio-diesel' && "flex-1 flex flex-col min-h-0")}>
+                    {allActiveSitesPortfolio.comparativeChartData.length > 0 ? (
+                      <div className={cn("w-full min-w-0", fullScreenChart === 'portfolio-diesel' ? "flex-1 min-h-[500px]" : "h-72")}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <BarChart data={allActiveSitesPortfolio.comparativeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              stroke={isDark ? '#94a3b8' : '#64748b'}
+                              fontSize={11}
+                              tickLine={false}
+                              interval={0}
+                              angle={-15}
+                              textAnchor="end"
+                            />
+                            <YAxis
+                              stroke={isDark ? '#94a3b8' : '#64748b'}
+                              fontSize={11}
+                              tickLine={false}
+                              tickFormatter={v => `${v}L`}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                borderColor: isDark ? '#334155' : '#e2e8f0',
+                                borderRadius: '0.75rem',
+                                fontSize: '12px',
+                                color: isDark ? '#ffffff' : '#0f172a'
+                              }}
+                              formatter={(val: any, name: string) => [
+                                `${val} Litres`,
+                                name === 'dieselRefilled' ? 'Diesel Refilled' : 'Expected Burn'
+                              ]}
+                            />
+                            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px' }} />
+                            <Bar dataKey="dieselRefilled" name="Diesel Refilled (L)" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
+                            <Bar dataKey="expectedDiesel" name="Expected Burn (L)" fill="#06b6d4" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
+                        No site telemetry recorded yet.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              {/* Chart 2: Deployed Pumps & Operating Days by Site */}
-              <Card 
-                style={fullScreenChart === 'portfolio-pumps' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 380px' }}
-                className={cn(
-                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
-                fullScreenChart === 'portfolio-pumps' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
-              )}>
-                {fullScreenChart === 'portfolio-pumps' && (
-                  <Button
-                    variant="default"
-                    size="icon"
-                    className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
-                    onClick={() => toggleFullScreenChart('portfolio-pumps')}
-                    title="Exit Full Screen"
-                  >
-                    <Minimize2 className="h-5 w-5" />
-                  </Button>
-                )}
-                <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-emerald-500" />
-                    Active Pumps & Operational Days by Site
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                    onClick={() => toggleFullScreenChart('portfolio-pumps')}
-                    title="Full Screen"
-                    aria-label="Full Screen"
-                  >
-                    <Maximize2 className="h-3.5 w-3.5" />
-                  </Button>
-                </CardHeader>
-                <CardContent className={cn("p-5 pt-6", fullScreenChart === 'portfolio-pumps' && "flex-1 flex flex-col min-h-0")}>
-                  {allActiveSitesPortfolio.comparativeChartData.length > 0 ? (
-                    <div className={cn("w-full min-w-0", fullScreenChart === 'portfolio-pumps' ? "flex-1 min-h-[500px]" : "h-72")}>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                        <BarChart data={allActiveSitesPortfolio.comparativeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
-                          <XAxis 
-                            dataKey="name" 
-                            stroke={isDark ? '#94a3b8' : '#64748b'} 
-                            fontSize={11}
-                            tickLine={false}
-                            interval={0}
-                            angle={-15}
-                            textAnchor="end"
-                          />
-                          <YAxis 
-                            stroke={isDark ? '#94a3b8' : '#64748b'} 
-                            fontSize={11}
-                            tickLine={false}
-                          />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                              borderColor: isDark ? '#334155' : '#e2e8f0',
-                              borderRadius: '0.75rem',
-                              fontSize: '12px',
-                              color: isDark ? '#ffffff' : '#0f172a'
-                            }}
-                          />
-                          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px' }} />
-                          <Bar dataKey="activePumps" name="Active Pumps Count" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
-                          <Bar dataKey="activeDays" name="Active Operating Days" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
-                      No site deployment data recorded yet.
-                    </div>
+                {/* Chart 2: Deployed Pumps & Operating Days by Site */}
+                <Card
+                  style={fullScreenChart === 'portfolio-pumps' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 380px' }}
+                  className={cn(
+                    "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                    fullScreenChart === 'portfolio-pumps' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+                  )}>
+                  {fullScreenChart === 'portfolio-pumps' && (
+                    <Button
+                      variant="default"
+                      size="icon"
+                      className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                      onClick={() => toggleFullScreenChart('portfolio-pumps')}
+                      title="Exit Full Screen"
+                    >
+                      <Minimize2 className="h-5 w-5" />
+                    </Button>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                  <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+                    <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-emerald-500" />
+                      Active Pumps & Operational Days by Site
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                      onClick={() => toggleFullScreenChart('portfolio-pumps')}
+                      title="Full Screen"
+                      aria-label="Full Screen"
+                    >
+                      <Maximize2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </CardHeader>
+                  <CardContent className={cn("p-5 pt-6", fullScreenChart === 'portfolio-pumps' && "flex-1 flex flex-col min-h-0")}>
+                    {allActiveSitesPortfolio.comparativeChartData.length > 0 ? (
+                      <div className={cn("w-full min-w-0", fullScreenChart === 'portfolio-pumps' ? "flex-1 min-h-[500px]" : "h-72")}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                          <BarChart data={allActiveSitesPortfolio.comparativeChartData} margin={{ top: 10, right: 10, left: -15, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              stroke={isDark ? '#94a3b8' : '#64748b'}
+                              fontSize={11}
+                              tickLine={false}
+                              interval={0}
+                              angle={-15}
+                              textAnchor="end"
+                            />
+                            <YAxis
+                              stroke={isDark ? '#94a3b8' : '#64748b'}
+                              fontSize={11}
+                              tickLine={false}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                                borderColor: isDark ? '#334155' : '#e2e8f0',
+                                borderRadius: '0.75rem',
+                                fontSize: '12px',
+                                color: isDark ? '#ffffff' : '#0f172a'
+                              }}
+                            />
+                            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px' }} />
+                            <Bar dataKey="activePumps" name="Active Pumps Count" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
+                            <Bar dataKey="activeDays" name="Active Operating Days" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={35} isAnimationActive={false} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
+                        No site deployment data recorded yet.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             )} {/* end chartsReady ternary */}
 
             {/* Active Sites Performance & Telemetry Summary Table */}
@@ -3033,8 +3058,8 @@ export function ActiveSiteAnalytics() {
                   </TableHeader>
                   <TableBody>
                     {allActiveSitesPortfolio.siteMetricsList.map(site => (
-                      <TableRow 
-                        key={site.id} 
+                      <TableRow
+                        key={site.id}
                         className="border-b border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                       >
                         <TableCell className="py-3 font-medium">
@@ -3052,7 +3077,7 @@ export function ActiveSiteAnalytics() {
                           <div className="flex flex-col gap-1 items-start">
                             <Badge variant="outline" className={cn(
                               "text-[9px] font-bold uppercase",
-                              site.isOnHold 
+                              site.isOnHold
                                 ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-700"
                                 : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
                             )}>
@@ -3199,11 +3224,11 @@ export function ActiveSiteAnalytics() {
               <div className="flex items-center gap-2.5 flex-wrap">
                 <div className="flex items-center bg-white dark:bg-slate-900 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs shadow-2xs">
                   {(['all', 'ended', 'onhold'] as const).map(filterKey => {
-                    const count = filterKey === 'all' 
-                      ? historicalSiteMetrics.length 
-                      : filterKey === 'ended' 
-                      ? historicalSiteMetrics.filter(s => s.status === 'Ended').length 
-                      : historicalSiteMetrics.filter(s => s.isOnHold).length;
+                    const count = filterKey === 'all'
+                      ? historicalSiteMetrics.length
+                      : filterKey === 'ended'
+                        ? historicalSiteMetrics.filter(s => s.status === 'Ended').length
+                        : historicalSiteMetrics.filter(s => s.isOnHold).length;
 
                     const label = filterKey === 'all' ? 'All' : filterKey === 'ended' ? 'Ended' : 'On Hold';
 
@@ -3296,8 +3321,8 @@ export function ActiveSiteAnalytics() {
                   </TableHeader>
                   <TableBody>
                     {displayedHistoricalSites.map(site => (
-                      <TableRow 
-                        key={site.id} 
+                      <TableRow
+                        key={site.id}
                         className="border-b border-slate-100 dark:border-slate-800/80 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                       >
                         <TableCell className="py-3 font-medium">
@@ -3399,8 +3424,8 @@ export function ActiveSiteAnalytics() {
               /* Archive Content: Cards Grid View */
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {displayedHistoricalSites.map(site => (
-                  <Card 
-                    key={site.id} 
+                  <Card
+                    key={site.id}
                     className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all rounded-2xl overflow-hidden flex flex-col justify-between"
                   >
                     <div>
@@ -3483,7 +3508,7 @@ export function ActiveSiteAnalytics() {
                               </span>
                             )}
                           </div>
-                          <span 
+                          <span
                             className="text-[10px] text-slate-400 block truncate"
                             title={site.earliestPumpStartDateFormatted ? `Earliest pump start date: ${site.earliestPumpStartDateFormatted}` : 'No pump logs on record'}
                           >
@@ -3585,7 +3610,7 @@ export function ActiveSiteAnalytics() {
           </Button>
         </div>
       )}
-      
+
       {/* Mobile-only secondary filter strip for tiny screens */}
       <div className="sm:hidden flex items-center justify-between gap-2 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs overflow-x-auto">
@@ -3604,9 +3629,9 @@ export function ActiveSiteAnalytics() {
             </button>
           ))}
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleExportCSV}
           className="h-7 px-2 text-xs font-semibold rounded-lg shrink-0"
         >
@@ -3628,17 +3653,17 @@ export function ActiveSiteAnalytics() {
           siteAggregates.overallUtilization
         ]}
         secondaryMetrics={[
-          { 
-            label: 'Running Days', 
-            value: `${siteAggregates.activeDays} / ${siteAggregates.totalFleetDaysOnSite} d` 
+          {
+            label: 'Running Days',
+            value: `${siteAggregates.activeDays} / ${siteAggregates.totalFleetDaysOnSite} d`
           },
-          { 
-            label: 'Total Diesel Refilled', 
+          {
+            label: 'Total Diesel Refilled',
             value: `${siteAggregates.totalDiesel.toLocaleString(undefined, { maximumFractionDigits: 0 })} L`,
             subValue: siteAggregates.lastRefilledFormatted !== 'No refill recorded' ? `Last: ${siteAggregates.lastRefilledFormatted}` : undefined
           },
-          { 
-            label: 'Downtime Halt', 
+          {
+            label: 'Downtime Halt',
             value: `${siteAggregates.totalDowntimes} events`,
             subValue: `${siteAggregates.totalDowntimeHours.toFixed(1)}h lost`,
             tone: siteAggregates.totalDowntimes > 0 ? 'negative' : 'positive'
@@ -3677,7 +3702,7 @@ export function ActiveSiteAnalytics() {
                   .filter(m => m.isCurrentlyActive)
                   .map(m => {
                     return (
-                      <div 
+                      <div
                         key={m.id}
                         className="bg-slate-50/70 dark:bg-slate-850/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all"
                       >
@@ -3705,12 +3730,12 @@ export function ActiveSiteAnalytics() {
                               m.fuelLevelStatus === 'critical'
                                 ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border-rose-300 dark:border-rose-800'
                                 : m.fuelLevelStatus === 'low'
-                                ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                                : m.fuelLevelStatus === 'good'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border-blue-300 dark:border-blue-800'
-                                : m.fuelLevelStatus === 'optimal'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
-                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                  : m.fuelLevelStatus === 'good'
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border-blue-300 dark:border-blue-800'
+                                    : m.fuelLevelStatus === 'optimal'
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                             )}>
                               {(m.fuelLevelStatus === 'critical' || m.fuelLevelStatus === 'low') && (
                                 <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
@@ -3718,19 +3743,19 @@ export function ActiveSiteAnalytics() {
                               {m.fuelLevelStatus === 'critical'
                                 ? 'CRITICAL'
                                 : m.fuelLevelStatus === 'low'
-                                ? 'LOW LEVEL'
-                                : m.fuelLevelStatus === 'good'
-                                ? 'NORMAL'
-                                : m.fuelLevelStatus === 'optimal'
-                                ? 'OPTIMAL'
-                                : 'UNRATED'}
+                                  ? 'LOW LEVEL'
+                                  : m.fuelLevelStatus === 'good'
+                                    ? 'NORMAL'
+                                    : m.fuelLevelStatus === 'optimal'
+                                      ? 'OPTIMAL'
+                                      : 'UNRATED'}
                             </span>
                           </div>
 
                           {/* Center Visual: Realistic Tank Gauge */}
                           <div className="py-4 flex justify-center">
                             <div className="relative w-24 h-44 rounded-2xl border-2 border-slate-300/80 dark:border-slate-700 bg-slate-100/90 dark:bg-slate-900 overflow-hidden shadow-inner flex flex-col justify-end">
-                              
+
                               {/* Horizontal Calibration Lines matching reference image */}
                               <div className="absolute inset-0 pointer-events-none flex flex-col justify-between py-2 px-1 z-20 opacity-40 dark:opacity-30">
                                 <div className="border-b border-slate-600 dark:border-slate-400 w-1/3" />
@@ -3748,14 +3773,14 @@ export function ActiveSiteAnalytics() {
                               </div>
 
                               {/* Fuel Liquid Level Fill with Amber/Brown Liquid matching image */}
-                              <div 
+                              <div
                                 className={cn(
                                   'w-full transition-all duration-700 relative z-10',
                                   m.fuelLevelStatus === 'critical'
                                     ? 'bg-rose-600'
                                     : m.fuelLevelStatus === 'low'
-                                    ? 'bg-amber-600'
-                                    : 'bg-amber-500'
+                                      ? 'bg-amber-600'
+                                      : 'bg-amber-500'
                                 )}
                                 style={{ height: `${Math.max(4, m.fuelPercentage)}%` }}
                               >
@@ -3833,1537 +3858,1537 @@ export function ActiveSiteAnalytics() {
           ))}
         </div>
       ) : (
-      <>
-      {/* ── VISUAL SECTION 1: Diesel Consumption Trend Graph ── */}
-      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <Fuel className="h-4 w-4 text-amber-500" />
-                Diesel Telemetry: Refill Interval Variance & Daily Average Diesel Usage (L/Day)
-              </CardTitle>
-              {siteAggregates.lastRefilledFormatted && siteAggregates.lastRefilledFormatted !== 'No refill recorded' && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 px-2 py-0.5 rounded-full">
-                  <Clock className="w-3 h-3 text-amber-500" />
-                  Last Refilled: {siteAggregates.lastRefilledFormatted}
-                  {siteAggregates.lastRefillLitres > 0 && ` (${siteAggregates.lastRefillLitres}L)`}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Legend */}
-            <div className="flex items-center gap-3 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
-                <span>Daily Avg Burn (L/Day)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-4 border-t-2 border-dashed border-cyan-500 inline-block" />
-                <span>Rated Benchmark (18 L/d)</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-500 inline-block" />
-                <span>Variance (Diff)</span>
-              </div>
-            </div>
-
-            {/* Next Refill Forecast Trigger Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setRefillForecastScope(isPortfolioMode ? 'fleet' : 'current');
-                setIsRefillForecastModalOpen(true);
-              }}
-              className="h-7 px-2.5 text-xs font-semibold rounded-lg border-amber-200 dark:border-amber-800/70 text-amber-800 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-1.5 shrink-0"
-              title="Open Next Refill Forecast (1-Day Safety Buffer)"
-            >
-              <Bell className="w-3 h-3 text-amber-500" />
-              <span>Refill Forecast</span>
-              {urgentRefillCount > 0 ? (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-none">
-                  {urgentRefillCount}
-                </span>
-              ) : tomorrowRefillCount > 0 ? (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-none">
-                  {tomorrowRefillCount}
-                </span>
-              ) : null}
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-5 pt-6 space-y-6">
-          {/* Variance Mode Summary Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Refill Cycles</span>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {refillCyclesSummary.totalCycles} <span className="text-[10px] font-normal text-slate-400">refills</span>
-              </p>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Avg Refill Interval</span>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {refillCyclesSummary.avgActiveIntervalDays} <span className="text-[10px] font-normal text-slate-400">active days</span>
-              </p>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Total Refilled</span>
-              <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
-                {refillCyclesSummary.totalRefilled} <span className="text-[10px] font-normal text-slate-400">Litres</span>
-              </p>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Daily Avg Burn Rate</span>
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                {refillCyclesSummary.avgDailyUsage} <span className="text-[10px] font-normal text-slate-400">L/day</span>
-              </p>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Net Variance (Diff)</span>
-              <p className={cn(
-                "text-sm font-bold",
-                refillCyclesSummary.netDiff > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-              )}>
-                {refillCyclesSummary.netDiff > 0 ? `+${refillCyclesSummary.netDiff}` : refillCyclesSummary.netDiff} L
-                <span className="text-[10px] font-normal text-slate-400 ml-1">
-                  {refillCyclesSummary.netDiff > 0 ? '(overburn)' : '(saved)'}
-                </span>
-              </p>
-            </div>
-            <div className="space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Dipstick Verified</span>
-              <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">
-                {refillCyclesSummary.dipstickVerifiedCount} / {refillCyclesSummary.totalCycles}
-                <span className="text-[10px] font-normal text-slate-400 ml-1">cycles</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Variance & Avg Burn Mode: ComposedChart with Daily Avg Burn Bars & Benchmark Line */}
-          <div className="space-y-6">
-              {/* Interactive Machine / Pump Checkbox & Filter Bar */}
-              {scopedFilterMachines.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 bg-slate-50/90 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mr-1">
-                      <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-                      Filter Pumps:
+        <>
+          {/* ── VISUAL SECTION 1: Diesel Consumption Trend Graph ── */}
+          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Fuel className="h-4 w-4 text-amber-500" />
+                    Diesel Telemetry: Refill Interval Variance & Daily Average Diesel Usage (L/Day)
+                  </CardTitle>
+                  {siteAggregates.lastRefilledFormatted && siteAggregates.lastRefilledFormatted !== 'No refill recorded' && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 px-2 py-0.5 rounded-full">
+                      <Clock className="w-3 h-3 text-amber-500" />
+                      Last Refilled: {siteAggregates.lastRefilledFormatted}
+                      {siteAggregates.lastRefillLitres > 0 && ` (${siteAggregates.lastRefillLitres}L)`}
                     </span>
-
-                    {/* All Pumps Button */}
-                    <button
-                      type="button"
-                      onClick={() => setVarianceMachineFilter([])}
-                      className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border",
-                        varianceMachineFilter.length === 0 || varianceMachineFilter.length === scopedFilterMachines.length
-                          ? "bg-cyan-600 text-white border-cyan-700 shadow-xs"
-                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
-                      )}
-                    >
-                      {selectedMachineId === 'active_only' ? 'All Active Pumps' : 'All Pumps'} ({scopedFilterMachines.length})
-                    </button>
-
-                    {/* Individual Pump Checkboxes */}
-                    {scopedFilterMachines.map(m => {
-                      const isChecked = varianceMachineFilter.length === 0 || varianceMachineFilter.includes(m.id);
-                      const isOnly = varianceMachineFilter.length === 1 && varianceMachineFilter[0] === m.id;
-
-                      return (
-                        <div
-                          key={m.id}
-                          className={cn(
-                            "group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all select-none cursor-pointer",
-                            isChecked
-                              ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-cyan-500/80 dark:border-cyan-500/60 shadow-xs ring-1 ring-cyan-500/20"
-                              : "bg-slate-100/70 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100"
-                          )}
-                          onClick={() => {
-                            if (varianceMachineFilter.length === 0) {
-                              setVarianceMachineFilter(scopedFilterMachines.filter(x => x.id !== m.id).map(x => x.id));
-                            } else if (varianceMachineFilter.includes(m.id)) {
-                              const next = varianceMachineFilter.filter(id => id !== m.id);
-                              setVarianceMachineFilter(next.length === 0 ? [] : next);
-                            } else {
-                              const next = [...varianceMachineFilter, m.id];
-                              setVarianceMachineFilter(next.length === scopedFilterMachines.length ? [] : next);
-                            }
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}}
-                            className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 h-3.5 w-3.5 cursor-pointer pointer-events-none"
-                          />
-                          <span className={cn("h-2 w-2 rounded-full shrink-0", m.isCurrentlyOnSite ? "bg-emerald-500" : "bg-slate-400")} />
-                          <span>{formatMachineShortName(m.name)}</span>
-                          {!m.isCurrentlyOnSite && (
-                            <span className="text-[9px] text-slate-400 font-normal">(Ended)</span>
-                          )}
-                          <button
-                            type="button"
-                            title={`Show only ${formatMachineShortName(m.name)}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setVarianceMachineFilter([m.id]);
-                            }}
-                            className={cn(
-                              "text-[10px] px-1 rounded transition-colors ml-0.5",
-                              isOnly
-                                ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold"
-                                : "text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                            )}
-                          >
-                            only
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {varianceMachineFilter.length > 0 && varianceMachineFilter.length < scopedFilterMachines.length && (
-                    <button
-                      type="button"
-                      onClick={() => setVarianceMachineFilter([])}
-                      className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-semibold"
-                    >
-                      Show All {selectedMachineId === 'active_only' ? 'Active' : ''} Pumps
-                    </button>
                   )}
                 </div>
-              )}
+              </div>
 
-              {filteredRefillCycles.length > 0 ? (
-                <>
-                  <div className="h-72 w-full min-w-0">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                      <ComposedChart data={filteredRefillCycles} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
-                        <XAxis 
-                          dataKey="dateFormatted" 
-                          stroke={isDark ? '#94a3b8' : '#64748b'} 
-                          fontSize={11}
-                          tickLine={false}
-                        />
-                        <YAxis 
-                          stroke={isDark ? '#94a3b8' : '#64748b'} 
-                          fontSize={11}
-                          tickLine={false}
-                          tickFormatter={v => `${v} L/d`}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                            borderColor: isDark ? '#334155' : '#e2e8f0',
-                            borderRadius: '0.75rem',
-                            fontSize: '12px',
-                            color: isDark ? '#ffffff' : '#0f172a'
-                          }}
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null;
-                            const c = payload[0].payload;
-                            return (
-                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-2 text-xs min-w-[240px]">
-                                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
-                                  <span className="font-bold text-slate-800 dark:text-slate-100">{c.machineShortName}</span>
-                                  <span className="text-[10px] text-slate-400">{c.refillDate}</span>
-                                </div>
-                                <div className="space-y-1 text-slate-600 dark:text-slate-300">
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Refill Interval:</span>
-                                    <span className="font-semibold">{c.intervalLabel}</span>
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Legend */}
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 inline-block" />
+                    <span>Daily Avg Burn (L/Day)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-4 border-t-2 border-dashed border-cyan-500 inline-block" />
+                    <span>Rated Benchmark (18 L/d)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-blue-500 inline-block" />
+                    <span>Variance (Diff)</span>
+                  </div>
+                </div>
+
+                {/* Next Refill Forecast Trigger Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRefillForecastScope(isPortfolioMode ? 'fleet' : 'current');
+                    setIsRefillForecastModalOpen(true);
+                  }}
+                  className="h-7 px-2.5 text-xs font-semibold rounded-lg border-amber-200 dark:border-amber-800/70 text-amber-800 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-all flex items-center gap-1.5 shrink-0"
+                  title="Open Next Refill Forecast (1-Day Safety Buffer)"
+                >
+                  <Bell className="w-3 h-3 text-amber-500" />
+                  <span>Refill Forecast</span>
+                  {urgentRefillCount > 0 ? (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white leading-none">
+                      {urgentRefillCount}
+                    </span>
+                  ) : tomorrowRefillCount > 0 ? (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white leading-none">
+                      {tomorrowRefillCount}
+                    </span>
+                  ) : null}
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="p-5 pt-6 space-y-6">
+              {/* Variance Mode Summary Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Refill Cycles</span>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                    {refillCyclesSummary.totalCycles} <span className="text-[10px] font-normal text-slate-400">refills</span>
+                  </p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Avg Refill Interval</span>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                    {refillCyclesSummary.avgActiveIntervalDays} <span className="text-[10px] font-normal text-slate-400">active days</span>
+                  </p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Total Refilled</span>
+                  <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                    {refillCyclesSummary.totalRefilled} <span className="text-[10px] font-normal text-slate-400">Litres</span>
+                  </p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Daily Avg Burn Rate</span>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                    {refillCyclesSummary.avgDailyUsage} <span className="text-[10px] font-normal text-slate-400">L/day</span>
+                  </p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Net Variance (Diff)</span>
+                  <p className={cn(
+                    "text-sm font-bold",
+                    refillCyclesSummary.netDiff > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                  )}>
+                    {refillCyclesSummary.netDiff > 0 ? `+${refillCyclesSummary.netDiff}` : refillCyclesSummary.netDiff} L
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">
+                      {refillCyclesSummary.netDiff > 0 ? '(overburn)' : '(saved)'}
+                    </span>
+                  </p>
+                </div>
+                <div className="space-y-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400">Dipstick Verified</span>
+                  <p className="text-sm font-bold text-cyan-600 dark:text-cyan-400">
+                    {refillCyclesSummary.dipstickVerifiedCount} / {refillCyclesSummary.totalCycles}
+                    <span className="text-[10px] font-normal text-slate-400 ml-1">cycles</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Variance & Avg Burn Mode: ComposedChart with Daily Avg Burn Bars & Benchmark Line */}
+              <div className="space-y-6">
+                {/* Interactive Machine / Pump Checkbox & Filter Bar */}
+                {scopedFilterMachines.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 bg-slate-50/90 dark:bg-slate-800/50 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mr-1">
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                        Filter Pumps:
+                      </span>
+
+                      {/* All Pumps Button */}
+                      <button
+                        type="button"
+                        onClick={() => setVarianceMachineFilter([])}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all border",
+                          varianceMachineFilter.length === 0 || varianceMachineFilter.length === scopedFilterMachines.length
+                            ? "bg-cyan-600 text-white border-cyan-700 shadow-xs"
+                            : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        )}
+                      >
+                        {selectedMachineId === 'active_only' ? 'All Active Pumps' : 'All Pumps'} ({scopedFilterMachines.length})
+                      </button>
+
+                      {/* Individual Pump Checkboxes */}
+                      {scopedFilterMachines.map(m => {
+                        const isChecked = varianceMachineFilter.length === 0 || varianceMachineFilter.includes(m.id);
+                        const isOnly = varianceMachineFilter.length === 1 && varianceMachineFilter[0] === m.id;
+
+                        return (
+                          <div
+                            key={m.id}
+                            className={cn(
+                              "group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all select-none cursor-pointer",
+                              isChecked
+                                ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-cyan-500/80 dark:border-cyan-500/60 shadow-xs ring-1 ring-cyan-500/20"
+                                : "bg-slate-100/70 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100"
+                            )}
+                            onClick={() => {
+                              if (varianceMachineFilter.length === 0) {
+                                setVarianceMachineFilter(scopedFilterMachines.filter(x => x.id !== m.id).map(x => x.id));
+                              } else if (varianceMachineFilter.includes(m.id)) {
+                                const next = varianceMachineFilter.filter(id => id !== m.id);
+                                setVarianceMachineFilter(next.length === 0 ? [] : next);
+                              } else {
+                                const next = [...varianceMachineFilter, m.id];
+                                setVarianceMachineFilter(next.length === scopedFilterMachines.length ? [] : next);
+                              }
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => { }}
+                              className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 h-3.5 w-3.5 cursor-pointer pointer-events-none"
+                            />
+                            <span className={cn("h-2 w-2 rounded-full shrink-0", m.isCurrentlyOnSite ? "bg-emerald-500" : "bg-slate-400")} />
+                            <span>{formatMachineShortName(m.name)}</span>
+                            {!m.isCurrentlyOnSite && (
+                              <span className="text-[9px] text-slate-400 font-normal">(Ended)</span>
+                            )}
+                            <button
+                              type="button"
+                              title={`Show only ${formatMachineShortName(m.name)}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setVarianceMachineFilter([m.id]);
+                              }}
+                              className={cn(
+                                "text-[10px] px-1 rounded transition-colors ml-0.5",
+                                isOnly
+                                  ? "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 font-bold"
+                                  : "text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              )}
+                            >
+                              only
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {varianceMachineFilter.length > 0 && varianceMachineFilter.length < scopedFilterMachines.length && (
+                      <button
+                        type="button"
+                        onClick={() => setVarianceMachineFilter([])}
+                        className="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-semibold"
+                      >
+                        Show All {selectedMachineId === 'active_only' ? 'Active' : ''} Pumps
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {filteredRefillCycles.length > 0 ? (
+                  <>
+                    <div className="h-72 w-full min-w-0">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <ComposedChart data={filteredRefillCycles} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
+                          <XAxis
+                            dataKey="dateFormatted"
+                            stroke={isDark ? '#94a3b8' : '#64748b'}
+                            fontSize={11}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            stroke={isDark ? '#94a3b8' : '#64748b'}
+                            fontSize={11}
+                            tickLine={false}
+                            tickFormatter={v => `${v} L/d`}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                              borderColor: isDark ? '#334155' : '#e2e8f0',
+                              borderRadius: '0.75rem',
+                              fontSize: '12px',
+                              color: isDark ? '#ffffff' : '#0f172a'
+                            }}
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null;
+                              const c = payload[0].payload;
+                              return (
+                                <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl space-y-2 text-xs min-w-[240px]">
+                                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                                    <span className="font-bold text-slate-800 dark:text-slate-100">{c.machineShortName}</span>
+                                    <span className="text-[10px] text-slate-400">{c.refillDate}</span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Active Operational Days:</span>
-                                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">{c.activeDays} days ({c.offDays} off)</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Diesel Refilled:</span>
-                                    <span className="font-semibold text-amber-600">{c.refilledLitres} L</span>
-                                  </div>
-                                  {c.dipstickLitres != null && (
+                                  <div className="space-y-1 text-slate-600 dark:text-slate-300">
                                     <div className="flex justify-between">
-                                      <span className="text-slate-400">Post-Fill Dipstick:</span>
-                                      <span className="font-semibold text-cyan-600">{c.dipstickLitres} L</span>
+                                      <span className="text-slate-400">Refill Interval:</span>
+                                      <span className="font-semibold">{c.intervalLabel}</span>
                                     </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Active Operational Days:</span>
+                                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">{c.activeDays} days ({c.offDays} off)</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Diesel Refilled:</span>
+                                      <span className="font-semibold text-amber-600">{c.refilledLitres} L</span>
+                                    </div>
+                                    {c.dipstickLitres != null && (
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-400">Post-Fill Dipstick:</span>
+                                        <span className="font-semibold text-cyan-600">{c.dipstickLitres} L</span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Actual Burn:</span>
+                                      <span className="font-bold text-slate-900 dark:text-slate-100">
+                                        {c.actualBurn} L {c.isDipstickVerified ? '✓ (Dipstick)' : '(Refilled)'}
+                                      </span>
+                                    </div>
+                                    <div className="border-t border-slate-100 dark:border-slate-800 pt-1 flex justify-between font-bold">
+                                      <span className="text-slate-700 dark:text-slate-200">Daily Average Burn:</span>
+                                      {c.status === 'initial_fill' ? (
+                                        <span className="text-cyan-600 dark:text-cyan-400 font-semibold">Initial Starting Fill</span>
+                                      ) : (
+                                        <span className={cn(
+                                          c.dailyAvgBurn > c.benchmarkRate ? "text-rose-600" : "text-emerald-600"
+                                        )}>
+                                          {c.dailyAvgBurn} L/day
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Target Benchmark:</span>
+                                      <span className="font-medium">{c.benchmarkRate} L/day ({c.expectedBurn} L)</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold">
+                                      <span className="text-slate-400">Variance (Diff):</span>
+                                      {c.status === 'initial_fill' ? (
+                                        <span className="text-cyan-600 dark:text-cyan-400">Tank Baseline</span>
+                                      ) : (
+                                        <span className={cn(
+                                          c.diffLitres > 0 ? "text-rose-600" : "text-emerald-600"
+                                        )}>
+                                          {c.diffLitres > 0 ? `+${c.diffLitres}` : c.diffLitres} L
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }}
+                          />
+                          <ReferenceLine
+                            y={refillIntervalCycles[0]?.benchmarkRate || 18}
+                            stroke="#06b6d4"
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            label={{
+                              value: `Target: ${refillIntervalCycles[0]?.benchmarkRate || 18} L/d`,
+                              position: 'top',
+                              fill: '#06b6d4',
+                              fontSize: 10,
+                              fontWeight: 'bold'
+                            }}
+                          />
+                          <Bar
+                            dataKey="dailyAvgBurn"
+                            name="Daily Avg Burn (L/Day)"
+                            radius={[6, 6, 0, 0]}
+                            maxBarSize={45}
+                            isAnimationActive={false}
+                          >
+                            {filteredRefillCycles.map((entry, index) => {
+                              if (entry.status === 'initial_fill') {
+                                return <Cell key={`cell-${index}`} fill="#06b6d4" />;
+                              }
+                              const isHigh = entry.dailyAvgBurn > entry.benchmarkRate * 1.15;
+                              const isMild = entry.dailyAvgBurn > entry.benchmarkRate;
+                              const fillColor = isHigh ? '#f43f5e' : isMild ? '#f59e0b' : '#10b981';
+                              return <Cell key={`cell-${index}`} fill={fillColor} />;
+                            })}
+                          </Bar>
+                          <Line
+                            type="monotone"
+                            dataKey="diffLitres"
+                            name="Variance Diff (L)"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            dot={{ r: 4, fill: '#3b82f6' }}
+                            isAnimationActive={false}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Refill Intervals & Variance Audit Table (Matching User's Excel Workflow) */}
+                    <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+                      <div className="p-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <Fuel className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Refill Intervals Audit Log & Variance (Diff) Table
+                          </span>
+                          <Badge variant="outline" className="text-[10px] font-semibold bg-white dark:bg-slate-900">
+                            {filteredRefillCycles.length} Intervals
+                          </Badge>
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
+                          <span>Target = <strong className="text-slate-700 dark:text-slate-300">Active Days × 18 L/day</strong></span>
+                          <span className="text-slate-300 dark:text-slate-600">•</span>
+                          <span>Diff = <strong className="text-slate-700 dark:text-slate-300">Actual Burn - Target</strong> (Minus = Fuel Saved, Plus = Overburn)</span>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="bg-slate-100/90 dark:bg-slate-800/90 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                            <tr>
+                              <th className="p-2.5 pl-3">Refill Date</th>
+                              <th className="p-2.5">Machine</th>
+                              <th className="p-2.5">Interval Span</th>
+                              <th className="p-2.5 text-center">Off Days</th>
+                              <th className="p-2.5 text-center">Active Days</th>
+                              <th className="p-2.5 text-right">Refilled (L)</th>
+                              <th className="p-2.5 text-right">Dipstick (L)</th>
+                              <th className="p-2.5 text-right">Actual Burn (L)</th>
+                              <th className="p-2.5 text-right">Daily Avg (L/Day)</th>
+                              <th className="p-2.5 text-right">Est. Target</th>
+                              <th className="p-2.5 text-right">Diff (L)</th>
+                              <th className="p-2.5 pr-3 text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                            {filteredRefillCycles.map(c => (
+                              <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                                <td className="p-2.5 pl-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                                  {c.dateFormatted}
+                                </td>
+                                <td className="p-2.5 font-medium text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={c.machineName}>
+                                  {c.machineShortName}
+                                </td>
+                                <td className="p-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                  {c.intervalLabel}
+                                </td>
+                                <td className="p-2.5 text-center text-slate-400">
+                                  {c.offDays}
+                                </td>
+                                <td className="p-2.5 text-center font-bold text-cyan-600 dark:text-cyan-400">
+                                  {c.activeDays}
+                                </td>
+                                <td className="p-2.5 text-right font-bold text-amber-600">
+                                  {c.refilledLitres} L
+                                </td>
+                                <td className="p-2.5 text-right text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                  {c.dipstickLitres != null ? (
+                                    <span className="font-semibold">{c.dipstickLitres} L</span>
+                                  ) : (
+                                    <span className="text-slate-400 italic">Unrecorded</span>
                                   )}
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Actual Burn:</span>
-                                    <span className="font-bold text-slate-900 dark:text-slate-100">
-                                      {c.actualBurn} L {c.isDipstickVerified ? '✓ (Dipstick)' : '(Refilled)'}
+                                </td>
+                                <td className="p-2.5 text-right font-bold text-slate-900 dark:text-slate-100">
+                                  {c.actualBurn} L
+                                  {c.isDipstickVerified && (
+                                    <span className="text-[10px] text-cyan-500 font-normal ml-1" title="Calculated from dipstick level delta">
+                                      ✓
                                     </span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 text-right font-bold">
+                                  {c.status === 'initial_fill' ? (
+                                    <span className="text-slate-400 dark:text-slate-500 text-xs italic font-normal">Initial Fill</span>
+                                  ) : (
+                                    <span className={cn(
+                                      c.dailyAvgBurn > c.benchmarkRate ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
+                                    )}>
+                                      {c.dailyAvgBurn} L/d
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 text-right text-slate-500">
+                                  {c.expectedBurn} L
+                                </td>
+                                <td className="p-2.5 text-right font-bold">
+                                  {c.status === 'initial_fill' ? (
+                                    <span className="text-slate-400 dark:text-slate-500 text-[11px] font-normal italic">Baseline</span>
+                                  ) : (
+                                    <span className={cn(
+                                      "px-1.5 py-0.5 rounded text-[11px]",
+                                      c.diffLitres > 0
+                                        ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300"
+                                        : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
+                                    )}>
+                                      {c.diffLitres > 0 ? `+${c.diffLitres}` : c.diffLitres} L
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 pr-3 text-center">
+                                  {c.status === 'initial_fill' ? (
+                                    <Badge variant="outline" className="text-[10px] bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border-sky-200 dark:border-sky-800">
+                                      Initial Fill
+                                    </Badge>
+                                  ) : c.status === 'optimal' ? (
+                                    <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
+                                      Optimal
+                                    </Badge>
+                                  ) : c.status === 'mild_overburn' ? (
+                                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                                      Mild Diff
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200 dark:border-rose-800">
+                                      High Burn
+                                    </Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-48 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                    <Fuel className="h-8 w-8 text-slate-300 dark:text-slate-700" />
+                    <p className="text-xs font-medium">No refill interval cycles recorded for the selected machine(s).</p>
+                    {varianceMachineFilter.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVarianceMachineFilter([])}
+                        className="text-xs h-7 mt-1 font-semibold text-cyan-600"
+                      >
+                        Show All Pumps
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── VISUAL SECTION 2: Machine Days & Downtime Graphs (Side by Side) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* Graph 2A: Days on Site & Running Status per Machine */}
+            <Card
+              style={fullScreenChart === 'site-operational-days' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}
+              className={cn(
+                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                fullScreenChart === 'site-operational-days' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+              )}>
+              {fullScreenChart === 'site-operational-days' && (
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                  onClick={() => toggleFullScreenChart('site-operational-days')}
+                  title="Exit Full Screen"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </Button>
+              )}
+              <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-emerald-500" />
+                    Operational Days by Machine (Full vs Half vs Off)
+                  </CardTitle>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Quick Fleet Status Toggle */}
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setFleetChartFilter('all')}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
+                        fleetChartFilter === 'all'
+                          ? 'bg-white dark:bg-slate-700 text-cyan-700 dark:text-cyan-300 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700'
+                      )}
+                    >
+                      All ({machineFleetStats.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFleetChartFilter('active')}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
+                        fleetChartFilter === 'active'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-500 hover:text-emerald-600'
+                      )}
+                    >
+                      Active ({siteAggregates.activeFleetCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFleetChartFilter('offsite')}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
+                        fleetChartFilter === 'offsite'
+                          ? 'bg-slate-600 text-white shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700'
+                      )}
+                    >
+                      Taken Out ({siteAggregates.takenOutFleetCount})
+                    </button>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                    onClick={() => toggleFullScreenChart('site-operational-days')}
+                    title="Full Screen"
+                    aria-label="Full Screen"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className={cn("p-5 pt-6", fullScreenChart === 'site-operational-days' && "flex-1 flex flex-col min-h-0")}>
+                {machineDaysChartData.length > 0 ? (
+                  <div className={cn("w-full min-w-0", fullScreenChart === 'site-operational-days' ? "flex-1 min-h-[500px]" : "h-80")}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <BarChart data={machineDaysChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
+                        <XAxis
+                          dataKey="chartLabel"
+                          stroke={isDark ? '#94a3b8' : '#64748b'}
+                          fontSize={10}
+                          tickLine={false}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis
+                          stroke={isDark ? '#94a3b8' : '#64748b'}
+                          fontSize={11}
+                          tickLine={false}
+                          tickFormatter={v => `${v}d`}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                            borderRadius: '0.875rem',
+                            fontSize: '12px',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                            padding: '12px 14px'
+                          }}
+                          formatter={(val: any, name: any) => [
+                            `${val} Days`,
+                            name === 'fullDays' ? 'Full Day Running (1.0)' : name === 'halfDays' ? 'Half Day Running (0.5)' : 'Standby / Off'
+                          ]}
+                          labelFormatter={(label, items) => {
+                            const item = items?.[0]?.payload;
+                            if (!item) return label;
+                            return (
+                              <div className="space-y-1.5 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+                                <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center justify-between gap-2">
+                                  <span>{item.fullName}</span>
+                                  <span className={cn(
+                                    'text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1',
+                                    item.isCurrentlyActive
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                      : item.status === 'replaced'
+                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
+                                        : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  )}>
+                                    {item.isCurrentlyActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                    {item.statusLabel}
+                                  </span>
+                                </div>
+
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300">Pumping Period: </span>
+                                  {item.startDate ? formatDisplayDate(item.startDate) : 'Start unrecorded'}
+                                  {' → '}
+                                  {item.isCurrentlyActive ? 'Present (Active)' : (item.stopDate ? formatDisplayDate(item.stopDate) : 'Stopped')}
+                                  <span className="ml-1 text-slate-400 font-medium">({item.totalDays} calendar days)</span>
+                                </div>
+
+                                {item.successorName && (
+                                  <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/90 dark:bg-blue-950/50 px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-900/60">
+                                    <strong>🔄 Swapped out:</strong> Replaced by <strong>{item.successorName}</strong>
+                                    {item.swapReason ? <span className="italic block text-[10px] mt-0.5">"{item.swapReason}"</span> : null}
                                   </div>
-                                  <div className="border-t border-slate-100 dark:border-slate-800 pt-1 flex justify-between font-bold">
-                                    <span className="text-slate-700 dark:text-slate-200">Daily Average Burn:</span>
-                                    {c.status === 'initial_fill' ? (
-                                      <span className="text-cyan-600 dark:text-cyan-400 font-semibold">Initial Starting Fill</span>
-                                    ) : (
-                                      <span className={cn(
-                                        c.dailyAvgBurn > c.benchmarkRate ? "text-rose-600" : "text-emerald-600"
-                                      )}>
-                                        {c.dailyAvgBurn} L/day
-                                      </span>
-                                    )}
+                                )}
+                                {item.predecessorName && (
+                                  <div className="text-[11px] text-cyan-700 dark:text-cyan-300 bg-cyan-50/90 dark:bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-200/60 dark:border-cyan-900/60">
+                                    <strong>⬅️ Swapped in:</strong> Replaced <strong>{item.predecessorName}</strong>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-slate-400">Target Benchmark:</span>
-                                    <span className="font-medium">{c.benchmarkRate} L/day ({c.expectedBurn} L)</span>
-                                  </div>
-                                  <div className="flex justify-between font-bold">
-                                    <span className="text-slate-400">Variance (Diff):</span>
-                                    {c.status === 'initial_fill' ? (
-                                      <span className="text-cyan-600 dark:text-cyan-400">Tank Baseline</span>
-                                    ) : (
-                                      <span className={cn(
-                                        c.diffLitres > 0 ? "text-rose-600" : "text-emerald-600"
-                                      )}>
-                                        {c.diffLitres > 0 ? `+${c.diffLitres}` : c.diffLitres} L
-                                      </span>
-                                    )}
-                                  </div>
+                                )}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend
+                          wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                          formatter={(val) => val === 'fullDays' ? 'Full (1.0)' : val === 'halfDays' ? 'Half (0.5)' : 'Off / Standby'}
+                        />
+                        <Bar dataKey="fullDays" stackId="a" fill={CHART_COLORS.emerald} radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                        <Bar dataKey="halfDays" stackId="a" fill={CHART_COLORS.amber} radius={[0, 0, 0, 0]} isAnimationActive={false} />
+                        <Bar dataKey="offDays" stackId="a" fill={CHART_COLORS.slate} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
+                    No machine operational logs available for this filter.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Graph 2B: Machine Downtime & Halts (Incidents & Lost Hours) */}
+            <Card
+              style={fullScreenChart === 'site-downtime' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}
+              className={cn(
+                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                fullScreenChart === 'site-downtime' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+              )}>
+              {fullScreenChart === 'site-downtime' && (
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                  onClick={() => toggleFullScreenChart('site-downtime')}
+                  title="Exit Full Screen"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </Button>
+              )}
+              <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-500" />
+                    Downtime Incidents & Lost Hours
+                  </CardTitle>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                  onClick={() => toggleFullScreenChart('site-downtime')}
+                  title="Full Screen"
+                  aria-label="Full Screen"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent className={cn("p-5 pt-6", fullScreenChart === 'site-downtime' && "flex-1 flex flex-col min-h-0")}>
+                {machineDowntimeChartData.length > 0 ? (
+                  <div className={cn("w-full min-w-0", fullScreenChart === 'site-downtime' ? "flex-1 min-h-[500px]" : "h-80")}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                      <BarChart data={machineDowntimeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
+                        <XAxis
+                          dataKey="chartLabel"
+                          stroke={isDark ? '#94a3b8' : '#64748b'}
+                          fontSize={10}
+                          tickLine={false}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis
+                          stroke={isDark ? '#94a3b8' : '#64748b'}
+                          fontSize={11}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                            borderColor: isDark ? '#334155' : '#e2e8f0',
+                            borderRadius: '0.875rem',
+                            fontSize: '12px',
+                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                            padding: '12px 14px'
+                          }}
+                          formatter={(val: any, name: any) => [
+                            name === 'incidents' ? `${val} Events` : `${val} Hours Lost`,
+                            name === 'incidents' ? 'Incidents Count' : 'Lost Hours'
+                          ]}
+                          labelFormatter={(label, items) => {
+                            const item = items?.[0]?.payload;
+                            if (!item) return label;
+                            return (
+                              <div className="space-y-1 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+                                <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center justify-between gap-2">
+                                  <span>{item.fullName}</span>
+                                  <span className={cn(
+                                    'text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1',
+                                    item.isCurrentlyActive
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                  )}>
+                                    {item.isCurrentlyActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                    {item.statusLabel}
+                                  </span>
+                                </div>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  {item.startDate ? formatDisplayDate(item.startDate) : 'Start unrecorded'}
+                                  {' → '}
+                                  {item.isCurrentlyActive ? 'Present (Active)' : (item.stopDate ? formatDisplayDate(item.stopDate) : 'Stopped')}
                                 </div>
                               </div>
                             );
                           }}
                         />
-                        <ReferenceLine 
-                          y={refillIntervalCycles[0]?.benchmarkRate || 18} 
-                          stroke="#06b6d4" 
-                          strokeDasharray="4 4" 
-                          strokeWidth={2}
-                          label={{
-                            value: `Target: ${refillIntervalCycles[0]?.benchmarkRate || 18} L/d`,
-                            position: 'top',
-                            fill: '#06b6d4',
-                            fontSize: 10,
-                            fontWeight: 'bold'
-                          }}
+                        <Legend
+                          wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
+                          formatter={(val) => val === 'incidents' ? 'Incidents Count' : 'Lost Hours (h)'}
                         />
-                        <Bar 
-                          dataKey="dailyAvgBurn" 
-                          name="Daily Avg Burn (L/Day)"
-                          radius={[6, 6, 0, 0]}
-                          maxBarSize={45}
-                          isAnimationActive={false}
-                        >
-                          {filteredRefillCycles.map((entry, index) => {
-                            if (entry.status === 'initial_fill') {
-                              return <Cell key={`cell-${index}`} fill="#06b6d4" />;
-                            }
-                            const isHigh = entry.dailyAvgBurn > entry.benchmarkRate * 1.15;
-                            const isMild = entry.dailyAvgBurn > entry.benchmarkRate;
-                            const fillColor = isHigh ? '#f43f5e' : isMild ? '#f59e0b' : '#10b981';
-                            return <Cell key={`cell-${index}`} fill={fillColor} />;
-                          })}
-                        </Bar>
-                        <Line 
-                          type="monotone" 
-                          dataKey="diffLitres" 
-                          name="Variance Diff (L)"
-                          stroke="#3b82f6" 
-                          strokeWidth={2} 
-                          dot={{ r: 4, fill: '#3b82f6' }}
-                          isAnimationActive={false}
-                        />
-                      </ComposedChart>
+                        <Bar dataKey="incidents" fill={CHART_COLORS.rose} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                        <Bar dataKey="lostHours" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
-
-                  {/* Refill Intervals & Variance Audit Table (Matching User's Excel Workflow) */}
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
-                    <div className="p-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
-                        <Fuel className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Refill Intervals Audit Log & Variance (Diff) Table
-                        </span>
-                        <Badge variant="outline" className="text-[10px] font-semibold bg-white dark:bg-slate-900">
-                          {filteredRefillCycles.length} Intervals
-                        </Badge>
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 flex-wrap">
-                        <span>Target = <strong className="text-slate-700 dark:text-slate-300">Active Days × 18 L/day</strong></span>
-                        <span className="text-slate-300 dark:text-slate-600">•</span>
-                        <span>Diff = <strong className="text-slate-700 dark:text-slate-300">Actual Burn - Target</strong> (Minus = Fuel Saved, Plus = Overburn)</span>
-                      </div>
-                    </div>
-
-                    <div className="overflow-x-auto max-h-80 overflow-y-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-slate-100/90 dark:bg-slate-800/90 sticky top-0 z-10 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
-                          <tr>
-                            <th className="p-2.5 pl-3">Refill Date</th>
-                            <th className="p-2.5">Machine</th>
-                            <th className="p-2.5">Interval Span</th>
-                            <th className="p-2.5 text-center">Off Days</th>
-                            <th className="p-2.5 text-center">Active Days</th>
-                            <th className="p-2.5 text-right">Refilled (L)</th>
-                            <th className="p-2.5 text-right">Dipstick (L)</th>
-                            <th className="p-2.5 text-right">Actual Burn (L)</th>
-                            <th className="p-2.5 text-right">Daily Avg (L/Day)</th>
-                            <th className="p-2.5 text-right">Est. Target</th>
-                            <th className="p-2.5 text-right">Diff (L)</th>
-                            <th className="p-2.5 pr-3 text-center">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
-                          {filteredRefillCycles.map(c => (
-                            <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                              <td className="p-2.5 pl-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                                {c.dateFormatted}
-                              </td>
-                              <td className="p-2.5 font-medium text-slate-700 dark:text-slate-300 max-w-[140px] truncate" title={c.machineName}>
-                                {c.machineShortName}
-                              </td>
-                              <td className="p-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                {c.intervalLabel}
-                              </td>
-                              <td className="p-2.5 text-center text-slate-400">
-                                {c.offDays}
-                              </td>
-                              <td className="p-2.5 text-center font-bold text-cyan-600 dark:text-cyan-400">
-                                {c.activeDays}
-                              </td>
-                              <td className="p-2.5 text-right font-bold text-amber-600">
-                                {c.refilledLitres} L
-                              </td>
-                              <td className="p-2.5 text-right text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                {c.dipstickLitres != null ? (
-                                  <span className="font-semibold">{c.dipstickLitres} L</span>
-                                ) : (
-                                  <span className="text-slate-400 italic">Unrecorded</span>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-right font-bold text-slate-900 dark:text-slate-100">
-                                {c.actualBurn} L
-                                {c.isDipstickVerified && (
-                                  <span className="text-[10px] text-cyan-500 font-normal ml-1" title="Calculated from dipstick level delta">
-                                    ✓
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-right font-bold">
-                                {c.status === 'initial_fill' ? (
-                                  <span className="text-slate-400 dark:text-slate-500 text-xs italic font-normal">Initial Fill</span>
-                                ) : (
-                                  <span className={cn(
-                                    c.dailyAvgBurn > c.benchmarkRate ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"
-                                  )}>
-                                    {c.dailyAvgBurn} L/d
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-right text-slate-500">
-                                {c.expectedBurn} L
-                              </td>
-                              <td className="p-2.5 text-right font-bold">
-                                {c.status === 'initial_fill' ? (
-                                  <span className="text-slate-400 dark:text-slate-500 text-[11px] font-normal italic">Baseline</span>
-                                ) : (
-                                  <span className={cn(
-                                    "px-1.5 py-0.5 rounded text-[11px]",
-                                    c.diffLitres > 0 
-                                      ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300" 
-                                      : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300"
-                                  )}>
-                                    {c.diffLitres > 0 ? `+${c.diffLitres}` : c.diffLitres} L
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-2.5 pr-3 text-center">
-                                {c.status === 'initial_fill' ? (
-                                  <Badge variant="outline" className="text-[10px] bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 border-sky-200 dark:border-sky-800">
-                                    Initial Fill
-                                  </Badge>
-                                ) : c.status === 'optimal' ? (
-                                  <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-                                    Optimal
-                                  </Badge>
-                                ) : c.status === 'mild_overburn' ? (
-                                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                                    Mild Diff
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200 dark:border-rose-800">
-                                    High Burn
-                                  </Badge>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                ) : (
+                  <div className="h-80 flex flex-col items-center justify-center text-slate-400 gap-2">
+                    <CheckCircle2 className="h-10 w-10 text-emerald-500 opacity-60" />
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Zero Unresolved Downtimes</p>
+                    <p className="text-xs text-slate-400">All machines operating smoothly with no logged incidents.</p>
                   </div>
-                </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── VISUAL SECTION 3: Donut Distributions ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Donut 3A: Operational Status Breakdown */}
+            <Card
+              style={fullScreenChart === 'site-duty-pie' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
+              className={cn(
+                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                fullScreenChart === 'site-duty-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+              )}>
+              {fullScreenChart === 'site-duty-pie' && (
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                  onClick={() => toggleFullScreenChart('site-duty-pie')}
+                  title="Exit Full Screen"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </Button>
+              )}
+              <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-emerald-500" />
+                  Fleet Duty Cycle & Running Distribution
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                  onClick={() => toggleFullScreenChart('site-duty-pie')}
+                  title="Full Screen"
+                  aria-label="Full Screen"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent className={cn("p-5 flex flex-col sm:flex-row items-center justify-around gap-4", fullScreenChart === 'site-duty-pie' && "flex-1 min-h-0")}>
+                {operationalStatusDonutData.length > 0 ? (
+                  <>
+                    <div className={cn("shrink-0 min-w-0", fullScreenChart === 'site-duty-pie' ? "h-96 w-96" : "h-52 w-52")}>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <PieChart>
+                          <Pie
+                            data={operationalStatusDonutData}
+                            innerRadius={55}
+                            outerRadius={80}
+                            paddingAngle={3}
+                            dataKey="value"
+                            isAnimationActive={false}
+                          >
+                            {operationalStatusDonutData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                              borderColor: isDark ? '#334155' : '#e2e8f0',
+                              borderRadius: '0.75rem',
+                              fontSize: '12px'
+                            }}
+                            formatter={(val: any) => [`${val} Days`, 'Quantity']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3 min-w-[160px]">
+                      {operationalStatusDonutData.map((d, i) => (
+                        <div key={i} className="flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
+                            <span className="text-slate-600 dark:text-slate-300 font-medium">{d.name}</span>
+                          </div>
+                          <span className="font-bold text-slate-800 dark:text-white">{d.value}d</span>
+                        </div>
+                      ))}
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+                        Total Duty Days: <strong className="text-slate-700 dark:text-slate-200">{siteAggregates.fullDays + siteAggregates.halfDays + siteAggregates.offDays}</strong>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
+                    No duty cycle data logged.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Donut 3B: Downtime Severity Breakdown */}
+            <Card
+              style={fullScreenChart === 'site-severity-pie' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
+              className={cn(
+                "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
+                fullScreenChart === 'site-severity-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
+              )}>
+              {fullScreenChart === 'site-severity-pie' && (
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
+                  onClick={() => toggleFullScreenChart('site-severity-pie')}
+                  title="Exit Full Screen"
+                >
+                  <Minimize2 className="h-5 w-5" />
+                </Button>
+              )}
+              <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-rose-500" />
+                  Downtime Severity Categorization
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
+                  onClick={() => toggleFullScreenChart('site-severity-pie')}
+                  title="Full Screen"
+                  aria-label="Full Screen"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                </Button>
+              </CardHeader>
+              <CardContent className={cn("p-5 flex flex-col sm:flex-row items-center justify-around gap-4", fullScreenChart === 'site-severity-pie' && "flex-1 min-h-0")}>
+                {downtimeSeverityDonutData.length > 0 ? (
+                  <>
+                    <div className={cn("shrink-0 min-w-0", fullScreenChart === 'site-severity-pie' ? "h-96 w-96" : "h-52 w-52")}>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <PieChart>
+                          <Pie
+                            data={downtimeSeverityDonutData}
+                            innerRadius={55}
+                            outerRadius={80}
+                            paddingAngle={3}
+                            dataKey="value"
+                            isAnimationActive={false}
+                          >
+                            {downtimeSeverityDonutData.map((entry, index) => (
+                              <Cell key={`sev-cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                              borderColor: isDark ? '#334155' : '#e2e8f0',
+                              borderRadius: '0.75rem',
+                              fontSize: '12px'
+                            }}
+                            formatter={(val: any) => [`${val} Events`, 'Count']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3 min-w-[160px]">
+                      {downtimeSeverityDonutData.map((d, i) => (
+                        <div key={i} className="flex items-center justify-between gap-3 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
+                            <span className="text-slate-600 dark:text-slate-300 font-medium">{d.name}</span>
+                          </div>
+                          <span className="font-bold text-slate-800 dark:text-white">{d.value}</span>
+                        </div>
+                      ))}
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+                        Total Incidents: <strong className="text-rose-600">{siteAggregates.totalDowntimes}</strong>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
+                    No downtime incidents recorded.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── SECTION: Machine Deployment & Swap Timeline (Active vs Replaced / Demobilized) ── */}
+          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-emerald-500" />
+                  Site Machine Deployments, Pump Dates & Swap Lineage
+                </CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  {siteAggregates.activeFleetCount} Active on Site
+                </span>
+                {siteAggregates.takenOutFleetCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                    ⚪ {siteAggregates.takenOutFleetCount} Taken Out / Swapped
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Column 1: Currently Active Pumps on Site */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Currently Active on Site ({machineFleetStats.filter(m => m.isCurrentlyActive).length})
+                    </h4>
+                    <span className="text-[11px] text-slate-400">Pumping operational</span>
+                  </div>
+
+                  {machineFleetStats.filter(m => m.isCurrentlyActive).length > 0 ? (
+                    <div className="space-y-2.5">
+                      {machineFleetStats.filter(m => m.isCurrentlyActive).map(m => (
+                        <div
+                          key={m.id}
+                          className="p-3 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between gap-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm">
+                                {m.name}
+                              </div>
+                              <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-2 mt-0.5">
+                                <span>Pump Start: <strong>{m.startDate ? formatDisplayDate(m.startDate) : 'Not configured'}</strong></span>
+                                <span>•</span>
+                                <span>{m.calendarDaysOnSite} days on site</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEditPumpDates(m)}
+                              className="h-6 px-2 text-[10px] font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/50 rounded-md"
+                              title="Edit Pump Start / Stop Dates"
+                            >
+                              <Calendar className="w-3 h-3 mr-1" /> Dates
+                            </Button>
+                          </div>
+
+                          {/* Predecessor Swap note */}
+                          {m.predecessorName && (
+                            <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-900/60 flex items-center gap-1.5">
+                              <ArrowRight className="w-3 h-3 text-blue-500 shrink-0" />
+                              <span>Brought in to replace: <strong>{m.predecessorName}</strong></span>
+                              {m.swapReason && <span className="text-slate-400 italic">({m.swapReason})</span>}
+                            </div>
+                          )}
+
+                          {/* Quick Operational Metrics */}
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-[11px]">
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Active Duty</span>
+                              <strong className="text-slate-700 dark:text-slate-200">{m.activeDays}d ({m.utilization}%)</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Diesel Burned</span>
+                              <strong className="text-amber-600 dark:text-amber-400">{m.totalDiesel.toFixed(0)} L</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Downtime</span>
+                              <strong className={m.downtimeCount > 0 ? "text-rose-600" : "text-slate-400"}>
+                                {m.downtimeCount} events ({m.downtimeHours.toFixed(1)}h)
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+                      No pumps currently designated active on this site.
+                    </div>
+                  )}
+                </div>
+
+                {/* Column 2: Swapped Out / Taken Out Machines */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-slate-400" />
+                      Taken Out / Swapped Offsite ({machineFleetStats.filter(m => !m.isCurrentlyActive).length})
+                    </h4>
+                    <span className="text-[11px] text-slate-400">Demobilized / Replaced</span>
+                  </div>
+
+                  {machineFleetStats.filter(m => !m.isCurrentlyActive).length > 0 ? (
+                    <div className="space-y-2.5">
+                      {machineFleetStats.filter(m => !m.isCurrentlyActive).map(m => (
+                        <div
+                          key={m.id}
+                          className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/40 flex flex-col justify-between gap-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-bold text-slate-700 dark:text-slate-300 text-xs sm:text-sm">
+                                {m.name}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2 mt-0.5">
+                                <span>
+                                  {m.startDate ? formatDisplayDate(m.startDate) : 'Start unrecorded'}
+                                  {' → '}
+                                  <strong>{m.stopDate ? formatDisplayDate(m.stopDate) : 'Stopped'}</strong>
+                                </span>
+                                <span>•</span>
+                                <span>{m.calendarDaysOnSite} days served</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEditPumpDates(m)}
+                              className="h-6 px-2 text-[10px] font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 rounded-md"
+                              title="Edit Pump Start / Stop Dates"
+                            >
+                              <Calendar className="w-3 h-3 mr-1" /> Dates
+                            </Button>
+                          </div>
+
+                          {/* Successor Replacement note */}
+                          {m.successorName ? (
+                            <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-900/50">
+                              <div className="flex items-center gap-1.5 font-semibold">
+                                <RefreshCw className="w-3 h-3 text-blue-500 shrink-0" />
+                                <span>Taken out & replaced by: <strong>{m.successorName}</strong></span>
+                              </div>
+                              {m.swapReason && (
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 ml-4">
+                                  Reason: "{m.swapReason}"
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                              <span>Demobilized / taken out of active site rotation.</span>
+                            </div>
+                          )}
+
+                          {/* Quick Operational Metrics */}
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[11px]">
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Active Delivered</span>
+                              <strong className="text-slate-700 dark:text-slate-200">{m.activeDays}d ({m.utilization}%)</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Diesel Burned</span>
+                              <strong className="text-amber-600 dark:text-amber-400">{m.totalDiesel.toFixed(0)} L</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">Downtime</span>
+                              <strong className={m.downtimeCount > 0 ? "text-rose-600" : "text-slate-400"}>
+                                {m.downtimeCount} events ({m.downtimeHours.toFixed(1)}h)
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+                      No demobilized or swapped machines on this site.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── SECTION 4: Machine Fleet Matrix & Lineage Table ── */}
+          <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                  Machine Fleet Performance & Daily Register Access
+                </CardTitle>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                {machineFleetStats.length} Unit{machineFleetStats.length !== 1 ? 's' : ''} on Record
+              </span>
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {machineFleetStats.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                        <th className="py-3 px-4">Machine Unit & Lineage</th>
+                        <th className="py-3 px-3">Days on Site</th>
+                        <th className="py-3 px-3">Active Days</th>
+                        <th className="py-3 px-3">Diesel Refilled</th>
+                        <th className="py-3 px-3">Expected vs Variance</th>
+                        <th className="py-3 px-3">Downtimes</th>
+                        <th className="py-3 px-3">Utilization</th>
+                        <th className="py-3 px-3">Maintenance</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {machineFleetStats.map(m => (
+                        <tr key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2 flex-wrap">
+                              <span>{m.name}</span>
+                              <span className={cn(
+                                'text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1',
+                                m.isCurrentlyActive
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                  : m.status === 'replaced'
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
+                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              )}>
+                                {m.isCurrentlyActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                {m.statusLabel}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 flex-wrap">
+                              <span>
+                                Pump Dates: <strong>{m.startDate ? formatDisplayDate(m.startDate) : '—'}</strong>
+                                {' → '}
+                                <strong>{m.isCurrentlyActive ? 'Present (Active)' : (m.stopDate ? formatDisplayDate(m.stopDate) : 'Ended')}</strong>
+                              </span>
+                              {m.successorName && (
+                                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                  • ➡️ Replaced by: {m.successorName}
+                                </span>
+                              )}
+                              {m.predecessorName && (
+                                <span className="text-cyan-600 dark:text-cyan-400 font-medium">
+                                  • ⬅️ Replaced: {m.predecessorName}
+                                </span>
+                              )}
+                              {m.expectedDailyBurnRate > 0 && (
+                                <span className="text-slate-500 dark:text-slate-400 font-medium">
+                                  • ⛽ Rated: {m.expectedDailyBurnRate} L/day {m.tankCapacityLitres > 0 ? `(${m.tankCapacityLitres}L tank)` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
+                            {m.calendarDaysOnSite} days
+                          </td>
+
+                          <td className="py-3 px-3 font-semibold text-emerald-600 dark:text-emerald-400">
+                            {m.activeDays} days
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              {m.fullDays} full · {m.halfDays} half
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 font-semibold text-amber-600 dark:text-amber-400">
+                            {m.totalDiesel.toFixed(1)} L
+                            <div className="text-[10px] text-slate-400 font-normal">
+                              avg {m.avgDieselPerActiveDay.toFixed(1)} L/d
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3">
+                            {m.isBenchmarked ? (
+                              <div>
+                                <div className="font-semibold text-slate-700 dark:text-slate-300">
+                                  {m.expectedDiesel.toFixed(1)} L
+                                  <span className="text-[10px] text-slate-400 font-normal ml-1">
+                                    ({m.expectedDailyBurnRate} L/d)
+                                  </span>
+                                </div>
+                                <div className="mt-0.5">
+                                  <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block leading-none', m.fuelEfficiency.badgeCls)}>
+                                    {m.fuelEfficiency.label} ({m.varianceLitres >= 0 ? `+${m.varianceLitres}` : m.varianceLitres} L)
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">
+                                Unbenchmarked
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <span className={cn('font-semibold', m.downtimeCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400')}>
+                              {m.downtimeCount} incidents
+                            </span>
+                            {m.downtimeHours > 0 && (
+                              <div className="text-[10px] text-slate-400 font-normal">
+                                {m.downtimeHours.toFixed(1)} hrs lost
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                'font-bold text-xs',
+                                m.utilization >= 75 ? 'text-emerald-600' : m.utilization >= 45 ? 'text-amber-600' : 'text-slate-400'
+                              )}>
+                                {m.utilization}%
+                              </span>
+                              <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full',
+                                    m.utilization >= 75 ? 'bg-emerald-500' : m.utilization >= 45 ? 'bg-amber-400' : 'bg-slate-400'
+                                  )}
+                                  style={{ width: `${m.utilization}%` }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <span className={cn(
+                              'inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize',
+                              m.serviceStatus === 'overdue' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' :
+                                m.serviceStatus === 'due_soon' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' :
+                                  'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            )}>
+                              {m.serviceStatus === 'overdue' && <AlertCircle className="w-3 h-3" />}
+                              {m.serviceStatus === 'due_soon' && <Clock className="w-3 h-3" />}
+                              {m.serviceStatus === 'ok' && <CheckCircle2 className="w-3 h-3" />}
+                              {m.serviceStatus.replace('_', ' ')}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEditPumpDates(m)}
+                                className="h-7 px-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                title="Configure Pump Start & Stop Dates"
+                              >
+                                <Calendar className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                                Dates
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setActiveRegisterMachine({ id: m.id, name: m.name })}
+                                className="h-7 px-2.5 text-xs font-semibold rounded-lg text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/40"
+                              >
+                                Open Register
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
-                <div className="h-48 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                  <Fuel className="h-8 w-8 text-slate-300 dark:text-slate-700" />
-                  <p className="text-xs font-medium">No refill interval cycles recorded for the selected machine(s).</p>
-                  {varianceMachineFilter.length > 0 && (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  No machines deployed or configured on this site yet.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── SECTION 5: Recent Downtime Log & Root-Cause Analysis ── */}
+          {siteAggregates.allDowntimesList.length > 0 && (
+            <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-500" />
+                    Downtime Events Log & Failure Reasons
+                  </CardTitle>
+                </div>
+                <Badge variant="destructive" className="text-xs">
+                  {siteAggregates.allDowntimesList.length} Incident{siteAggregates.allDowntimesList.length !== 1 ? 's' : ''}
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
+                  {siteAggregates.allDowntimesList.map((dt, idx) => (
+                    <div key={dt.id || idx} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          'mt-0.5 p-1.5 rounded-lg shrink-0',
+                          dt.severity === 'high' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' :
+                            dt.severity === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' :
+                              'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                        )}>
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">{dt.machineName}</span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs text-slate-500">{formatDisplayDate(dt.date)}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                            {dt.reason}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <Badge className={cn(
+                          'text-[10px] font-bold uppercase tracking-wider',
+                          dt.severity === 'high' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' :
+                            dt.severity === 'medium' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
+                              'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                        )}>
+                          {dt.severity}
+                        </Badge>
+                        {dt.durationHours > 0 && (
+                          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 mt-1">
+                            {dt.durationHours} hrs halted
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── MODAL: Configure Pump Dates & Replacement Lineage ── */}
+          {editingPumpDateMachine && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-cyan-500" />
+                      Configure Pump Dates & Swaps
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setEditingPumpDateMachine(null)}
+                    className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSavePumpDatesModal} className="p-5 space-y-4">
+                  {pumpDateModalError && (
+                    <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{pumpDateModalError}</span>
+                    </div>
+                  )}
+
+                  {/* Machine Banner */}
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Machine Unit</span>
+                      <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">{editingPumpDateMachine.name}</div>
+                    </div>
+                    <Badge variant="outline" className="text-xs font-semibold">
+                      {currentSite?.name}
+                    </Badge>
+                  </div>
+
+                  {/* Pump Start Date */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Pump Start Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={(editingPumpDateMachine.startDate || '').split('T')[0]}
+                      onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, startDate: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
+                      required
+                    />
+                  </div>
+
+                  {/* Pump Stop Date */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Pump Stop / End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={(editingPumpDateMachine.stopDate || '').split('T')[0]}
+                      onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, stopDate: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  {/* Replaced Predecessor Machine */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Replaced Predecessor Unit (Machine Swap)
+                    </label>
+                    <select
+                      value={editingPumpDateMachine.replacedAssetId}
+                      onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, replacedAssetId: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
+                    >
+                      <option value="">None (Initial unit deployment)</option>
+                      {siteMachines
+                        .filter(m => m.id !== editingPumpDateMachine.id)
+                        .map(m => (
+                          <option key={m.id} value={m.id}>
+                            Replaced: {m.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Swap Reason */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Swap / Demobilization Reason
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Mechanical fault, capacity upgrade, or basement phase complete"
+                      value={editingPumpDateMachine.swapReason}
+                      onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, swapReason: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => setVarianceMachineFilter([])}
-                      className="text-xs h-7 mt-1 font-semibold text-cyan-600"
+                      onClick={() => setEditingPumpDateMachine(null)}
+                      disabled={isSavingPumpDates}
+                      className="text-xs"
                     >
-                      Show All Pumps
+                      Cancel
                     </Button>
-                  )}
-                </div>
-              )}
-            </div>
-        </CardContent>
-      </Card>
-
-      {/* ── VISUAL SECTION 2: Machine Days & Downtime Graphs (Side by Side) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Graph 2A: Days on Site & Running Status per Machine */}
-        <Card 
-          style={fullScreenChart === 'site-operational-days' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}
-          className={cn(
-          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
-          fullScreenChart === 'site-operational-days' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
-        )}>
-          {fullScreenChart === 'site-operational-days' && (
-            <Button
-              variant="default"
-              size="icon"
-              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
-              onClick={() => toggleFullScreenChart('site-operational-days')}
-              title="Exit Full Screen"
-            >
-              <Minimize2 className="h-5 w-5" />
-            </Button>
-          )}
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-            <div>
-              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-emerald-500" />
-                Operational Days by Machine (Full vs Half vs Off)
-              </CardTitle>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Quick Fleet Status Toggle */}
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
-                <button
-                  type="button"
-                  onClick={() => setFleetChartFilter('all')}
-                  className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
-                    fleetChartFilter === 'all' 
-                      ? 'bg-white dark:bg-slate-700 text-cyan-700 dark:text-cyan-300 shadow-xs' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  )}
-                >
-                  All ({machineFleetStats.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFleetChartFilter('active')}
-                  className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
-                    fleetChartFilter === 'active' 
-                      ? 'bg-emerald-600 text-white shadow-xs' 
-                      : 'text-slate-500 hover:text-emerald-600'
-                  )}
-                >
-                  Active ({siteAggregates.activeFleetCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFleetChartFilter('offsite')}
-                  className={cn(
-                    'px-2 py-0.5 rounded text-[10px] font-semibold transition-all',
-                    fleetChartFilter === 'offsite' 
-                      ? 'bg-slate-600 text-white shadow-xs' 
-                      : 'text-slate-500 hover:text-slate-700'
-                  )}
-                >
-                  Taken Out ({siteAggregates.takenOutFleetCount})
-                </button>
-              </div>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-                onClick={() => toggleFullScreenChart('site-operational-days')}
-                title="Full Screen"
-                aria-label="Full Screen"
-              >
-                <Maximize2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className={cn("p-5 pt-6", fullScreenChart === 'site-operational-days' && "flex-1 flex flex-col min-h-0")}>
-            {machineDaysChartData.length > 0 ? (
-              <div className={cn("w-full min-w-0", fullScreenChart === 'site-operational-days' ? "flex-1 min-h-[500px]" : "h-80")}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <BarChart data={machineDaysChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
-                    <XAxis 
-                      dataKey="chartLabel" 
-                      stroke={isDark ? '#94a3b8' : '#64748b'} 
-                      fontSize={10} 
-                      tickLine={false}
-                      interval={0}
-                      angle={-20}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis 
-                      stroke={isDark ? '#94a3b8' : '#64748b'} 
-                      fontSize={11} 
-                      tickLine={false}
-                      tickFormatter={v => `${v}d`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                        borderRadius: '0.875rem',
-                        fontSize: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                        padding: '12px 14px'
-                      }}
-                      formatter={(val: any, name: any) => [
-                        `${val} Days`, 
-                        name === 'fullDays' ? 'Full Day Running (1.0)' : name === 'halfDays' ? 'Half Day Running (0.5)' : 'Standby / Off'
-                      ]}
-                      labelFormatter={(label, items) => {
-                        const item = items?.[0]?.payload;
-                        if (!item) return label;
-                        return (
-                          <div className="space-y-1.5 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
-                            <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center justify-between gap-2">
-                              <span>{item.fullName}</span>
-                              <span className={cn(
-                                'text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1',
-                                item.isCurrentlyActive 
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' 
-                                  : item.status === 'replaced'
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                              )}>
-                                {item.isCurrentlyActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                                {item.statusLabel}
-                              </span>
-                            </div>
-                            
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                              <span className="font-semibold text-slate-700 dark:text-slate-300">Pumping Period: </span>
-                              {item.startDate ? formatDisplayDate(item.startDate) : 'Start unrecorded'} 
-                              {' → '} 
-                              {item.isCurrentlyActive ? 'Present (Active)' : (item.stopDate ? formatDisplayDate(item.stopDate) : 'Stopped')}
-                              <span className="ml-1 text-slate-400 font-medium">({item.totalDays} calendar days)</span>
-                            </div>
-
-                            {item.successorName && (
-                              <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/90 dark:bg-blue-950/50 px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-900/60">
-                                <strong>🔄 Swapped out:</strong> Replaced by <strong>{item.successorName}</strong>
-                                {item.swapReason ? <span className="italic block text-[10px] mt-0.5">"{item.swapReason}"</span> : null}
-                              </div>
-                            )}
-                            {item.predecessorName && (
-                              <div className="text-[11px] text-cyan-700 dark:text-cyan-300 bg-cyan-50/90 dark:bg-cyan-950/50 px-2 py-1 rounded-md border border-cyan-200/60 dark:border-cyan-900/60">
-                                <strong>⬅️ Swapped in:</strong> Replaced <strong>{item.predecessorName}</strong>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                    <Legend 
-                      wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                      formatter={(val) => val === 'fullDays' ? 'Full (1.0)' : val === 'halfDays' ? 'Half (0.5)' : 'Off / Standby'}
-                    />
-                    <Bar dataKey="fullDays" stackId="a" fill={CHART_COLORS.emerald} radius={[0, 0, 0, 0]} isAnimationActive={false} />
-                    <Bar dataKey="halfDays" stackId="a" fill={CHART_COLORS.amber} radius={[0, 0, 0, 0]} isAnimationActive={false} />
-                    <Bar dataKey="offDays" stackId="a" fill={CHART_COLORS.slate} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
-                No machine operational logs available for this filter.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Graph 2B: Machine Downtime & Halts (Incidents & Lost Hours) */}
-        <Card 
-          style={fullScreenChart === 'site-downtime' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 400px' }}
-          className={cn(
-          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
-          fullScreenChart === 'site-downtime' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
-        )}>
-          {fullScreenChart === 'site-downtime' && (
-            <Button
-              variant="default"
-              size="icon"
-              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
-              onClick={() => toggleFullScreenChart('site-downtime')}
-              title="Exit Full Screen"
-            >
-              <Minimize2 className="h-5 w-5" />
-            </Button>
-          )}
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-            <div>
-              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-rose-500" />
-                Downtime Incidents & Lost Hours
-              </CardTitle>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              onClick={() => toggleFullScreenChart('site-downtime')}
-              title="Full Screen"
-              aria-label="Full Screen"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-          <CardContent className={cn("p-5 pt-6", fullScreenChart === 'site-downtime' && "flex-1 flex flex-col min-h-0")}>
-            {machineDowntimeChartData.length > 0 ? (
-              <div className={cn("w-full min-w-0", fullScreenChart === 'site-downtime' ? "flex-1 min-h-[500px]" : "h-80")}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <BarChart data={machineDowntimeChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#334155' : '#f1f5f9'} vertical={false} />
-                    <XAxis 
-                      dataKey="chartLabel" 
-                      stroke={isDark ? '#94a3b8' : '#64748b'} 
-                      fontSize={10} 
-                      tickLine={false}
-                      interval={0}
-                      angle={-20}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis 
-                      stroke={isDark ? '#94a3b8' : '#64748b'} 
-                      fontSize={11} 
-                      tickLine={false} 
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                        borderColor: isDark ? '#334155' : '#e2e8f0',
-                        borderRadius: '0.875rem',
-                        fontSize: '12px',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                        padding: '12px 14px'
-                      }}
-                      formatter={(val: any, name: any) => [
-                        name === 'incidents' ? `${val} Events` : `${val} Hours Lost`,
-                        name === 'incidents' ? 'Incidents Count' : 'Lost Hours'
-                      ]}
-                      labelFormatter={(label, items) => {
-                        const item = items?.[0]?.payload;
-                        if (!item) return label;
-                        return (
-                          <div className="space-y-1 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
-                            <div className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center justify-between gap-2">
-                              <span>{item.fullName}</span>
-                              <span className={cn(
-                                'text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1',
-                                item.isCurrentlyActive 
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' 
-                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                              )}>
-                                {item.isCurrentlyActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                                {item.statusLabel}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                              {item.startDate ? formatDisplayDate(item.startDate) : 'Start unrecorded'} 
-                              {' → '} 
-                              {item.isCurrentlyActive ? 'Present (Active)' : (item.stopDate ? formatDisplayDate(item.stopDate) : 'Stopped')}
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-                    <Legend 
-                      wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }}
-                      formatter={(val) => val === 'incidents' ? 'Incidents Count' : 'Lost Hours (h)'}
-                    />
-                    <Bar dataKey="incidents" fill={CHART_COLORS.rose} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                    <Bar dataKey="lostHours" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="h-80 flex flex-col items-center justify-center text-slate-400 gap-2">
-                <CheckCircle2 className="h-10 w-10 text-emerald-500 opacity-60" />
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Zero Unresolved Downtimes</p>
-                <p className="text-xs text-slate-400">All machines operating smoothly with no logged incidents.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── VISUAL SECTION 3: Donut Distributions ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Donut 3A: Operational Status Breakdown */}
-        <Card 
-          style={fullScreenChart === 'site-duty-pie' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
-          className={cn(
-          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
-          fullScreenChart === 'site-duty-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
-        )}>
-          {fullScreenChart === 'site-duty-pie' && (
-            <Button
-              variant="default"
-              size="icon"
-              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
-              onClick={() => toggleFullScreenChart('site-duty-pie')}
-              title="Exit Full Screen"
-            >
-              <Minimize2 className="h-5 w-5" />
-            </Button>
-          )}
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Activity className="h-4 w-4 text-emerald-500" />
-              Fleet Duty Cycle & Running Distribution
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              onClick={() => toggleFullScreenChart('site-duty-pie')}
-              title="Full Screen"
-              aria-label="Full Screen"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-          <CardContent className={cn("p-5 flex flex-col sm:flex-row items-center justify-around gap-4", fullScreenChart === 'site-duty-pie' && "flex-1 min-h-0")}>
-            {operationalStatusDonutData.length > 0 ? (
-              <>
-                <div className={cn("shrink-0 min-w-0", fullScreenChart === 'site-duty-pie' ? "h-96 w-96" : "h-52 w-52")}>
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <PieChart>
-                      <Pie
-                        data={operationalStatusDonutData}
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={3}
-                        dataKey="value"
-                        isAnimationActive={false}
-                      >
-                        {operationalStatusDonutData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                          borderRadius: '0.75rem',
-                          fontSize: '12px'
-                        }}
-                        formatter={(val: any) => [`${val} Days`, 'Quantity']}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-3 min-w-[160px]">
-                  {operationalStatusDonutData.map((d, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                        <span className="text-slate-600 dark:text-slate-300 font-medium">{d.name}</span>
-                      </div>
-                      <span className="font-bold text-slate-800 dark:text-white">{d.value}d</span>
-                    </div>
-                  ))}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-                    Total Duty Days: <strong className="text-slate-700 dark:text-slate-200">{siteAggregates.fullDays + siteAggregates.halfDays + siteAggregates.offDays}</strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
-                No duty cycle data logged.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Donut 3B: Downtime Severity Breakdown */}
-        <Card 
-          style={fullScreenChart === 'site-severity-pie' ? undefined : { contentVisibility: 'auto', containIntrinsicSize: '0 320px' }}
-          className={cn(
-          "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden transition-all",
-          fullScreenChart === 'site-severity-pie' && "fixed inset-0 z-[120] m-0 rounded-none border-none w-screen h-screen flex flex-col p-4 sm:p-6 overflow-auto bg-white dark:bg-slate-900"
-        )}>
-          {fullScreenChart === 'site-severity-pie' && (
-            <Button
-              variant="default"
-              size="icon"
-              className="fixed top-4 right-4 z-[130] rounded-full shadow-2xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 w-11 h-11"
-              onClick={() => toggleFullScreenChart('site-severity-pie')}
-              title="Exit Full Screen"
-            >
-              <Minimize2 className="h-5 w-5" />
-            </Button>
-          )}
-          <CardHeader className="p-5 pb-2 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-rose-500" />
-              Downtime Severity Categorization
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 rounded-lg border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-              onClick={() => toggleFullScreenChart('site-severity-pie')}
-              title="Full Screen"
-              aria-label="Full Screen"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-          <CardContent className={cn("p-5 flex flex-col sm:flex-row items-center justify-around gap-4", fullScreenChart === 'site-severity-pie' && "flex-1 min-h-0")}>
-            {downtimeSeverityDonutData.length > 0 ? (
-              <>
-                <div className={cn("shrink-0 min-w-0", fullScreenChart === 'site-severity-pie' ? "h-96 w-96" : "h-52 w-52")}>
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <PieChart>
-                      <Pie
-                        data={downtimeSeverityDonutData}
-                        innerRadius={55}
-                        outerRadius={80}
-                        paddingAngle={3}
-                        dataKey="value"
-                        isAnimationActive={false}
-                      >
-                        {downtimeSeverityDonutData.map((entry, index) => (
-                          <Cell key={`sev-cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: isDark ? '#0f172a' : '#ffffff', 
-                          borderColor: isDark ? '#334155' : '#e2e8f0',
-                          borderRadius: '0.75rem',
-                          fontSize: '12px'
-                        }}
-                        formatter={(val: any) => [`${val} Events`, 'Count']}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-3 min-w-[160px]">
-                  {downtimeSeverityDonutData.map((d, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                        <span className="text-slate-600 dark:text-slate-300 font-medium">{d.name}</span>
-                      </div>
-                      <span className="font-bold text-slate-800 dark:text-white">{d.value}</span>
-                    </div>
-                  ))}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
-                    Total Incidents: <strong className="text-rose-600">{siteAggregates.totalDowntimes}</strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="h-48 flex items-center justify-center text-slate-400 text-xs">
-                No downtime incidents recorded.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── SECTION: Machine Deployment & Swap Timeline (Active vs Replaced / Demobilized) ── */}
-      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-          <div>
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-emerald-500" />
-              Site Machine Deployments, Pump Dates & Swap Lineage
-            </CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              {siteAggregates.activeFleetCount} Active on Site
-            </span>
-            {siteAggregates.takenOutFleetCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                ⚪ {siteAggregates.takenOutFleetCount} Taken Out / Swapped
-              </span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="p-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Column 1: Currently Active Pumps on Site */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Currently Active on Site ({machineFleetStats.filter(m => m.isCurrentlyActive).length})
-                </h4>
-                <span className="text-[11px] text-slate-400">Pumping operational</span>
-              </div>
-
-              {machineFleetStats.filter(m => m.isCurrentlyActive).length > 0 ? (
-                <div className="space-y-2.5">
-                  {machineFleetStats.filter(m => m.isCurrentlyActive).map(m => (
-                    <div 
-                      key={m.id}
-                      className="p-3 rounded-xl border border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between gap-2.5"
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={isSavingPumpDates}
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold gap-1.5"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm">
-                            {m.name}
-                          </div>
-                          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-2 mt-0.5">
-                            <span>Pump Start: <strong>{m.startDate ? formatDisplayDate(m.startDate) : 'Not configured'}</strong></span>
-                            <span>•</span>
-                            <span>{m.calendarDaysOnSite} days on site</span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEditPumpDates(m)}
-                          className="h-6 px-2 text-[10px] font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/50 rounded-md"
-                          title="Edit Pump Start / Stop Dates"
-                        >
-                          <Calendar className="w-3 h-3 mr-1" /> Dates
-                        </Button>
-                      </div>
-
-                      {/* Predecessor Swap note */}
-                      {m.predecessorName && (
-                        <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2 py-1 rounded-md border border-blue-200/60 dark:border-blue-900/60 flex items-center gap-1.5">
-                          <ArrowRight className="w-3 h-3 text-blue-500 shrink-0" />
-                          <span>Brought in to replace: <strong>{m.predecessorName}</strong></span>
-                          {m.swapReason && <span className="text-slate-400 italic">({m.swapReason})</span>}
-                        </div>
-                      )}
-
-                      {/* Quick Operational Metrics */}
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-[11px]">
-                        <div>
-                          <span className="text-slate-400 text-[10px] block">Active Duty</span>
-                          <strong className="text-slate-700 dark:text-slate-200">{m.activeDays}d ({m.utilization}%)</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 text-[10px] block">Diesel Burned</span>
-                          <strong className="text-amber-600 dark:text-amber-400">{m.totalDiesel.toFixed(0)} L</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 text-[10px] block">Downtime</span>
-                          <strong className={m.downtimeCount > 0 ? "text-rose-600" : "text-slate-400"}>
-                            {m.downtimeCount} events ({m.downtimeHours.toFixed(1)}h)
-                          </strong>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
-                  No pumps currently designated active on this site.
-                </div>
-              )}
-            </div>
-
-            {/* Column 2: Swapped Out / Taken Out Machines */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-400" />
-                  Taken Out / Swapped Offsite ({machineFleetStats.filter(m => !m.isCurrentlyActive).length})
-                </h4>
-                <span className="text-[11px] text-slate-400">Demobilized / Replaced</span>
+                      {isSavingPumpDates ? 'Saving...' : 'Save Pump Dates'}
+                    </Button>
+                  </div>
+                </form>
               </div>
-
-              {machineFleetStats.filter(m => !m.isCurrentlyActive).length > 0 ? (
-                <div className="space-y-2.5">
-                  {machineFleetStats.filter(m => !m.isCurrentlyActive).map(m => (
-                    <div 
-                      key={m.id}
-                      className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850/40 flex flex-col justify-between gap-2.5"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-bold text-slate-700 dark:text-slate-300 text-xs sm:text-sm">
-                            {m.name}
-                          </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2 mt-0.5">
-                            <span>
-                              {m.startDate ? formatDisplayDate(m.startDate) : 'Start unrecorded'} 
-                              {' → '} 
-                              <strong>{m.stopDate ? formatDisplayDate(m.stopDate) : 'Stopped'}</strong>
-                            </span>
-                            <span>•</span>
-                            <span>{m.calendarDaysOnSite} days served</span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEditPumpDates(m)}
-                          className="h-6 px-2 text-[10px] font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800 rounded-md"
-                          title="Edit Pump Start / Stop Dates"
-                        >
-                          <Calendar className="w-3 h-3 mr-1" /> Dates
-                        </Button>
-                      </div>
-
-                      {/* Successor Replacement note */}
-                      {m.successorName ? (
-                        <div className="text-[11px] text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/40 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-900/50">
-                          <div className="flex items-center gap-1.5 font-semibold">
-                            <RefreshCw className="w-3 h-3 text-blue-500 shrink-0" />
-                            <span>Taken out & replaced by: <strong>{m.successorName}</strong></span>
-                          </div>
-                          {m.swapReason && (
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 ml-4">
-                              Reason: "{m.swapReason}"
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                          <span>Demobilized / taken out of active site rotation.</span>
-                        </div>
-                      )}
-
-                      {/* Quick Operational Metrics */}
-                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-800 text-[11px]">
-                        <div>
-                          <span className="text-slate-400 text-[10px] block">Active Delivered</span>
-                          <strong className="text-slate-700 dark:text-slate-200">{m.activeDays}d ({m.utilization}%)</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 text-[10px] block">Diesel Burned</span>
-                          <strong className="text-amber-600 dark:text-amber-400">{m.totalDiesel.toFixed(0)} L</strong>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 text-[10px] block">Downtime</span>
-                          <strong className={m.downtimeCount > 0 ? "text-rose-600" : "text-slate-400"}>
-                            {m.downtimeCount} events ({m.downtimeHours.toFixed(1)}h)
-                          </strong>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
-                  No demobilized or swapped machines on this site.
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── SECTION 4: Machine Fleet Matrix & Lineage Table ── */}
-      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between flex-wrap gap-2">
-          <div>
-            <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-              Machine Fleet Performance & Daily Register Access
-            </CardTitle>
-          </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-            {machineFleetStats.length} Unit{machineFleetStats.length !== 1 ? 's' : ''} on Record
-          </span>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          {machineFleetStats.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                    <th className="py-3 px-4">Machine Unit & Lineage</th>
-                    <th className="py-3 px-3">Days on Site</th>
-                    <th className="py-3 px-3">Active Days</th>
-                    <th className="py-3 px-3">Diesel Refilled</th>
-                    <th className="py-3 px-3">Expected vs Variance</th>
-                    <th className="py-3 px-3">Downtimes</th>
-                    <th className="py-3 px-3">Utilization</th>
-                    <th className="py-3 px-3">Maintenance</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {machineFleetStats.map(m => (
-                    <tr key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-800 dark:text-slate-200 text-sm flex items-center gap-2 flex-wrap">
-                          <span>{m.name}</span>
-                          <span className={cn(
-                            'text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1',
-                            m.isCurrentlyActive 
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300' 
-                              : m.status === 'replaced'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                          )}>
-                            {m.isCurrentlyActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                            {m.statusLabel}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-1 flex-wrap">
-                          <span>
-                            Pump Dates: <strong>{m.startDate ? formatDisplayDate(m.startDate) : '—'}</strong>
-                            {' → '}
-                            <strong>{m.isCurrentlyActive ? 'Present (Active)' : (m.stopDate ? formatDisplayDate(m.stopDate) : 'Ended')}</strong>
-                          </span>
-                          {m.successorName && (
-                            <span className="text-blue-600 dark:text-blue-400 font-medium">
-                              • ➡️ Replaced by: {m.successorName}
-                            </span>
-                          )}
-                          {m.predecessorName && (
-                            <span className="text-cyan-600 dark:text-cyan-400 font-medium">
-                              • ⬅️ Replaced: {m.predecessorName}
-                            </span>
-                          )}
-                          {m.expectedDailyBurnRate > 0 && (
-                            <span className="text-slate-500 dark:text-slate-400 font-medium">
-                              • ⛽ Rated: {m.expectedDailyBurnRate} L/day {m.tankCapacityLitres > 0 ? `(${m.tankCapacityLitres}L tank)` : ''}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3 font-semibold text-slate-700 dark:text-slate-300">
-                        {m.calendarDaysOnSite} days
-                      </td>
-
-                      <td className="py-3 px-3 font-semibold text-emerald-600 dark:text-emerald-400">
-                        {m.activeDays} days
-                        <div className="text-[10px] text-slate-400 font-normal">
-                          {m.fullDays} full · {m.halfDays} half
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3 font-semibold text-amber-600 dark:text-amber-400">
-                        {m.totalDiesel.toFixed(1)} L
-                        <div className="text-[10px] text-slate-400 font-normal">
-                          avg {m.avgDieselPerActiveDay.toFixed(1)} L/d
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        {m.isBenchmarked ? (
-                          <div>
-                            <div className="font-semibold text-slate-700 dark:text-slate-300">
-                              {m.expectedDiesel.toFixed(1)} L
-                              <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                ({m.expectedDailyBurnRate} L/d)
-                              </span>
-                            </div>
-                            <div className="mt-0.5">
-                              <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border inline-block leading-none', m.fuelEfficiency.badgeCls)}>
-                                {m.fuelEfficiency.label} ({m.varianceLitres >= 0 ? `+${m.varianceLitres}` : m.varianceLitres} L)
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 italic">
-                            Unbenchmarked
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span className={cn('font-semibold', m.downtimeCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400')}>
-                          {m.downtimeCount} incidents
-                        </span>
-                        {m.downtimeHours > 0 && (
-                          <div className="text-[10px] text-slate-400 font-normal">
-                            {m.downtimeHours.toFixed(1)} hrs lost
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            'font-bold text-xs',
-                            m.utilization >= 75 ? 'text-emerald-600' : m.utilization >= 45 ? 'text-amber-600' : 'text-slate-400'
-                          )}>
-                            {m.utilization}%
-                          </span>
-                          <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                            <div 
-                              className={cn(
-                                'h-full rounded-full',
-                                m.utilization >= 75 ? 'bg-emerald-500' : m.utilization >= 45 ? 'bg-amber-400' : 'bg-slate-400'
-                              )}
-                              style={{ width: `${m.utilization}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span className={cn(
-                          'inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize',
-                          m.serviceStatus === 'overdue' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' :
-                          m.serviceStatus === 'due_soon' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' :
-                          'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        )}>
-                          {m.serviceStatus === 'overdue' && <AlertCircle className="w-3 h-3" />}
-                          {m.serviceStatus === 'due_soon' && <Clock className="w-3 h-3" />}
-                          {m.serviceStatus === 'ok' && <CheckCircle2 className="w-3 h-3" />}
-                          {m.serviceStatus.replace('_', ' ')}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEditPumpDates(m)}
-                            className="h-7 px-2 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
-                            title="Configure Pump Start & Stop Dates"
-                          >
-                            <Calendar className="w-3.5 h-3.5 mr-1 text-slate-400" />
-                            Dates
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setActiveRegisterMachine({ id: m.id, name: m.name })}
-                            className="h-7 px-2.5 text-xs font-semibold rounded-lg text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-50 dark:hover:bg-cyan-950/40"
-                          >
-                            Open Register
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-8 text-center text-slate-400 text-xs">
-              No machines deployed or configured on this site yet.
             </div>
           )}
-        </CardContent>
-      </Card>
 
-      {/* ── SECTION 5: Recent Downtime Log & Root-Cause Analysis ── */}
-      {siteAggregates.allDowntimesList.length > 0 && (
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="p-5 pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-rose-500" />
-                Downtime Events Log & Failure Reasons
-              </CardTitle>
-            </div>
-            <Badge variant="destructive" className="text-xs">
-              {siteAggregates.allDowntimesList.length} Incident{siteAggregates.allDowntimesList.length !== 1 ? 's' : ''}
-            </Badge>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto">
-              {siteAggregates.allDowntimesList.map((dt, idx) => (
-                <div key={dt.id || idx} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                  <div className="flex items-start gap-3">
-                    <div className={cn(
-                      'mt-0.5 p-1.5 rounded-lg shrink-0',
-                      dt.severity === 'high' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300' :
-                      dt.severity === 'medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' :
-                      'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                    )}>
-                      <AlertTriangle className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">{dt.machineName}</span>
-                        <span className="text-xs text-slate-400">•</span>
-                        <span className="text-xs text-slate-500">{formatDisplayDate(dt.date)}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                        {dt.reason}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <Badge className={cn(
-                      'text-[10px] font-bold uppercase tracking-wider',
-                      dt.severity === 'high' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' :
-                      dt.severity === 'medium' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' :
-                      'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                    )}>
-                      {dt.severity}
-                    </Badge>
-                    {dt.durationHours > 0 && (
-                      <p className="text-xs font-bold text-slate-600 dark:text-slate-400 mt-1">
-                        {dt.durationHours} hrs halted
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── MODAL: Configure Pump Dates & Replacement Lineage ── */}
-      {editingPumpDateMachine && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[120] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-cyan-500" />
-                  Configure Pump Dates & Swaps
-                </h3>
-              </div>
-              <button
-                onClick={() => setEditingPumpDateMachine(null)}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSavePumpDatesModal} className="p-5 space-y-4">
-              {pumpDateModalError && (
-                <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{pumpDateModalError}</span>
-                </div>
-              )}
-
-              {/* Machine Banner */}
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Machine Unit</span>
-                  <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">{editingPumpDateMachine.name}</div>
-                </div>
-                <Badge variant="outline" className="text-xs font-semibold">
-                  {currentSite?.name}
-                </Badge>
-              </div>
-
-              {/* Pump Start Date */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Pump Start Date <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={(editingPumpDateMachine.startDate || '').split('T')[0]}
-                  onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, startDate: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
-                  required
-                />
-              </div>
-
-              {/* Pump Stop Date */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Pump Stop / End Date
-                </label>
-                <input
-                  type="date"
-                  value={(editingPumpDateMachine.stopDate || '').split('T')[0]}
-                  onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, stopDate: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
-                />
-              </div>
-
-              {/* Replaced Predecessor Machine */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Replaced Predecessor Unit (Machine Swap)
-                </label>
-                <select
-                  value={editingPumpDateMachine.replacedAssetId}
-                  onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, replacedAssetId: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
-                >
-                  <option value="">None (Initial unit deployment)</option>
-                  {siteMachines
-                    .filter(m => m.id !== editingPumpDateMachine.id)
-                    .map(m => (
-                      <option key={m.id} value={m.id}>
-                        Replaced: {m.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Swap Reason */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Swap / Demobilization Reason
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Mechanical fault, capacity upgrade, or basement phase complete"
-                  value={editingPumpDateMachine.swapReason}
-                  onChange={e => setEditingPumpDateMachine({ ...editingPumpDateMachine, swapReason: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-cyan-500 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingPumpDateMachine(null)}
-                  disabled={isSavingPumpDates}
-                  className="text-xs"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isSavingPumpDates}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold gap-1.5"
-                >
-                  {isSavingPumpDates ? 'Saving...' : 'Save Pump Dates'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      </>
+        </>
       )} {/* end chartsReady ternary */}
 
       {renderRefillForecastModal()}

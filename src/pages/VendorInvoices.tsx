@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useDeferredValue } from 'react';
 import { Card } from '@/src/components/ui/card';
 import { Button } from '@/src/components/ui/button';
 import { Input } from '@/src/components/ui/input';
@@ -6,7 +6,7 @@ import { Badge } from '@/src/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/src/components/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/src/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/src/components/ui/table';
-import { useAppStore, VendorInvoice, VendorInvoicePayment, LedgerEntry, LedgerVendor, InvoiceVersion } from '@/src/store/appStore';
+import { useAppStore, VendorInvoice, VendorInvoicePayment, LedgerEntry, LedgerVendor, LedgerVendorBankAccount, InvoiceVersion } from '@/src/store/appStore';
 import { useUserStore } from '@/src/store/userStore';
 import { usePriv } from '@/src/hooks/usePriv';
 import { toast, showConfirm } from '@/src/components/ui/toast';
@@ -18,7 +18,7 @@ import {
   Link2, Unlink, Edit2, Users, Paperclip, Upload, Eye, Loader2,
   Phone, MapPin, Landmark, ShieldCheck, History, Send, ThumbsUp,
   ThumbsDown, MessageSquare, TrendingDown, Tag, RotateCcw, UserCheck, Lock,
-  Copy, Info, Briefcase
+  Copy, Info, Briefcase, Mail, Star
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
@@ -378,6 +378,7 @@ export function VendorInvoices() {
   // ─── State: Filters, Search, Sort & Pagination ──────────────────────────────
   const [activeTab, setActiveTab] = useState<'all' | 'outstanding' | 'awaiting_approval' | 'overdue' | 'paid'>('outstanding');
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [vendorFilter, setVendorFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'balance-desc' | 'balance-asc' | 'due-soon' | 'vendor-asc' | 'vendor-desc'>('date-desc');
   const [isVendorBalancesOpen, setIsVendorBalancesOpen] = useState(false);
@@ -410,19 +411,31 @@ export function VendorInvoices() {
   const [detailInvoice, setDetailInvoice] = useState<ComputedVendorInvoice | null>(null);
   const [showVendorBankInfo, setShowVendorBankInfo] = useState(false);
 
-  // ─── State: Vendor Directory Modal ──────────────────────────────────────────
+  // ─── State: Vendor Directory & View Modal ──────────────────────────────────
   const [isVendorDirectoryOpen, setIsVendorDirectoryOpen] = useState(false);
   const [vendorSearchTerm, setVendorSearchTerm] = useState('');
+  const [viewingVendor, setViewingVendor] = useState<LedgerVendor | null>(null);
   const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
   const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
   const [vendorFormName, setVendorFormName] = useState('');
   const [vendorFormTin, setVendorFormTin] = useState('');
   const [vendorFormAddress, setVendorFormAddress] = useState('');
-  const [vendorFormPhone, setVendorFormPhone] = useState('');
   const [vendorFormServicesRendered, setVendorFormServicesRendered] = useState('');
-  const [vendorFormBankName, setVendorFormBankName] = useState('');
-  const [vendorFormAccountNumber, setVendorFormAccountNumber] = useState('');
   const [vendorFormNotes, setVendorFormNotes] = useState('');
+  const [vendorFormPhones, setVendorFormPhones] = useState<string[]>(['']);
+  const [vendorFormEmails, setVendorFormEmails] = useState<string[]>(['']);
+  const [vendorFormBankAccounts, setVendorFormBankAccounts] = useState<LedgerVendorBankAccount[]>([
+    { bankName: '', accountNumber: '', accountName: '', isPrimary: true }
+  ]);
+
+  // Quick-add state inside Vendor View modal
+  const [quickAddPhone, setQuickAddPhone] = useState('');
+  const [quickAddEmail, setQuickAddEmail] = useState('');
+  const [quickAddBankName, setQuickAddBankName] = useState('');
+  const [quickAddAccountNo, setQuickAddAccountNo] = useState('');
+  const [quickAddAccountName, setQuickAddAccountName] = useState('');
+  const [showQuickAddBank, setShowQuickAddBank] = useState(false);
+  const [copiedBankIdx, setCopiedBankIdx] = useState<number | null>(null);
 
   // ─── Invoice Form State ─────────────────────────────────────────────────────
   const MEDIA_SERVER_URL = import.meta.env.VITE_MEDIA_SERVER_URL || 'https://dewaterconstruct.com/dcel-media';
@@ -621,10 +634,26 @@ export function VendorInvoices() {
   const [editPayNotes, setEditPayNotes] = useState('');
 
   // ─── Computations: Invoices with live balance & status ───────────────────────
-  const invoicesWithBalance: ComputedVendorInvoice[] = useMemo(() => {
+  // ─── Optimized Payments Index (O(P)) ──────────────────────────────────────
+  const paymentsByInvoiceId = useMemo(() => {
+    const map = new Map<string, VendorInvoicePayment[]>();
+    for (let i = 0; i < vendorInvoicePayments.length; i++) {
+      const p = vendorInvoicePayments[i];
+      const list = map.get(p.invoiceId);
+      if (list) list.push(p);
+      else map.set(p.invoiceId, [p]);
+    }
+    return map;
+  }, [vendorInvoicePayments]);
+
+  // ─── Computations: Invoices with live balance & status (O(N)) ───────────────
+  const invoicesWithBalance: (ComputedVendorInvoice & { itemSummary?: string })[] = useMemo(() => {
     return vendorInvoices.map((inv) => {
-      const payments = vendorInvoicePayments.filter((p) => p.invoiceId === inv.id);
-      const paid = payments.reduce((sum, p) => sum + Number(p.amountPaid || 0), 0);
+      const payments = paymentsByInvoiceId.get(inv.id) || [];
+      let paid = 0;
+      for (let i = 0; i < payments.length; i++) {
+        paid += Number(payments[i].amountPaid || 0);
+      }
       const balance = Math.max(0, Number(inv.totalAmount || 0) - paid);
       const isApproved = isInvoiceApproved(inv);
       const daysOverdue = isApproved && inv.dueDate && inv.status !== 'paid' ? getDaysOverdue(inv.dueDate) : 0;
@@ -637,6 +666,18 @@ export function VendorInvoices() {
         derivedStatus = 'partial';
       }
 
+      let itemSummary = '';
+      if (inv.lineItems) {
+        try {
+          const parsed = JSON.parse(inv.lineItems);
+          const count = Array.isArray(parsed) ? parsed.filter((it: any) => (it.desc || '').trim()).length : 0;
+          if (count > 0) itemSummary = `${count} item${count !== 1 ? 's' : ''}`;
+        } catch {}
+      }
+      if (!itemSummary) {
+        itemSummary = (inv.description || '').split('\n')[0].slice(0, 60) || '—';
+      }
+
       return {
         ...inv,
         paidAmount: paid,
@@ -645,9 +686,10 @@ export function VendorInvoices() {
         isOverdue,
         daysOverdue,
         paymentCount: payments.length,
+        itemSummary,
       };
     });
-  }, [vendorInvoices, vendorInvoicePayments]);
+  }, [vendorInvoices, paymentsByInvoiceId]);
 
   // Invoices waiting for current user's approval
   const myPendingApprovals = useMemo(() => {
@@ -708,9 +750,10 @@ export function VendorInvoices() {
   // ─── Vendor Balance Summaries (Total Owed per Vendor) ────────────────────────
   const vendorBalances = useMemo(() => {
     const map = new Map<string, { totalInvoiced: number; totalPaid: number; totalOwed: number; overdueCount: number; overdueAmount: number; invoiceCount: number }>();
-    invoicesWithBalance.forEach((inv) => {
+    for (let i = 0; i < invoicesWithBalance.length; i++) {
+      const inv = invoicesWithBalance[i];
       const isApproved = (inv.approvalStatus || 'approved') === 'approved';
-      if (!isApproved) return;
+      if (!isApproved) continue;
       const key = (inv.vendorName || '').trim() || 'Unknown Vendor';
       const cur = map.get(key) || { totalInvoiced: 0, totalPaid: 0, totalOwed: 0, overdueCount: 0, overdueAmount: 0, invoiceCount: 0 };
       cur.totalInvoiced += Number(inv.totalAmount || 0);
@@ -722,11 +765,17 @@ export function VendorInvoices() {
         cur.overdueAmount += inv.balanceRemaining;
       }
       map.set(key, cur);
-    });
+    }
+
+    const vendorMap = new Map<string, LedgerVendor>();
+    for (let i = 0; i < ledgerVendors.length; i++) {
+      const v = ledgerVendors[i];
+      if (v.name) vendorMap.set(v.name.toLowerCase().trim(), v);
+    }
 
     return Array.from(map.entries())
       .map(([name, stats]) => {
-        const vendorObj = ledgerVendors.find(v => v.name.toLowerCase() === name.toLowerCase());
+        const vendorObj = vendorMap.get(name.toLowerCase());
         return {
           name,
           servicesRendered: vendorObj?.servicesRendered,
@@ -735,7 +784,7 @@ export function VendorInvoices() {
           ...stats,
         };
       })
-      .sort((a, b) => b.totalOwed - a.totalOwed); // Highest owed first by default
+      .sort((a, b) => b.totalOwed - a.totalOwed);
   }, [invoicesWithBalance, ledgerVendors]);
 
   const activeVendorStats = useMemo(() => {
@@ -772,9 +821,9 @@ export function VendorInvoices() {
       list = list.filter((i) => i.vendorName.toLowerCase() === vendorFilter.toLowerCase());
     }
 
-    // 3. Search filter
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
+    // 3. Search filter (Non-blocking deferred search)
+    if (deferredSearchTerm.trim()) {
+      const q = deferredSearchTerm.toLowerCase();
       list = list.filter((i) =>
         i.vendorName.toLowerCase().includes(q) ||
         i.invoiceNumber.toLowerCase().includes(q) ||
@@ -850,16 +899,37 @@ export function VendorInvoices() {
   };
 
   // ─── Vendor Directory Handlers ──────────────────────────────────────────────
+  // ─── Active Viewing Vendor Computations ─────────────────────────────────────
+  const activeViewingVendor = useMemo(() => {
+    if (!viewingVendor) return null;
+    return ledgerVendors.find((v) => v.id === viewingVendor.id) || viewingVendor;
+  }, [viewingVendor, ledgerVendors]);
+
+  const viewingVendorInvoices = useMemo(() => {
+    if (!activeViewingVendor) return [];
+    const vName = (activeViewingVendor.name || '').trim().toLowerCase();
+    return invoicesWithBalance.filter(
+      (i) => (i.vendorName || '').trim().toLowerCase() === vName || i.vendorId === activeViewingVendor.id
+    );
+  }, [activeViewingVendor, invoicesWithBalance]);
+
+  const viewingVendorStats = useMemo(() => {
+    const totalInvoiced = viewingVendorInvoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0);
+    const totalPaid = viewingVendorInvoices.reduce((sum, i) => sum + (i.paidAmount || 0), 0);
+    const totalBalance = viewingVendorInvoices.reduce((sum, i) => sum + (i.balanceRemaining || 0), 0);
+    return { totalInvoiced, totalPaid, totalBalance, count: viewingVendorInvoices.length };
+  }, [viewingVendorInvoices]);
+
   const openNewVendorModal = () => {
     setEditingVendorId(null);
     setVendorFormName('');
     setVendorFormTin('');
     setVendorFormAddress('');
-    setVendorFormPhone('');
     setVendorFormServicesRendered('');
-    setVendorFormBankName('');
-    setVendorFormAccountNumber('');
     setVendorFormNotes('');
+    setVendorFormPhones(['']);
+    setVendorFormEmails(['']);
+    setVendorFormBankAccounts([{ bankName: '', accountNumber: '', accountName: '', isPrimary: true }]);
     setIsVendorModalOpen(true);
   };
 
@@ -868,11 +938,29 @@ export function VendorInvoices() {
     setVendorFormName(v.name || '');
     setVendorFormTin(v.tinNumber || '');
     setVendorFormAddress(v.address || '');
-    setVendorFormPhone(v.phone || '');
     setVendorFormServicesRendered(v.servicesRendered || '');
-    setVendorFormBankName(v.bankName || '');
-    setVendorFormAccountNumber(v.accountNumber || '');
     setVendorFormNotes(v.notes || '');
+
+    const phones = v.phones && v.phones.length > 0 ? [...v.phones] : (v.phone ? [v.phone] : ['']);
+    setVendorFormPhones(phones);
+
+    const emails = v.emails && v.emails.length > 0 ? [...v.emails] : [''];
+    setVendorFormEmails(emails);
+
+    let banks: LedgerVendorBankAccount[] = [];
+    if (v.bankAccounts && v.bankAccounts.length > 0) {
+      banks = v.bankAccounts.map((b) => ({ ...b }));
+    } else if (v.bankName || v.accountNumber) {
+      banks = [{
+        bankName: v.bankName || '',
+        accountNumber: v.accountNumber || '',
+        accountName: '',
+        isPrimary: true,
+      }];
+    } else {
+      banks = [{ bankName: '', accountNumber: '', accountName: '', isPrimary: true }];
+    }
+    setVendorFormBankAccounts(banks);
     setIsVendorModalOpen(true);
   };
 
@@ -883,38 +971,173 @@ export function VendorInvoices() {
       return;
     }
 
+    const cleanPhones = vendorFormPhones.map((p) => p.trim()).filter(Boolean);
+    const cleanEmails = vendorFormEmails.map((e) => e.trim()).filter(Boolean);
+    const cleanBanks = vendorFormBankAccounts
+      .map((b) => ({
+        bankName: b.bankName.trim(),
+        accountNumber: b.accountNumber.trim(),
+        accountName: b.accountName?.trim() || undefined,
+        isPrimary: !!b.isPrimary,
+      }))
+      .filter((b) => b.bankName || b.accountNumber);
+
+    if (cleanBanks.length > 0 && !cleanBanks.some((b) => b.isPrimary)) {
+      cleanBanks[0].isPrimary = true;
+    }
+
+    const primaryBank = cleanBanks.find((b) => b.isPrimary) || cleanBanks[0];
+    const primaryPhone = cleanPhones[0] || undefined;
+
+    const vendorPayload: Partial<LedgerVendor> = {
+      name: cleanName,
+      tinNumber: vendorFormTin.trim() || undefined,
+      address: vendorFormAddress.trim() || undefined,
+      phone: primaryPhone,
+      phones: cleanPhones.length > 0 ? cleanPhones : undefined,
+      emails: cleanEmails.length > 0 ? cleanEmails : undefined,
+      bankAccounts: cleanBanks.length > 0 ? cleanBanks : undefined,
+      servicesRendered: vendorFormServicesRendered.trim() || undefined,
+      bankName: primaryBank?.bankName || undefined,
+      accountNumber: primaryBank?.accountNumber || undefined,
+      notes: vendorFormNotes.trim() || undefined,
+    };
+
     if (!editingVendorId) {
       const exists = ledgerVendors.some((v) => v.name.toLowerCase() === cleanName.toLowerCase());
       if (exists) {
         toast.error(`Vendor "${cleanName}" already exists.`);
         return;
       }
-      addLedgerVendor({
-        id: generateId(),
+      const newId = generateId();
+      const newVendor: LedgerVendor = {
+        id: newId,
         name: cleanName,
-        tinNumber: vendorFormTin.trim() || undefined,
-        address: vendorFormAddress.trim() || undefined,
-        phone: vendorFormPhone.trim() || undefined,
-        servicesRendered: vendorFormServicesRendered.trim() || undefined,
-        bankName: vendorFormBankName.trim() || undefined,
-        accountNumber: vendorFormAccountNumber.trim() || undefined,
-        notes: vendorFormNotes.trim() || undefined,
-      });
+        ...vendorPayload,
+      };
+      addLedgerVendor(newVendor);
       toast.success(`Vendor "${cleanName}" added to directory.`);
+      if (viewingVendor) setViewingVendor(newVendor);
     } else {
-      updateLedgerVendor(editingVendorId, {
-        name: cleanName,
-        tinNumber: vendorFormTin.trim() || undefined,
-        address: vendorFormAddress.trim() || undefined,
-        phone: vendorFormPhone.trim() || undefined,
-        servicesRendered: vendorFormServicesRendered.trim() || undefined,
-        bankName: vendorFormBankName.trim() || undefined,
-        accountNumber: vendorFormAccountNumber.trim() || undefined,
-        notes: vendorFormNotes.trim() || undefined,
-      });
+      updateLedgerVendor(editingVendorId, vendorPayload);
       toast.success(`Vendor "${cleanName}" updated.`);
+      if (viewingVendor && viewingVendor.id === editingVendorId) {
+        setViewingVendor((prev) => (prev ? { ...prev, ...vendorPayload } : null));
+      }
     }
     setIsVendorModalOpen(false);
+  };
+
+  const handleQuickAddPhone = (vendor: LedgerVendor) => {
+    const p = quickAddPhone.trim();
+    if (!p) return;
+    const currentPhones = vendor.phones ? [...vendor.phones] : (vendor.phone ? [vendor.phone] : []);
+    if (currentPhones.includes(p)) {
+      toast.error('This phone number already exists.');
+      return;
+    }
+    const updatedPhones = [...currentPhones, p];
+    updateLedgerVendor(vendor.id, {
+      phones: updatedPhones,
+      phone: updatedPhones[0],
+    });
+    setQuickAddPhone('');
+    toast.success('Phone number added.');
+  };
+
+  const handleQuickRemovePhone = (vendor: LedgerVendor, phoneToRemove: string) => {
+    const currentPhones = vendor.phones ? [...vendor.phones] : (vendor.phone ? [vendor.phone] : []);
+    const updatedPhones = currentPhones.filter((p) => p !== phoneToRemove);
+    updateLedgerVendor(vendor.id, {
+      phones: updatedPhones,
+      phone: updatedPhones[0] || undefined,
+    });
+    toast.success('Phone number removed.');
+  };
+
+  const handleQuickAddEmail = (vendor: LedgerVendor) => {
+    const e = quickAddEmail.trim();
+    if (!e) return;
+    const currentEmails = vendor.emails ? [...vendor.emails] : [];
+    if (currentEmails.includes(e)) {
+      toast.error('This email already exists.');
+      return;
+    }
+    const updatedEmails = [...currentEmails, e];
+    updateLedgerVendor(vendor.id, { emails: updatedEmails });
+    setQuickAddEmail('');
+    toast.success('Email address added.');
+  };
+
+  const handleQuickRemoveEmail = (vendor: LedgerVendor, emailToRemove: string) => {
+    const currentEmails = vendor.emails ? [...vendor.emails] : [];
+    const updatedEmails = currentEmails.filter((e) => e !== emailToRemove);
+    updateLedgerVendor(vendor.id, { emails: updatedEmails });
+    toast.success('Email removed.');
+  };
+
+  const handleQuickAddBankAccount = (vendor: LedgerVendor) => {
+    const bank = quickAddBankName.trim();
+    const acc = quickAddAccountNo.trim();
+    const accName = quickAddAccountName.trim();
+    if (!bank || !acc) {
+      toast.error('Please enter both bank name and account number.');
+      return;
+    }
+    const currentBanks: LedgerVendorBankAccount[] = vendor.bankAccounts ? [...vendor.bankAccounts] : (
+      (vendor.bankName || vendor.accountNumber) ? [{ bankName: vendor.bankName || '', accountNumber: vendor.accountNumber || '', isPrimary: true }] : []
+    );
+    const newAccount: LedgerVendorBankAccount = {
+      id: generateId(),
+      bankName: bank,
+      accountNumber: acc,
+      accountName: accName || undefined,
+      isPrimary: currentBanks.length === 0,
+    };
+    const updatedBanks = [...currentBanks, newAccount];
+    const primary = updatedBanks.find((b) => b.isPrimary) || updatedBanks[0];
+    updateLedgerVendor(vendor.id, {
+      bankAccounts: updatedBanks,
+      bankName: primary?.bankName,
+      accountNumber: primary?.accountNumber,
+    });
+    setQuickAddBankName('');
+    setQuickAddAccountNo('');
+    setQuickAddAccountName('');
+    setShowQuickAddBank(false);
+    toast.success('Bank account added.');
+  };
+
+  const handleSetPrimaryBank = (vendor: LedgerVendor, bankIndex: number) => {
+    const currentBanks: LedgerVendorBankAccount[] = vendor.bankAccounts ? [...vendor.bankAccounts] : (
+      (vendor.bankName || vendor.accountNumber) ? [{ bankName: vendor.bankName || '', accountNumber: vendor.accountNumber || '', isPrimary: true }] : []
+    );
+    const updatedBanks = currentBanks.map((b, idx) => ({
+      ...b,
+      isPrimary: idx === bankIndex,
+    }));
+    const primary = updatedBanks[bankIndex];
+    updateLedgerVendor(vendor.id, {
+      bankAccounts: updatedBanks,
+      bankName: primary?.bankName,
+      accountNumber: primary?.accountNumber,
+    });
+    toast.success(`Set ${primary?.bankName || 'account'} as primary payout.`);
+  };
+
+  const handleQuickRemoveBank = (vendor: LedgerVendor, bankIndex: number) => {
+    const currentBanks: LedgerVendorBankAccount[] = vendor.bankAccounts ? [...vendor.bankAccounts] : [];
+    const updatedBanks = currentBanks.filter((_, idx) => idx !== bankIndex);
+    if (updatedBanks.length > 0 && !updatedBanks.some((b) => b.isPrimary)) {
+      updatedBanks[0].isPrimary = true;
+    }
+    const primary = updatedBanks.find((b) => b.isPrimary) || updatedBanks[0];
+    updateLedgerVendor(vendor.id, {
+      bankAccounts: updatedBanks,
+      bankName: primary?.bankName || undefined,
+      accountNumber: primary?.accountNumber || undefined,
+    });
+    toast.success('Bank account removed.');
   };
 
   const handleDeleteVendorDirectory = async (id: string, name: string) => {
@@ -2243,16 +2466,7 @@ export function VendorInvoices() {
                               </button>
                             )}
                             <span className="text-xs text-slate-500 truncate max-w-[160px]">
-                              {(() => {
-                                if (inv.lineItems) {
-                                  try {
-                                    const parsed = JSON.parse(inv.lineItems);
-                                    const count = Array.isArray(parsed) ? parsed.filter((i: {desc?: string}) => (i.desc || '').trim()).length : 0;
-                                    if (count > 0) return `${count} item${count !== 1 ? 's' : ''}`;
-                                  } catch {}
-                                }
-                                return (inv.description || '').split('\n')[0].slice(0, 60) || '—';
-                              })()}
+                              {(inv as any).itemSummary || '—'}
                             </span>
                           </div>
                         </div>
@@ -2477,6 +2691,7 @@ export function VendorInvoices() {
 
       {/* ── 6. Dialog: Add / Edit Invoice ──────────────────────────────────── */}
       <Dialog open={isInvoiceModalOpen} onOpenChange={setIsInvoiceModalOpen}>
+        {isInvoiceModalOpen && (
         <DialogContent className="max-w-xl sm:max-w-2xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           <DialogHeader className="px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
             <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -3008,10 +3223,12 @@ export function VendorInvoices() {
             </Button>
           </DialogFooter>
         </DialogContent>
+        )}
       </Dialog>
 
       {/* ── 7. Dialog: Record Payment (Minimalist & Succinct) ────────────── */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        {isPaymentModalOpen && (
         <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           <DialogHeader className="px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
             <div className="flex items-center justify-between">
@@ -3391,10 +3608,12 @@ export function VendorInvoices() {
             </Button>
           </DialogFooter>
         </DialogContent>
+        )}
       </Dialog>
 
       {/* ── 8. Dialog: Invoice Detail & Payment History ────────────────────── */}
       <Dialog open={isDetailModalOpen} onOpenChange={(open) => { setIsDetailModalOpen(open); if (!open) { setShowVendorBankInfo(false); setLinkingPaymentId(null); setLinkingPaymentDate(''); setLinkingPaymentAmt(0); setLinkVoucherSearch(''); } }}>
+        {isDetailModalOpen && (
         <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           {detailInvoiceComputed && (
             <>
@@ -3470,11 +3689,12 @@ export function VendorInvoices() {
                               type="button"
                               onClick={() => {
                                 setIsDetailModalOpen(false);
-                                setEditingVendorId(detailVendor?.id || null);
-                                setVendorFormName(detailInvoiceComputed.vendorName);
-                                setVendorFormBankName('');
-                                setVendorFormAccountNumber('');
-                                setIsVendorModalOpen(true);
+                                if (detailVendor) {
+                                  openEditVendorModal(detailVendor);
+                                } else {
+                                  openNewVendorModal();
+                                  setVendorFormName(detailInvoiceComputed.vendorName);
+                                }
                               }}
                               className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
                             >
@@ -4040,6 +4260,7 @@ export function VendorInvoices() {
             </>
           )}
         </DialogContent>
+        )}
       </Dialog>
 
       {/* ── 9a. Dialog: Link Voucher Picker ─────────────────────────────────── */}
@@ -4185,6 +4406,7 @@ export function VendorInvoices() {
 
       {/* ── 9. Dialog: Vendor Directory ────────────────────────────────────── */}
       <Dialog open={isVendorDirectoryOpen} onOpenChange={setIsVendorDirectoryOpen}>
+        {isVendorDirectoryOpen && (
         <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh]">
           <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
             <div className="flex items-center justify-between gap-4">
@@ -4274,14 +4496,25 @@ export function VendorInvoices() {
                         (i) => (i.vendorName || '').toLowerCase() === v.name.toLowerCase() || i.vendorId === v.id
                       ).length;
 
+                      const phonesList = v.phones && v.phones.length > 0 ? v.phones : (v.phone ? [v.phone] : []);
+                      const emailsList = v.emails || [];
+                      const banksList = v.bankAccounts && v.bankAccounts.length > 0
+                        ? v.bankAccounts
+                        : (v.bankName || v.accountNumber ? [{ bankName: v.bankName || '', accountNumber: v.accountNumber || '', isPrimary: true }] : []);
+                      const primaryBank = banksList.find((b) => b.isPrimary) || banksList[0];
+
                       return (
-                        <TableRow key={v.id} className="border-slate-100 dark:border-slate-800 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group">
+                        <TableRow
+                          key={v.id}
+                          onClick={() => setViewingVendor(v)}
+                          className="border-slate-100 dark:border-slate-800 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors group cursor-pointer"
+                        >
                           {/* Vendor Name & Address / Notes */}
                           <TableCell className="py-2.5 px-4 align-top">
                             <div>
-                              <div className="font-semibold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5">
-                                <Building2 className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                                <span>{v.name}</span>
+                              <div className="font-semibold text-slate-800 dark:text-slate-100 text-xs flex items-center gap-1.5 group-hover:text-blue-600 transition-colors">
+                                <Building2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 flex-shrink-0 transition-colors" />
+                                <span className="font-bold">{v.name}</span>
                               </div>
                               {v.address && (
                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 ml-5">
@@ -4303,20 +4536,36 @@ export function VendorInvoices() {
                             </div>
                           </TableCell>
 
-                          {/* TIN & Phone */}
+                          {/* TIN & Contacts */}
                           <TableCell className="py-2.5 px-4 align-top">
                             <div className="space-y-1">
                               {v.tinNumber ? (
-                                <span className="inline-block text-[11px] font-mono font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                                <span className="inline-block text-[10px] font-mono font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                                   {v.tinNumber}
                                 </span>
                               ) : (
-                                <span className="text-[11px] text-slate-400">No TIN</span>
+                                <span className="text-[10px] text-slate-400">No TIN</span>
                               )}
-                              {v.phone && (
+                              {phonesList.length > 0 && (
                                 <div className="text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1">
                                   <Phone className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                  <span>{v.phone}</span>
+                                  <span>{phonesList[0]}</span>
+                                  {phonesList.length > 1 && (
+                                    <span className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1 rounded">
+                                      +{phonesList.length - 1}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {emailsList.length > 0 && (
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                  <Mail className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                  <span className="truncate max-w-[130px]">{emailsList[0]}</span>
+                                  {emailsList.length > 1 && (
+                                    <span className="text-[9px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1 rounded">
+                                      +{emailsList.length - 1}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -4324,17 +4573,20 @@ export function VendorInvoices() {
 
                           {/* Bank & Account Details */}
                           <TableCell className="py-2.5 px-4 align-top">
-                            {v.bankName || v.accountNumber ? (
+                            {primaryBank && (primaryBank.bankName || primaryBank.accountNumber) ? (
                               <div className="space-y-0.5">
-                                {v.bankName && (
-                                  <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1">
-                                    <Landmark className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                                    <span>{v.bankName}</span>
-                                  </div>
-                                )}
-                                {v.accountNumber && (
-                                  <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 ml-4">
-                                    {v.accountNumber}
+                                <div className="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                  <Landmark className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                                  <span className="truncate max-w-[140px]">{primaryBank.bankName}</span>
+                                  {banksList.length > 1 && (
+                                    <span className="text-[9px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1 py-0.2 rounded">
+                                      {banksList.length} accts
+                                    </span>
+                                  )}
+                                </div>
+                                {primaryBank.accountNumber && (
+                                  <div className="text-[11px] font-mono text-slate-600 dark:text-slate-400 ml-4.5">
+                                    {primaryBank.accountNumber}
                                   </div>
                                 )}
                               </div>
@@ -4361,8 +4613,23 @@ export function VendorInvoices() {
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                                title="View Vendor Profile"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingVendor(v);
+                                }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                                 title="Edit Vendor"
-                                onClick={() => openEditVendorModal(v)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditVendorModal(v);
+                                }}
                               >
                                 <Edit2 className="h-3.5 w-3.5" />
                               </Button>
@@ -4371,7 +4638,10 @@ export function VendorInvoices() {
                                 size="sm"
                                 className="h-7 w-7 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                                 title="Delete Vendor"
-                                onClick={() => handleDeleteVendorDirectory(v.id, v.name)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteVendorDirectory(v.id, v.name);
+                                }}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -4400,144 +4670,827 @@ export function VendorInvoices() {
             </Button>
           </DialogFooter>
         </DialogContent>
+        )}
+      </Dialog>
+
+      {/* ── 9b. Dialog: Vendor View Screen ─────────────────────────────────── */}
+      <Dialog open={!!viewingVendor} onOpenChange={(open) => { if (!open) { setViewingVendor(null); setShowQuickAddBank(false); } }} className="!z-[10040]">
+        <DialogContent className="max-w-3xl w-[95vw] p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh]">
+          {activeViewingVendor && (
+            <>
+              {/* Header */}
+              <div className="p-5 sm:p-6 pb-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shrink-0 mt-0.5">
+                      <Building2 className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <DialogTitle className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 truncate">
+                          {activeViewingVendor.name}
+                        </DialogTitle>
+                        {activeViewingVendor.tinNumber && (
+                          <span className="inline-flex items-center text-[10px] font-mono font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-md border border-slate-200 dark:border-slate-700">
+                            TIN: {activeViewingVendor.tinNumber}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-1 flex-wrap">
+                        {activeViewingVendor.servicesRendered && (
+                          <span className="flex items-center gap-1 font-medium text-blue-600 dark:text-blue-400">
+                            <Briefcase className="w-3.5 h-3.5" />
+                            {activeViewingVendor.servicesRendered}
+                          </span>
+                        )}
+                        {activeViewingVendor.address && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            {activeViewingVendor.address}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const vName = activeViewingVendor.name;
+                        setInvVendorName(vName);
+                        setInvSelectedVendorId(activeViewingVendor.id || '__custom__');
+                        setIsInvoiceModalOpen(true);
+                      }}
+                      className="h-8 px-3 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>New Bill</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditVendorModal(activeViewingVendor)}
+                      className="h-8 px-3 text-xs font-medium border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                      <span>Edit</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewingVendor(null)}
+                      className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* KPI Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Invoiced</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 block">
+                      ₦{fmt(viewingVendorStats.totalInvoiced)}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Paid</span>
+                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5 block">
+                      ₦{fmt(viewingVendorStats.totalPaid)}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Outstanding</span>
+                    <span className={`text-sm font-bold font-mono mt-0.5 block ${viewingVendorStats.totalBalance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                      ₦{fmt(viewingVendorStats.totalBalance)}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-xl">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Bills</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 font-mono mt-0.5 block">
+                      {viewingVendorStats.count} {viewingVendorStats.count === 1 ? 'bill' : 'bills'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scrollable Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/40 dark:bg-slate-950/40">
+                {/* Contact & Banking Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Card: Phone & Email Contacts */}
+                  <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                          Phone Numbers
+                        </h4>
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400">
+                        {((activeViewingVendor.phones?.length) || (activeViewingVendor.phone ? 1 : 0))} saved
+                      </span>
+                    </div>
+
+                    {/* Phones List */}
+                    <div className="space-y-1.5">
+                      {(() => {
+                        const phones = activeViewingVendor.phones && activeViewingVendor.phones.length > 0
+                          ? activeViewingVendor.phones
+                          : (activeViewingVendor.phone ? [activeViewingVendor.phone] : []);
+                        if (phones.length === 0) {
+                          return <p className="text-xs text-slate-400 italic">No phone numbers recorded.</p>;
+                        }
+                        return phones.map((p, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <a href={`tel:${p}`} className="font-mono font-medium text-slate-800 dark:text-slate-200 hover:text-blue-600 hover:underline">
+                                {p}
+                              </a>
+                              {idx === 0 && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+                                  Primary
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(p);
+                                  toast.success(`Copied phone: ${p}`);
+                                }}
+                                title="Copy Phone"
+                                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleQuickRemovePhone(activeViewingVendor, p)}
+                                title="Remove Phone"
+                                className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ));
+                      })()}
+
+                      {/* Quick Add Phone */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <Input
+                          placeholder="Add new phone number..."
+                          value={quickAddPhone}
+                          onChange={(e) => setQuickAddPhone(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickAddPhone(activeViewingVendor); } }}
+                          className="h-8 text-xs bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleQuickAddPhone(activeViewingVendor)}
+                          disabled={!quickAddPhone.trim()}
+                          className="h-8 px-3 text-xs bg-slate-900 hover:bg-slate-800 text-white shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-slate-100 dark:bg-slate-800" />
+
+                    {/* Email Addresses */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-blue-600" />
+                          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                            Email Addresses
+                          </h4>
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          {activeViewingVendor.emails?.length || 0} saved
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {(!activeViewingVendor.emails || activeViewingVendor.emails.length === 0) ? (
+                          <p className="text-xs text-slate-400 italic">No email addresses recorded.</p>
+                        ) : (
+                          activeViewingVendor.emails.map((email, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800 text-xs">
+                              <a href={`mailto:${email}`} className="font-medium text-slate-800 dark:text-slate-200 hover:text-blue-600 hover:underline truncate mr-2">
+                                {email}
+                              </a>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(email);
+                                    toast.success(`Copied email: ${email}`);
+                                  }}
+                                  title="Copy Email"
+                                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleQuickRemoveEmail(activeViewingVendor, email)}
+                                  title="Remove Email"
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+
+                        {/* Quick Add Email */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <Input
+                            type="email"
+                            placeholder="Add new email address..."
+                            value={quickAddEmail}
+                            onChange={(e) => setQuickAddEmail(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickAddEmail(activeViewingVendor); } }}
+                            className="h-8 text-xs bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleQuickAddEmail(activeViewingVendor)}
+                            disabled={!quickAddEmail.trim()}
+                            className="h-8 px-3 text-xs bg-slate-900 hover:bg-slate-800 text-white shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Add
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card: Bank & Payout Accounts */}
+                  <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                          Bank Accounts
+                        </h4>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowQuickAddBank(!showQuickAddBank)}
+                        className="h-7 px-2.5 text-[11px] font-semibold border-slate-200 dark:border-slate-700"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {showQuickAddBank ? 'Close' : 'Add Account'}
+                      </Button>
+                    </div>
+
+                    {/* Inline Quick Add Bank Account Form */}
+                    {showQuickAddBank && (
+                      <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-200/80 dark:border-blue-900/50 space-y-2.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+                          Add Payout Bank Account
+                        </span>
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Bank Name (e.g. GTBank, Zenith, Access)"
+                            list="quick-bank-suggestions"
+                            value={quickAddBankName}
+                            onChange={(e) => setQuickAddBankName(e.target.value)}
+                            className="h-8 text-xs bg-white dark:bg-slate-900"
+                          />
+                          <datalist id="quick-bank-suggestions">
+                            {ledgerBeneficiaryBanks.map((b) => (
+                              <option key={b.id} value={b.name}>
+                                {b.accountNo ? `${b.name} (${b.accountNo})` : b.name}
+                              </option>
+                            ))}
+                          </datalist>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              placeholder="Account Number"
+                              value={quickAddAccountNo}
+                              onChange={(e) => setQuickAddAccountNo(e.target.value)}
+                              className="h-8 text-xs font-mono bg-white dark:bg-slate-900"
+                            />
+                            <Input
+                              placeholder="Account Name (optional)"
+                              value={quickAddAccountName}
+                              onChange={(e) => setQuickAddAccountName(e.target.value)}
+                              className="h-8 text-xs bg-white dark:bg-slate-900"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowQuickAddBank(false)}
+                            className="h-7 text-xs"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleQuickAddBankAccount(activeViewingVendor)}
+                            className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            Save Account
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bank Accounts List */}
+                    <div className="space-y-2.5">
+                      {(() => {
+                        const banks = activeViewingVendor.bankAccounts && activeViewingVendor.bankAccounts.length > 0
+                          ? activeViewingVendor.bankAccounts
+                          : (activeViewingVendor.bankName || activeViewingVendor.accountNumber
+                              ? [{ bankName: activeViewingVendor.bankName || '', accountNumber: activeViewingVendor.accountNumber || '', isPrimary: true }]
+                              : []);
+
+                        if (banks.length === 0) {
+                          return <p className="text-xs text-slate-400 italic">No bank accounts registered.</p>;
+                        }
+
+                        return banks.map((b, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-xl border transition-all ${
+                              b.isPrimary
+                                ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/60 shadow-xs'
+                                : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                                    {b.bankName || 'Unknown Bank'}
+                                  </span>
+                                  {b.isPrimary ? (
+                                    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                      Primary Payout
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleSetPrimaryBank(activeViewingVendor, idx)}
+                                      className="text-[9px] font-semibold text-slate-500 hover:text-blue-600 underline"
+                                    >
+                                      Set Primary
+                                    </button>
+                                  )}
+                                </div>
+                                {b.accountName && (
+                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                                    {b.accountName}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(b.accountNumber);
+                                    setCopiedBankIdx(idx);
+                                    setTimeout(() => setCopiedBankIdx(null), 1800);
+                                    toast.success(`Copied account: ${b.accountNumber}`);
+                                  }}
+                                  title="Copy Account Number"
+                                  className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded"
+                                >
+                                  {copiedBankIdx === idx ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                                <button
+                                  onClick={() => handleQuickRemoveBank(activeViewingVendor, idx)}
+                                  title="Delete Account"
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between text-xs">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Account No.</span>
+                              <span className="font-mono font-bold text-slate-900 dark:text-slate-100 tracking-wider bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800">
+                                {b.accountNumber || '—'}
+                              </span>
+                            </div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes & Payment Instructions */}
+                {activeViewingVendor.notes && (
+                  <div className="p-3.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Payment Notes & Terms
+                    </span>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {activeViewingVendor.notes}
+                    </p>
+                  </div>
+                )}
+
+                {/* Vendor Bills / Invoices History */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                      <Receipt className="w-4 h-4 text-blue-600" />
+                      Invoice History ({viewingVendorInvoices.length})
+                    </h4>
+                  </div>
+
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900">
+                    <Table>
+                      <TableHeader className="bg-slate-50 dark:bg-slate-800/60">
+                        <TableRow className="border-slate-100 dark:border-slate-800">
+                          <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-8 px-4">Invoice #</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-8 px-4">Date</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-8 px-4 text-right">Amount</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-8 px-4 text-right">Balance</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-8 px-4 text-center">Status</TableHead>
+                          <TableHead className="text-[10px] uppercase font-bold text-slate-500 h-8 px-4 text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewingVendorInvoices.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="h-20 text-center text-slate-400 text-xs italic">
+                              No invoices recorded for this vendor yet.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          viewingVendorInvoices.map((inv) => (
+                            <TableRow key={inv.id} className="border-slate-100 dark:border-slate-800 text-xs hover:bg-slate-50/70 transition-colors">
+                              <TableCell className="py-2 px-4 font-mono font-semibold text-slate-900 dark:text-slate-100">
+                                {inv.invoiceNumber}
+                              </TableCell>
+                              <TableCell className="py-2 px-4 text-slate-500 dark:text-slate-400">
+                                {inv.dateReceived}
+                              </TableCell>
+                              <TableCell className="py-2 px-4 text-right font-mono font-medium text-slate-800 dark:text-slate-200">
+                                ₦{fmt(inv.totalAmount || 0)}
+                              </TableCell>
+                              <TableCell className={`py-2 px-4 text-right font-mono font-bold ${inv.balanceRemaining > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`}>
+                                ₦{fmt(inv.balanceRemaining || 0)}
+                              </TableCell>
+                              <TableCell className="py-2 px-4 text-center">
+                                <Badge variant="outline" className={`text-[10px] font-semibold uppercase ${
+                                  inv.derivedStatus === 'paid'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : inv.derivedStatus === 'partial'
+                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                                }`}>
+                                  {inv.derivedStatus}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-2 px-4 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDetailInvoice(inv)}
+                                  className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600"
+                                  title="View Invoice Details"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/20 shrink-0 flex items-center justify-between">
+                <span className="text-xs text-slate-400 dark:text-slate-500">
+                  Vendor details are synchronized across ledger and invoices.
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewingVendor(null)}
+                  className="text-xs h-8 px-4 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                >
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
       </Dialog>
 
       {/* ── 10. Dialog: Add / Edit Vendor Modal ─────────────────────────────── */}
-      <Dialog open={isVendorModalOpen} onOpenChange={setIsVendorModalOpen} className="!z-[10050]">
-        <DialogContent className="max-w-sm p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
+      <Dialog open={isVendorModalOpen} onOpenChange={setIsVendorModalOpen} className="!z-[10060]">
+        <DialogContent className="max-w-md w-[95vw] p-0 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh]">
           {/* Header */}
-          <div className="flex items-center gap-2.5 px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div className="p-1.5 bg-blue-50 dark:bg-blue-950/50 rounded-lg shrink-0">
-              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950/50 rounded-xl shrink-0">
+                <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 leading-none">
+                {editingVendorId ? 'Edit Vendor Profile' : 'New Vendor'}
+              </DialogTitle>
             </div>
-            <DialogTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-none">
-              {editingVendorId ? 'Edit Vendor' : 'New Vendor'}
-            </DialogTitle>
+            <button
+              onClick={() => setIsVendorModalOpen(false)}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Body */}
-          <div
-            className="px-5 py-4 space-y-2.5"
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveVendorModal(); } }}
-          >
-            {/* Name */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Name</span>
-              <input
-                autoFocus
-                value={vendorFormName}
-                onChange={(e) => setVendorFormName(e.target.value)}
-                className="flex-1 text-xs font-medium text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Company name"
-              />
+          {/* Scrollable Body */}
+          <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
+            {/* General Info */}
+            <div className="space-y-2.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Company Details</span>
+
+              {/* Name */}
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-16 shrink-0">Name *</span>
+                <input
+                  autoFocus
+                  value={vendorFormName}
+                  onChange={(e) => setVendorFormName(e.target.value)}
+                  className="flex-1 text-xs font-medium text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  placeholder="Company name"
+                />
+              </div>
+
+              {/* TIN */}
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-16 shrink-0">TIN</span>
+                <input
+                  value={vendorFormTin}
+                  onChange={(e) => setVendorFormTin(e.target.value)}
+                  className="flex-1 text-xs font-mono text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  placeholder="Tax ID"
+                />
+              </div>
+
+              {/* Address */}
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-16 shrink-0">Address</span>
+                <input
+                  value={vendorFormAddress}
+                  onChange={(e) => setVendorFormAddress(e.target.value)}
+                  className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  placeholder="Office location"
+                />
+              </div>
+
+              {/* Services Rendered */}
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-16 shrink-0">Services</span>
+                <input
+                  value={vendorFormServicesRendered}
+                  onChange={(e) => setVendorFormServicesRendered(e.target.value)}
+                  className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  placeholder="e.g. Haulage, Dewatering pump rental"
+                />
+              </div>
             </div>
 
-            {/* TIN */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">TIN</span>
-              <input
-                value={vendorFormTin}
-                onChange={(e) => setVendorFormTin(e.target.value)}
-                className="flex-1 text-xs font-mono text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Tax ID"
-              />
-            </div>
+            {/* Multiple Phone Numbers */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Phone Numbers</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVendorFormPhones([...vendorFormPhones, ''])}
+                  className="h-6 px-2 text-[10px] text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                >
+                  <Plus className="w-3 h-3 mr-0.5" /> Add Phone
+                </Button>
+              </div>
 
-            {/* Phone */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Phone</span>
-              <input
-                type="tel"
-                value={vendorFormPhone}
-                onChange={(e) => setVendorFormPhone(e.target.value)}
-                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Phone number"
-              />
-            </div>
-
-            {/* Address */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Address</span>
-              <input
-                value={vendorFormAddress}
-                onChange={(e) => setVendorFormAddress(e.target.value)}
-                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Office location"
-              />
-            </div>
-
-            {/* Services Rendered */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Services</span>
-              <input
-                value={vendorFormServicesRendered}
-                onChange={(e) => setVendorFormServicesRendered(e.target.value)}
-                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Services rendered (e.g. Haulage, Generator repair)"
-              />
-            </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-2 pt-0.5">
-              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-              <span className="text-[9px] font-bold text-slate-300 dark:text-slate-600 uppercase tracking-widest">Bank</span>
-              <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-            </div>
-
-            {/* Bank Name */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Bank</span>
-              <input
-                list="vendor-bank-suggestions"
-                value={vendorFormBankName}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setVendorFormBankName(val);
-                  const matched = ledgerBeneficiaryBanks.find(b => b.name.toLowerCase() === val.toLowerCase());
-                  if (matched && matched.accountNo && !vendorFormAccountNumber) {
-                    setVendorFormAccountNumber(matched.accountNo);
-                  }
-                }}
-                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Bank name"
-              />
-              <datalist id="vendor-bank-suggestions">
-                {ledgerBeneficiaryBanks.map((b) => (
-                  <option key={b.id} value={b.name}>
-                    {b.accountNo ? `${b.name} (${b.accountNo})` : b.name}
-                  </option>
+              <div className="space-y-1.5">
+                {vendorFormPhones.map((phone, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-9 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => {
+                          const updated = [...vendorFormPhones];
+                          updated[idx] = e.target.value;
+                          setVendorFormPhones(updated);
+                        }}
+                        className="flex-1 text-xs font-mono text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                        placeholder={idx === 0 ? 'Primary phone number' : `Secondary phone #${idx + 1}`}
+                      />
+                      {idx === 0 && (
+                        <span className="text-[9px] font-bold uppercase text-slate-400 shrink-0">Primary</span>
+                      )}
+                    </div>
+                    {vendorFormPhones.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setVendorFormPhones(vendorFormPhones.filter((_, i) => i !== idx))}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </datalist>
+              </div>
             </div>
 
-            {/* Account Number */}
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-10 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0">Acct No.</span>
-              <input
-                value={vendorFormAccountNumber}
-                onChange={(e) => setVendorFormAccountNumber(e.target.value)}
-                className="flex-1 text-xs font-mono text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Account number"
-              />
+            {/* Multiple Emails */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Email Addresses</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVendorFormEmails([...vendorFormEmails, ''])}
+                  className="h-6 px-2 text-[10px] text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                >
+                  <Plus className="w-3 h-3 mr-0.5" /> Add Email
+                </Button>
+              </div>
+
+              <div className="space-y-1.5">
+                {vendorFormEmails.map((email, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 h-9 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => {
+                          const updated = [...vendorFormEmails];
+                          updated[idx] = e.target.value;
+                          setVendorFormEmails(updated);
+                        }}
+                        className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                        placeholder={idx === 0 ? 'Primary email address' : `Email #${idx + 1}`}
+                      />
+                    </div>
+                    {vendorFormEmails.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setVendorFormEmails(vendorFormEmails.filter((_, i) => i !== idx))}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Multiple Bank Accounts */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bank & Account Details</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVendorFormBankAccounts([...vendorFormBankAccounts, { bankName: '', accountNumber: '', accountName: '', isPrimary: false }])}
+                  className="h-6 px-2 text-[10px] text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                >
+                  <Plus className="w-3 h-3 mr-0.5" /> Add Bank Account
+                </Button>
+              </div>
+
+              <div className="space-y-2.5">
+                {vendorFormBankAccounts.map((b, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Account #{idx + 1}</span>
+                        {b.isPrimary ? (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            Primary
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = vendorFormBankAccounts.map((item, i) => ({
+                                ...item,
+                                isPrimary: i === idx,
+                              }));
+                              setVendorFormBankAccounts(updated);
+                            }}
+                            className="text-[10px] text-blue-600 hover:underline font-semibold"
+                          >
+                            Set as Primary
+                          </button>
+                        )}
+                      </div>
+
+                      {vendorFormBankAccounts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = vendorFormBankAccounts.filter((_, i) => i !== idx);
+                            if (updated.length > 0 && !updated.some(item => item.isPrimary)) {
+                              updated[0].isPrimary = true;
+                            }
+                            setVendorFormBankAccounts(updated);
+                          }}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        list="modal-vendor-bank-suggestions"
+                        value={b.bankName}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const updated = [...vendorFormBankAccounts];
+                          updated[idx] = { ...updated[idx], bankName: val };
+                          const matched = ledgerBeneficiaryBanks.find(item => item.name.toLowerCase() === val.toLowerCase());
+                          if (matched && matched.accountNo && !updated[idx].accountNumber) {
+                            updated[idx].accountNumber = matched.accountNo;
+                          }
+                          setVendorFormBankAccounts(updated);
+                        }}
+                        className="h-8 px-2.5 text-xs text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500"
+                        placeholder="Bank name"
+                      />
+                      <input
+                        value={b.accountNumber}
+                        onChange={(e) => {
+                          const updated = [...vendorFormBankAccounts];
+                          updated[idx] = { ...updated[idx], accountNumber: e.target.value };
+                          setVendorFormBankAccounts(updated);
+                        }}
+                        className="h-8 px-2.5 text-xs font-mono text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500"
+                        placeholder="Account number"
+                      />
+                    </div>
+                    <input
+                      value={b.accountName || ''}
+                      onChange={(e) => {
+                        const updated = [...vendorFormBankAccounts];
+                        updated[idx] = { ...updated[idx], accountName: e.target.value };
+                        setVendorFormBankAccounts(updated);
+                      }}
+                      className="w-full h-7 px-2.5 text-[11px] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500"
+                      placeholder="Account name / Beneficiary (optional)"
+                    />
+                  </div>
+                ))}
+                <datalist id="modal-vendor-bank-suggestions">
+                  {ledgerBeneficiaryBanks.map((item) => (
+                    <option key={item.id} value={item.name}>
+                      {item.accountNo ? `${item.name} (${item.accountNo})` : item.name}
+                    </option>
+                  ))}
+                </datalist>
+              </div>
             </div>
 
             {/* Notes */}
-            <div className="flex gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-3 py-2.5 focus-within:border-blue-500 focus-within:bg-white dark:focus-within:bg-slate-800 transition-colors">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-14 shrink-0 pt-0.5">Notes</span>
+            <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Notes & Terms</span>
               <textarea
                 rows={2}
                 value={vendorFormNotes}
                 onChange={(e) => setVendorFormNotes(e.target.value)}
-                className="flex-1 text-xs text-slate-900 dark:text-slate-100 bg-transparent outline-none resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
-                placeholder="Payment instructions, terms..."
+                className="w-full p-2.5 text-xs text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:border-blue-500 resize-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                placeholder="Payment instructions, credit terms..."
               />
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-5 pb-5 pt-1 gap-2">
-            <span className="text-[10px] text-slate-400 dark:text-slate-600">↵ Enter to save</span>
-            <div className="flex gap-2">
+          <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/30 shrink-0">
+            <span className="text-[10px] text-slate-400">All fields autosaved upon confirm</span>
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -4551,7 +5504,7 @@ export function VendorInvoices() {
                 onClick={handleSaveVendorModal}
                 className="text-xs h-8 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
               >
-                {editingVendorId ? 'Save' : 'Create'}
+                {editingVendorId ? 'Save Changes' : 'Create Vendor'}
               </Button>
             </div>
           </div>
@@ -4838,6 +5791,7 @@ export function VendorInvoices() {
 
       {/* ── 11. Dialog: Totals Owed by Vendor Summary ───────────────────────── */}
       <Dialog open={isVendorBalancesOpen} onOpenChange={setIsVendorBalancesOpen}>
+        {isVendorBalancesOpen && (
         <DialogContent className="max-w-3xl max-h-[85vh] p-0 overflow-hidden flex flex-col rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl">
           {/* Header */}
           <DialogHeader className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
@@ -5003,6 +5957,7 @@ export function VendorInvoices() {
             </Button>
           </DialogFooter>
         </DialogContent>
+        )}
       </Dialog>
     </div>
   );

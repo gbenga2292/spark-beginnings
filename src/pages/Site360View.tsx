@@ -3,6 +3,7 @@ import { parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
+import { resolveEffectivePumpStartDate } from '@/src/lib/invoicePumpUtils';
 
 import {
   Building2, ArrowLeft, MapPin, DollarSign, Activity, Wrench, MessagesSquare,
@@ -402,7 +403,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
   const [isSavingContract, setIsSavingContract] = useState(false);
 
   const getInvoiceDates = (inv: any) => {
-    const startDate = normalizeDate(inv.startDate || inv.date);
+    const effectivePump = resolveEffectivePumpStartDate(inv, [site], sitePumpDates);
+    const startDate = normalizeDate(effectivePump || inv.startDate || inv.date);
     const duration = parseFloat(inv.duration) || 0;
     const countOffDays = inv.countOffDays ?? true;
     const siteId = inv.siteId;
@@ -864,7 +866,8 @@ export function Site360View({ site, clientSites, onSiteChange, onBack, onEditSit
 
     const pumpsOnSite = Array.from(mergedPumpsMap.values());
 
-    const pumpsWithStart = pumpsOnSite.filter(p => p.pumpStartDate);
+    const activePumpsWithStart = pumpsOnSite.filter(p => !p.pumpStopDate && p.pumpStartDate);
+    const pumpsWithStart = activePumpsWithStart.length > 0 ? activePumpsWithStart : pumpsOnSite.filter(p => p.pumpStartDate);
     const earliestPumpStart = pumpsWithStart.length > 0
       ? pumpsWithStart.reduce((min, p) => (p.pumpStartDate! < min ? p.pumpStartDate! : min), pumpsWithStart[0].pumpStartDate!)
       : null;

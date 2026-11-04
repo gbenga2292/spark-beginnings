@@ -6,8 +6,9 @@ import { Badge } from '@/src/components/ui/badge';
 import {
   Save, Building, Link as LinkIcon, CloudDownload,
   RefreshCw, Library, Pencil, X, Mail, Phone, MapPin, Hash, CheckCircle2,
-  DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle, FolderOpen,
+  DatabaseBackup, Upload, Download, Clock, ShieldCheck, AlertTriangle, AlertCircle, FolderOpen,
   Bot, Key, Eye, EyeOff, Star, Trash2, ToggleLeft, ToggleRight, FlaskConical, Cpu, Calendar,
+  Server, Send, Info,
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Variables } from './Variables';
@@ -19,6 +20,7 @@ import { useMinuteStore } from '@/src/store/minuteStore';
 import { useMeetingSettingsStore } from '@/src/store/meetingSettingsStore';
 import { MeetingSettingsPanel } from '@/src/components/minute/MeetingSettingsPanel';
 import { toast } from '@/src/components/ui/toast';
+import { cn } from '@/src/lib/utils';
 import { supabase } from '@/src/integrations/supabase/client';
 import { useSetPageTitle } from '@/src/contexts/PageContext';
 import { exportFullAppToExcel, restoreFullAppFromExcel } from '@/src/lib/excelBackup';
@@ -42,6 +44,34 @@ const DEFAULT_COMPANY: CompanyInfo = {
   email: 'hr@dcel.com',
   phone: '+234 801 234 5678',
   address: 'Victoria Island, Lagos, Nigeria',
+};
+
+export interface EmailSettings {
+  provider: 'resend' | 'smtp';
+  resendApiKey: string;
+  resendFromEmail: string;
+  resendFromName: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFromEmail: string;
+  smtpFromName: string;
+}
+
+export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
+  provider: 'resend',
+  resendApiKey: '',
+  resendFromEmail: '',
+  resendFromName: 'DCEL Payroll',
+  smtpHost: '',
+  smtpPort: 465,
+  smtpSecure: true,
+  smtpUser: '',
+  smtpPass: '',
+  smtpFromEmail: '',
+  smtpFromName: 'DCEL Payroll',
 };
 
 const BACKUP_SETTINGS_KEY = 'dcel-backup-settings';
@@ -199,6 +229,15 @@ export function Settings() {
   const [justSaved, setJustSaved] = useState(false);
   const [isSavingDB, setIsSavingDB] = useState(false);
   const [settingsRowId, setSettingsRowId] = useState<string | null>(null);
+
+  /* ── Email Delivery state ─────────────────────────────────────── */
+  const [emailSettings, setEmailSettings] = useState<EmailSettings>(DEFAULT_EMAIL_SETTINGS);
+  const [isSavingEmailSettings, setIsSavingEmailSettings] = useState(false);
+  const [isTestingEmail, setIsTestingEmail] = useState(false);
+  const [testRecipientEmail, setTestRecipientEmail] = useState('');
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [showResendApiKey, setShowResendApiKey] = useState(false);
+  const [justSavedEmail, setJustSavedEmail] = useState(false);
 
   /* ── Backup state ───────────────────────────────────────────── */
   const [backupSettings, setBackupSettings] = useState<BackupSettings>(() => {
@@ -378,7 +417,7 @@ export function Settings() {
     (async () => {
       const { data, error } = await supabase
         .from('app_settings')
-        .select('id, company_name, company_reg_number, company_email, company_phone, company_address')
+        .select('id, company_name, company_reg_number, company_email, company_phone, company_address, email_settings')
         .limit(1)
         .single();
       if (error || !data) return; // table empty or RLS — keep defaults
@@ -392,6 +431,15 @@ export function Settings() {
       };
       setSaved(loaded);
       setDraft(loaded);
+      if (data.email_settings && typeof data.email_settings === 'object') {
+        setEmailSettings({
+          ...DEFAULT_EMAIL_SETTINGS,
+          ...data.email_settings,
+        });
+      }
+      if (data.company_email) {
+        setTestRecipientEmail(data.company_email);
+      }
     })();
   }, []);
 
@@ -827,6 +875,117 @@ export function Settings() {
     }
   };
 
+  const handleSaveEmailSettings = async () => {
+    setIsSavingEmailSettings(true);
+    try {
+      const payload = {
+        email_settings: emailSettings,
+        updated_at: new Date().toISOString(),
+      };
+      if (settingsRowId) {
+        const { error } = await supabase.from('app_settings').update(payload).eq('id', settingsRowId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from('app_settings').insert(payload).select('id').single();
+        if (error) throw error;
+        if (data) setSettingsRowId(data.id);
+      }
+      setJustSavedEmail(true);
+      setTimeout(() => setJustSavedEmail(false), 2500);
+      toast.success('Email settings saved successfully.');
+    } catch (err: any) {
+      console.error('Failed to save email settings:', err);
+      toast.error(err.message || 'Failed to save email settings.');
+    } finally {
+      setIsSavingEmailSettings(false);
+    }
+  };
+
+  const handleTestEmailConnection = async () => {
+    const target = testRecipientEmail.trim() || saved.email || draft.email;
+    if (!target || !target.includes('@')) {
+      toast.error('Please enter a valid recipient email to test connection.');
+      return;
+    }
+    setIsTestingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-payslip-email', {
+        body: {
+          to: target,
+          action: 'test_connection',
+          emailSettings,
+          subject: `Test Email Connection (${emailSettings.provider.toUpperCase()}) — DCEL`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 580px; margin: 0 auto; background-color: #ffffff;">
+              <h2 style="color: #2563eb; margin-top: 0; font-size: 20px;">Email Delivery Verification Successful</h2>
+              <p style="color: #334155; font-size: 14px; line-height: 1.5;">Your <strong>${emailSettings.provider.toUpperCase()}</strong> email configuration for DCEL Office Suite is working properly.</p>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; color: #475569;">
+                <div><strong>Provider:</strong> ${emailSettings.provider.toUpperCase()}</div>
+                <div><strong>Sender:</strong> ${emailSettings.provider === 'smtp' ? (emailSettings.smtpFromEmail || emailSettings.smtpUser) : (emailSettings.resendFromEmail || 'Default')}</div>
+                <div><strong>Sent to:</strong> ${target}</div>
+              </div>
+              <p style="color: #94a3b8; font-size: 11px; margin-top: 20px; border-top: 1px solid #f1f5f9; padding-top: 12px;">This is an automated test transmission from DCEL Office Suite.</p>
+            </div>
+          `,
+        },
+      });
+
+      let errorMsg = '';
+      if (error) {
+        try {
+          if ((error as any).context && typeof (error as any).context.json === 'function') {
+            const errBody = await (error as any).context.json();
+            errorMsg = errBody?.error || errBody?.message || error.message;
+          } else {
+            errorMsg = error.message;
+          }
+        } catch {
+          errorMsg = error.message;
+        }
+      } else if (data && (data.success === false || data.error)) {
+        errorMsg = data.error || 'Connection failed.';
+      }
+
+      if (errorMsg) {
+        throw new Error(errorMsg);
+      }
+
+      if (data?.autoRecoveredHost) {
+        setEmailSettings((prev) => ({ ...prev, smtpHost: data.autoRecoveredHost }));
+        toast.success(`Test email verified! Switched SMTP Host to "${data.autoRecoveredHost}" to match SSL certificate.`);
+        if (data?.notice) {
+          alert(`SMTP SSL Certificate Notice:\n\n${data.notice}`);
+        }
+      } else {
+        toast.success(`Test email sent successfully to ${target}!`);
+      }
+    } catch (err: any) {
+      console.error('Test email failed:', err);
+      const msg = err.message || 'Check credentials';
+      toast.error(`Connection test failed: ${msg}`);
+
+      if (msg.includes('SSL Certificate Name Mismatch') || msg.includes('ps4.quaddns.com')) {
+        const match = msg.match(/"([^"]+\.quaddns\.com|[^"]+)"/);
+        const hostName = match ? match[1] : 'ps4.quaddns.com';
+        if (confirm(`Your mail server's SSL certificate is issued to "${hostName}".\n\nWould you like to automatically set your SMTP Host to "${hostName}" and test again?`)) {
+          setEmailSettings((prev) => ({ ...prev, smtpHost: hostName }));
+          toast.info(`Updated SMTP Host to ${hostName}. Click "Send Test Email" to verify.`);
+        }
+      } else if (msg.includes('onboarding@resend.dev') || msg.includes('403') || msg.includes('testing emails')) {
+        alert(
+          `Resend Test Mode Restriction (403):\n\n` +
+          `Resend's default test sender (onboarding@resend.dev) is only permitted to send emails to the email address registered on your Resend account.\n\n` +
+          `To test sending to "${target}":\n` +
+          `1. Change the test recipient field to your registered Resend account email address, OR\n` +
+          `2. Verify your custom company domain at https://resend.com/domains and set it as your Sender Email, OR\n` +
+          `3. Switch to standard SMTP (e.g. Gmail App Password, Zoho, cPanel Webmail) using the provider tabs above.`
+        );
+      }
+    } finally {
+      setIsTestingEmail(false);
+    }
+  };
+
   const fields: { key: keyof CompanyInfo; label: string; icon: any; type?: string; fullWidth?: boolean }[] = [
     { key: 'name',      label: 'Company Name',       icon: Building, fullWidth: true },
     { key: 'regNumber', label: 'Registration Number', icon: Hash },
@@ -842,6 +1001,7 @@ export function Settings() {
   const getTabTitle = () => {
     switch(activeTab) {
       case 'general': return 'General Settings';
+      case 'email': return 'Email Delivery Settings';
       case 'backup': return 'Backup & Restore';
       case 'integrations': return 'Integrations';
       case 'updates': return 'System Updates';
@@ -861,6 +1021,9 @@ export function Settings() {
         <TabsList className="mb-8 bg-slate-100 flex-wrap gap-y-1">
           <TabsTrigger active={activeTab === 'general'}      onClick={() => setActiveTab('general')}      className="w-32">
             <Building       className="mr-2 h-4 w-4" /> General
+          </TabsTrigger>
+          <TabsTrigger active={activeTab === 'email'}        onClick={() => setActiveTab('email')}        className="w-36">
+            <Mail           className="mr-2 h-4 w-4" /> Email
           </TabsTrigger>
           {priv.canBackup || priv.canRestore ? (
             <TabsTrigger active={activeTab === 'backup'}       onClick={() => setActiveTab('backup')}       className="w-40">
@@ -987,6 +1150,346 @@ export function Settings() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ─────────── EMAIL DELIVERY TAB ───────────────────────────── */}
+        <TabsContent active={activeTab === 'email'}>
+          <div className="flex flex-col gap-6">
+            <Card className="border border-slate-200 dark:border-slate-800 rounded-md overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 px-6 py-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-md bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100">Email Delivery &amp; Notifications</CardTitle>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Configure transactional delivery for payslips, payroll advice, and operational notifications.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {justSavedEmail && (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 animate-in fade-in duration-200">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+                      </span>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={handleSaveEmailSettings}
+                      disabled={isSavingEmailSettings}
+                      className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white h-9 px-4 rounded-sm"
+                    >
+                      {isSavingEmailSettings ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {isSavingEmailSettings ? 'Saving…' : 'Save Email Settings'}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="px-6 py-6 space-y-6">
+                {/* Provider Selection */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-2">
+                    Email Delivery Provider
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+                    <button
+                      type="button"
+                      onClick={() => setEmailSettings((prev) => ({ ...prev, provider: 'resend' }))}
+                      className={cn(
+                        'flex items-start gap-3 p-3.5 rounded-lg border text-left transition-all',
+                        emailSettings.provider === 'resend'
+                          ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200 ring-1 ring-blue-600'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
+                      )}
+                    >
+                      <div className={cn(
+                        'h-8 w-8 rounded-md flex items-center justify-center shrink-0 mt-0.5',
+                        emailSettings.provider === 'resend' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'
+                      )}>
+                        <Send className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">Resend API</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Modern HTTP transactional email API. Reliable and fast.
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setEmailSettings((prev) => ({ ...prev, provider: 'smtp' }))}
+                      className={cn(
+                        'flex items-start gap-3 p-3.5 rounded-lg border text-left transition-all',
+                        emailSettings.provider === 'smtp'
+                          ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200 ring-1 ring-blue-600'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
+                      )}
+                    >
+                      <div className={cn(
+                        'h-8 w-8 rounded-md flex items-center justify-center shrink-0 mt-0.5',
+                        emailSettings.provider === 'smtp' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'
+                      )}>
+                        <Server className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">Custom SMTP Server</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Standard SMTP (Gmail, Google Workspace, PrivateEmail, etc.)
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Resend Configuration Fields */}
+                {emailSettings.provider === 'resend' && (
+                  <div className="p-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 space-y-4 max-w-2xl">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Key className="h-3.5 w-3.5 text-blue-600" /> Resend API Key
+                        </span>
+                        <a
+                          href="https://resend.com/api-keys"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-blue-600 hover:underline normal-case font-medium"
+                        >
+                          Get API Key &rarr;
+                        </a>
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type={showResendApiKey ? 'text' : 'password'}
+                          value={emailSettings.resendApiKey}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, resendApiKey: e.target.value }))}
+                          placeholder="re_123456789..."
+                          className="h-10 pr-10 font-mono text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowResendApiKey(!showResendApiKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          {showResendApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5" /> Sender Email ("From")
+                        </label>
+                        <Input
+                          type="email"
+                          value={emailSettings.resendFromEmail}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, resendFromEmail: e.target.value }))}
+                          placeholder="e.g. payroll@dewaterconstruct.com or onboarding@resend.dev"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                        <p className="text-[11px] text-slate-400">
+                          Use <code>onboarding@resend.dev</code> for testing or your verified domain.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Building className="h-3.5 w-3.5" /> Sender Name
+                        </label>
+                        <Input
+                          type="text"
+                          value={emailSettings.resendFromName}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, resendFromName: e.target.value }))}
+                          placeholder="e.g. DCEL Payroll Advice"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Resend Sandbox Guidance Notice */}
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                      <div className="font-semibold flex items-center gap-1.5">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        Important: Resend Test Sandbox Restriction
+                      </div>
+                      <p className="leading-relaxed">
+                        Resend's default test address (<code>onboarding@resend.dev</code>) will <strong>only deliver</strong> to the email address registered on your Resend account.
+                      </p>
+                      <p className="leading-relaxed">
+                        To send payslips to other staff at any email address, verify your domain on{' '}
+                        <a href="https://resend.com/domains" target="_blank" rel="noreferrer" className="underline font-semibold hover:text-amber-900">
+                          resend.com/domains
+                        </a>{' '}
+                        or switch to standard <strong>SMTP</strong> above (e.g. Gmail App Password, Zoho, or cPanel Webmail).
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* SMTP Configuration Fields */}
+                {emailSettings.provider === 'smtp' && (
+                  <div className="p-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 space-y-4 max-w-2xl">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Server className="h-3.5 w-3.5 text-blue-600" /> SMTP Host
+                        </label>
+                        <Input
+                          type="text"
+                          value={emailSettings.smtpHost}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpHost: e.target.value }))}
+                          placeholder="e.g. ps4.quaddns.com or smtp.gmail.com"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                        {emailSettings.smtpHost.toLowerCase().includes('dewaterconstruct.com') && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 pt-0.5">
+                            <Info className="h-3.5 w-3.5 shrink-0" />
+                            <span>Mail SSL cert is registered to <strong>ps4.quaddns.com</strong>.</span>
+                            <button
+                              type="button"
+                              onClick={() => setEmailSettings((prev) => ({ ...prev, smtpHost: 'ps4.quaddns.com' }))}
+                              className="underline font-semibold hover:text-blue-800 dark:hover:text-blue-300 ml-1"
+                            >
+                              Use ps4.quaddns.com
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Hash className="h-3.5 w-3.5" /> Port
+                        </label>
+                        <Input
+                          type="number"
+                          value={emailSettings.smtpPort}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpPort: parseInt(e.target.value, 10) || 465 }))}
+                          placeholder="465 or 587"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 py-1">
+                      <input
+                        type="checkbox"
+                        id="smtpSecureToggle"
+                        checked={emailSettings.smtpSecure}
+                        onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpSecure: e.target.checked }))}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <label htmlFor="smtpSecureToggle" className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                        Use SSL/TLS Connection (recommended for port 465)
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5" /> SMTP Username / Account
+                        </label>
+                        <Input
+                          type="text"
+                          value={emailSettings.smtpUser}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpUser: e.target.value }))}
+                          placeholder="e.g. hr@dcel.com or account@gmail.com"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Key className="h-3.5 w-3.5" /> SMTP Password / App Password
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type={showSmtpPassword ? 'text' : 'password'}
+                            value={emailSettings.smtpPass}
+                            onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpPass: e.target.value }))}
+                            placeholder="••••••••••••••••"
+                            className="h-10 pr-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showSmtpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5" /> From Email Address (Optional)
+                        </label>
+                        <Input
+                          type="email"
+                          value={emailSettings.smtpFromEmail}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpFromEmail: e.target.value }))}
+                          placeholder="Defaults to SMTP Username"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Building className="h-3.5 w-3.5" /> Sender Display Name
+                        </label>
+                        <Input
+                          type="text"
+                          value={emailSettings.smtpFromName}
+                          onChange={(e) => setEmailSettings((prev) => ({ ...prev, smtpFromName: e.target.value }))}
+                          placeholder="e.g. DCEL Payroll"
+                          className="h-10 text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Test Connection Box */}
+                <div className="p-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-3 max-w-2xl">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                      Verify Connection &amp; Delivery
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Send a test email to verify that your credentials and sender address are accepted by the server.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                    <Input
+                      type="email"
+                      value={testRecipientEmail}
+                      onChange={(e) => setTestRecipientEmail(e.target.value)}
+                      placeholder="Enter destination email (e.g. your email)..."
+                      className="h-10 text-xs flex-1 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleTestEmailConnection}
+                      disabled={isTestingEmail}
+                      className="h-10 px-4 gap-2 border-slate-300 dark:border-slate-700 hover:border-blue-500 hover:text-blue-600 text-xs font-semibold shrink-0"
+                    >
+                      {isTestingEmail ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                      {isTestingEmail ? 'Verifying…' : 'Send Test Email'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ─────────── BACKUP & RESTORE TAB ─────────────────────────── */}

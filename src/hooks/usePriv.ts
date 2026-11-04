@@ -1,4 +1,4 @@
-import { useUserStore, UserPrivileges, FULL_ACCESS, NO_ACCESS } from '@/src/store/userStore';
+﻿import { useUserStore, UserPrivileges, FULL_ACCESS, NO_ACCESS } from '@/src/store/userStore';
 
 /**
  * Returns the current user's privilege object for a given page section.
@@ -15,9 +15,36 @@ export function usePriv<K extends keyof UserPrivileges>(section: K): UserPrivile
   if (!currentUser) return FULL_ACCESS[section];
 
   const priv = currentUser.privileges?.[section];
-  if (priv) return priv;
+  if (priv) {
+    if (section === 'payroll' && (priv as any).canEmailPayslips === undefined) {
+      return {
+        ...priv,
+        canEmailPayslips: !!(priv as any).canGenerate,
+      } as unknown as UserPrivileges[K];
+    }
+    return priv;
+  }
 
   // Fallback for newly separated privileges on existing user profiles
+  if (section === 'pettyCash' && currentUser.privileges?.ledger) {
+    const l = currentUser.privileges.ledger;
+    return {
+      canView: !!l.canView,
+      canAdd: !!l.canAdd,
+      canEdit: !!l.canEdit,
+      canDelete: !!l.canDelete,
+      canExport: !!l.canExport,
+    } as unknown as UserPrivileges[K];
+  }
+
+  if (section === 'profitAndLoss' && (currentUser.privileges?.ledger || currentUser.privileges?.financialReports)) {
+    const l = currentUser.privileges.ledger || currentUser.privileges.financialReports;
+    return {
+      canView: !!l.canView,
+      canExport: !!(l as any).canExport,
+    } as unknown as UserPrivileges[K];
+  }
+
   if (section === 'vendorInvoices' && currentUser.privileges?.ledger) {
     const l = currentUser.privileges.ledger;
     return {

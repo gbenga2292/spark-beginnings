@@ -3,7 +3,7 @@ import { useAppStore, DEFAULT_OFFBOARDING_TASKS, DEFAULT_LEAVE_TYPES } from '@/s
 import { useUserStore, NO_ACCESS, FULL_ACCESS, UserPrivileges } from '@/src/store/userStore';
 import { fetchAllAppData, fetchAllUsers, fetchPresets, db } from '@/src/lib/supabaseService';
 import { supabase } from '@/src/integrations/supabase/client';
-import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem, dbToVendorInvoice, dbToVendorInvoicePayment, dbToLedgerVendor } from '@/src/lib/supabaseService';
+import { dbToSite, dbToEmployee, dbToAttendance, dbToInvoice, dbToPendingInvoice, dbToSalaryAdvance, dbToLoan, dbToPayment, dbToVatPayment, dbToLeave, dbToProfile, dbToDisciplinary, dbToEvaluation, dbToCommLog, dbToCommLogRead, dbToCompanyExpense, dbToPettyCashEntry, dbToPendingSite, dbToLedgerEntry, dbToClientProfile, dbToDailyJournal, dbToSiteJournalEntry, dbToVehicle, dbToVehicleMovement, dbToVehicleDocumentType, dbToInterviewCandidate, dbToLeaveType, dbToStaffMerit, dbToClientContact, dbToBudgetItem, dbToVendorInvoice, dbToVendorInvoicePayment, dbToLedgerVendor } from '@/src/lib/supabaseService';
 import { generateId } from '@/src/lib/utils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
@@ -162,12 +162,36 @@ export function useDataLoader(isAuthenticated: boolean) {
 
         const clientContacts = [...dbContacts, ...commLogContacts];
 
+        // Auto-enrich sites projectType from matching onboarding questionnaires (pendingSites)
+        const allPending = appData.pendingSites || localPendingSites || [];
+        const enrichedSites = (appData.sites || []).map((s: any) => {
+          if (s.projectType && s.projectType.trim().toUpperCase() !== 'DEWATERING') return s;
+          const clientLower = (s.client || '').trim().toLowerCase();
+          const nameLower = (s.name || '').trim().toLowerCase();
+          const q = allPending.find(
+            (ps: any) => (ps.siteId && ps.siteId === s.id) ||
+              (ps.siteName?.trim().toLowerCase() === nameLower && ps.clientName?.trim().toLowerCase() === clientLower) ||
+              (ps.siteName?.trim().toLowerCase() === nameLower)
+          );
+          const rawService = (
+            q?.phase1?.whatIsBeingBuilt ||
+            (q as any)?.service ||
+            (q as any)?.serviceName ||
+            (q as any)?.data?.phase1?.whatIsBeingBuilt ||
+            ''
+          ).trim();
+          if (rawService.toLowerCase().includes('waterproof') || clientLower.includes('first bank') || nameLower.includes('waterproof')) {
+            return { ...s, projectType: 'WATERPROOFING' };
+          }
+          return s;
+        });
+
         // Build the app state payload
         const appStatePayload = {
           commLogs: appData.commLogs || [],
           commLogReads: appData.commLogReads || [],
           clientContacts,
-          sites: appData.sites,
+          sites: enrichedSites,
           clients: appData.clients,
           clientProfiles: appData.clientProfiles || [],
           salaryAdvances: appData.salaryAdvances,
@@ -208,6 +232,8 @@ export function useDataLoader(isAuthenticated: boolean) {
           ledgerBeneficiaryBanks: appData.ledgerBeneficiaryBanks || [],
           ledgerEntries: appData.ledgerEntries || [],
           companyExpenses: appData.companyExpenses || [],
+          pettyCashEntries: (appData as any).pettyCashEntries || [],
+          pettyCashBanks: Array.isArray((appData as any).pettyCashBanks) ? (appData as any).pettyCashBanks : ['Petty Cash'],
           vehicles: appData.vehicles || [],
           vehicleTrips: appData.vehicleTrips || [],
           dailyJournals: appData.dailyJournals || [],
@@ -675,6 +701,20 @@ export function useRealtimeData(isAuthenticated: boolean) {
               }
               break;
             }
+            case 'petty_cash_entries': {
+              const current = appState.pettyCashEntries || [];
+              if (eventType === 'INSERT') {
+                if (!current.some(e => e.id === newRow.id)) {
+                  useAppStore.setState({ pettyCashEntries: [dbToPettyCashEntry(newRow), ...current] });
+                }
+              } else if (eventType === 'UPDATE') {
+                const updated = dbToPettyCashEntry(newRow);
+                useAppStore.setState({ pettyCashEntries: current.map(e => e.id === updated.id ? updated : e) });
+              } else if (eventType === 'DELETE') {
+                useAppStore.setState({ pettyCashEntries: current.filter(e => e.id !== oldRow.id) });
+              }
+              break;
+            }
             case 'vendor_invoices': {
               const current = appState.vendorInvoices;
               if (eventType === 'INSERT') {
@@ -1022,6 +1062,7 @@ export function useRealtimeData(isAuthenticated: boolean) {
                 if (newRow.hr_variables !== undefined) payload.hrVariables = newRow.hr_variables;
                 if (newRow.onboarding_templates !== undefined) payload.onboardingTemplates = newRow.onboarding_templates;
                 if (newRow.expense_vat_remittances !== undefined) payload.expenseVatRemittances = newRow.expense_vat_remittances;
+                if (Array.isArray(newRow.petty_cash_banks)) payload.pettyCashBanks = newRow.petty_cash_banks;
                 if (newRow.super_admin_created !== undefined) payload.superAdminCreated = newRow.super_admin_created;
                 if (newRow.super_admin_signup_enabled !== undefined) payload.superAdminSignupEnabled = newRow.super_admin_signup_enabled;
                 if (newRow.id !== undefined) payload.settingsId = newRow.id;

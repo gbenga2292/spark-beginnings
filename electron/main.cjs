@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, dialog, shell, ipcMain, Notification, Tray, nativeImage, session } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -1053,6 +1053,19 @@ function createWindow() {
 
 /* ─── App Lifecycle ────────────────────────────────────────────── */
 app.whenReady().then(() => {
+  // Allow cross-origin requests to dewaterconstruct.com static media assets
+  if (session && session.defaultSession) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      if (details.url && details.url.includes('dewaterconstruct.com')) {
+        const responseHeaders = { ...details.responseHeaders };
+        responseHeaders['access-control-allow-origin'] = ['*'];
+        responseHeaders['access-control-allow-methods'] = ['GET, HEAD, OPTIONS'];
+        callback({ responseHeaders });
+        return;
+      }
+      callback({ responseHeaders: details.responseHeaders });
+    });
+  }
   initIPC();
   createWindow();
   initTray();

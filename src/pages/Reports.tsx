@@ -102,6 +102,28 @@ export function Reports() {
     });
   };
   const [otYear, setOtYear] = useState<number>(currentYear);
+  const [otMonth, setOtMonth] = useState<'All' | number>(() => {
+    try {
+      const saved = localStorage.getItem('dcel_hr_report_ot_month');
+      if (saved === 'All') return 'All';
+      if (saved) {
+        const m = Number(saved);
+        if (m >= 1 && m <= 12) return m;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 'All';
+  });
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem('dcel_hr_report_ot_month', String(otMonth));
+    } catch {
+      /* ignore */
+    }
+  }, [otMonth]);
+
   const [otChartView, setOtChartView] = useState<'table' | 'heatmap' | 'bar'>('table');
   const [fullScreenTable, setFullScreenTable] = useState<'site-work' | 'monthly-summary' | 'overtime-detail' | null>(null);
   const [hrTab, setHrTab] = useState<'history' | 'sick'>('history');
@@ -707,34 +729,60 @@ export function Reports() {
 
   const exportOtReportExcel = () => {
     const wb = XLSX.utils.book_new();
-    const headers = ['Full Name', 'Position'];
-    months.forEach(m => headers.push(m.label));
-    headers.push('Total OT Days');
+    const activeMonths = otMonth === 'All' ? months : months.filter((m) => m.value === otMonth);
+    const selectedMonthLabel =
+      otMonth === 'All' ? 'All_Months' : months.find((m) => m.value === otMonth)?.label || String(otMonth);
+
+    const headers =
+      otMonth === 'All'
+        ? ['Full Name', 'Position', ...activeMonths.map((m) => m.label), 'Total OT Days']
+        : [
+            'Full Name',
+            'Position',
+            `${selectedMonthLabel} Sites Breakdown`,
+            `${selectedMonthLabel} Overtime Dates`,
+            `${selectedMonthLabel} Total OT Days`,
+          ];
 
     const data = otFilteredStaff.map(emp => {
       const staffData = monthlyOvertimeDetail[emp.id];
       const row: (string | number)[] = [staffData?.name || '', staffData?.position || ''];
-      
-      let totalOT = 0;
-      for (let m = 1; m <= 12; m++) {
-        const monthData = staffData?.months[m] || { sites: {}, dates: [] };
-        const monthSites = monthData.sites;
-        const monthTotal = Object.values(monthSites).reduce((a, b) => a + b, 0);
-        totalOT += monthTotal;
-        
+
+      if (otMonth === 'All') {
+        let totalOT = 0;
+        for (let m = 1; m <= 12; m++) {
+          const monthData = staffData?.months[m] || { sites: {}, dates: [] };
+          const monthSites = monthData.sites;
+          const monthTotal = Object.values(monthSites).reduce((a, b) => a + b, 0);
+          totalOT += monthTotal;
+
+          const siteDetails = Object.entries(monthSites)
+            .map(([site, count]) => `${site}: ${count}`)
+            .join(', ');
+
+          row.push(siteDetails || 0);
+        }
+        row.push(totalOT);
+      } else {
+        const mIdx = Number(otMonth);
+        const monthData = staffData?.months[mIdx] || { sites: {} as Record<string, number>, dates: [] as string[] };
+        const monthSites: Record<string, number> = monthData.sites;
+        const monthTotal = Object.values(monthSites).reduce((a: number, b: number) => a + b, 0);
         const siteDetails = Object.entries(monthSites)
-          .map(([site, count]) => `${site}: ${count}`)
+          .map(([site, count]) => `${site} (${count})`)
           .join(', ');
-        
-        row.push(siteDetails || 0);
+        const dateDetails = (monthData.dates || []).join(', ');
+        row.push(siteDetails || '—', dateDetails || '—', monthTotal);
       }
-      row.push(totalOT);
       return row;
     });
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     XLSX.utils.book_append_sheet(wb, ws, "Overtime Detail");
-    const fileName = `overtime_detail_report_${otYear}.xlsx`;
+    const fileName =
+      otMonth === 'All'
+        ? `overtime_detail_report_${otYear}.xlsx`
+        : `overtime_detail_${selectedMonthLabel.toLowerCase()}_${otYear}.xlsx`;
     
     if (window.electronAPI?.savePathDialog) {
       window.electronAPI.savePathDialog({
@@ -2607,6 +2655,24 @@ export function Reports() {
         <CardContent className={`pt-6 ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
           <div className={`flex flex-wrap items-center gap-4 mb-6 ${fullScreenTable === 'overtime-detail' ? 'hidden' : ''}`}>
             <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-700">Month:</label>
+              <select
+                value={otMonth}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setOtMonth(val === 'All' ? 'All' : Number(val));
+                }}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="All">All Months</option>
+                {months.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-700">Year:</label>
               <select
                 value={otYear}
@@ -2638,73 +2704,198 @@ export function Reports() {
           </div>
 
           {otChartView === 'table' ? (
-            <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
-              <Table className={fullScreenTable === 'overtime-detail' ? 'flex-1' : "max-h-[420px]"}>
-                <TableHeader className="sticky top-0 z-10">
-                  <TableRow className="bg-slate-800 dark:bg-slate-900">
-                    <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
-                    {months.map(m => (
-                      <TableHead key={m.value} className="text-center font-semibold text-white border-l border-slate-600 py-1.5 px-1 text-xs">
-                        {m.label.substring(0, 3)}
-                      </TableHead>
-                    ))}
-                    <TableHead className="text-center font-semibold text-white bg-amber-600 align-middle py-2 px-2 whitespace-nowrap">Total OT</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {otFilteredStaff.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={14} className="text-center py-8 text-slate-500">
-                        No staff found for the selected filter.
-                      </TableCell>
+            otMonth === 'All' ? (
+              <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                <Table className={fullScreenTable === 'overtime-detail' ? 'flex-1' : "max-h-[420px]"}>
+                  <TableHeader className="sticky top-0 z-10">
+                    <TableRow className="bg-slate-800 dark:bg-slate-900">
+                      <TableHead className="text-left font-semibold text-white py-2 px-3 whitespace-nowrap sticky left-0 bg-slate-800 z-20">Full Name</TableHead>
+                      {months.map(m => (
+                        <TableHead key={m.value} className="text-center font-semibold text-white border-l border-slate-600 py-1.5 px-1 text-xs">
+                          {m.label.substring(0, 3)}
+                        </TableHead>
+                      ))}
+                      <TableHead className="text-center font-semibold text-white bg-amber-600 align-middle py-2 px-2 whitespace-nowrap">Total OT</TableHead>
                     </TableRow>
-                  ) : (
-                    otFilteredStaff.map((emp, idx) => {
-                      const data = monthlyOvertimeDetail[emp.id];
-                      let annualTotalOT = 0;
-                      return (
-                        <TableRow key={emp.id} className={`hover:bg-amber-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
-                          <TableCell className={`font-medium text-slate-800 sticky left-0 py-1.5 px-3 text-sm whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                            {data?.name || `${emp.surname} ${emp.firstname}`}
-                          </TableCell>
-                          {months.map(m => {
-                            const monthData = data?.months[m.value] || { sites: {}, dates: [] };
-                            const monthSites = monthData.sites;
-                            const monthTotal = Object.values(monthSites).reduce((a, b) => a + b, 0);
-                            annualTotalOT += monthTotal;
-                            return (
-                              <TableCell 
-                                key={m.value} 
-                                className="text-center py-1 px-1 text-[10px] text-slate-700 border-l border-slate-100"
-                                title={monthData.dates.length > 0 ? `Dates:\n${monthData.dates.join('\n')}` : ''}
-                              >
-                                {monthTotal > 0 ? (
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-bold text-amber-600">{monthTotal}</span>
-                                    <div className="text-[8px] text-slate-400 leading-tight max-w-[100px] mx-auto overflow-hidden text-ellipsis">
-                                      {Object.entries(monthSites).map(([site, count]) => `${site}(${count})`).join(', ')}
+                  </TableHeader>
+                  <TableBody>
+                    {otFilteredStaff.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={14} className="text-center py-8 text-slate-500">
+                          No staff found for the selected filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      otFilteredStaff.map((emp, idx) => {
+                        const data = monthlyOvertimeDetail[emp.id];
+                        let annualTotalOT = 0;
+                        return (
+                          <TableRow key={emp.id} className={`hover:bg-amber-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}`}>
+                            <TableCell className={`font-medium text-slate-800 sticky left-0 py-1.5 px-3 text-sm whitespace-nowrap ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                              {data?.name || `${emp.surname} ${emp.firstname}`}
+                            </TableCell>
+                            {months.map(m => {
+                              const monthData = data?.months[m.value] || { sites: {}, dates: [] };
+                              const monthSites = monthData.sites;
+                              const monthTotal = Object.values(monthSites).reduce((a, b) => a + b, 0);
+                              annualTotalOT += monthTotal;
+                              return (
+                                <TableCell 
+                                  key={m.value} 
+                                  className="text-center py-1 px-1 text-[10px] text-slate-700 border-l border-slate-100"
+                                  title={monthData.dates.length > 0 ? `Dates:\n${monthData.dates.join('\n')}` : ''}
+                                >
+                                  {monthTotal > 0 ? (
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="font-bold text-amber-600">{monthTotal}</span>
+                                      <div className="text-[8px] text-slate-400 leading-tight max-w-[100px] mx-auto overflow-hidden text-ellipsis">
+                                        {Object.entries(monthSites).map(([site, count]) => `${site}(${count})`).join(', ')}
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : '—'}
-                              </TableCell>
-                            );
-                          })}
-                          <TableCell className="text-center py-1.5 px-2 font-bold text-amber-700 bg-amber-50">
-                            {annualTotalOT}
-                          </TableCell>
+                                  ) : '—'}
+                                </TableCell>
+                              );
+                            })}
+                            <TableCell className="text-center py-1.5 px-2 font-bold text-amber-700 bg-amber-50">
+                              {annualTotalOT}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              /* Focused Single-Month Overtime Detail View */
+              (() => {
+                const mIdx = Number(otMonth);
+                const selectedMonthObj = months.find((m) => m.value === mIdx);
+                const selectedMonthName = selectedMonthObj?.label || '';
+                let grandMonthTotalOT = 0;
+                otFilteredStaff.forEach((emp) => {
+                  const mSites: Record<string, number> = monthlyOvertimeDetail[emp.id]?.months[mIdx]?.sites || {};
+                  grandMonthTotalOT += Object.values(mSites).reduce((a: number, b: number) => a + b, 0);
+                });
+
+                return (
+                  <div className={`rounded-md border border-slate-200 overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
+                    <Table className={fullScreenTable === 'overtime-detail' ? 'flex-1' : 'max-h-[460px]'}>
+                      <TableHeader className="sticky top-0 z-10">
+                        <TableRow className="bg-slate-800 dark:bg-slate-900">
+                          <TableHead className="text-left font-semibold text-white py-2.5 px-4 whitespace-nowrap sticky left-0 bg-slate-800 z-20 w-56">
+                            Full Name
+                          </TableHead>
+                          <TableHead className="text-left font-semibold text-white border-l border-slate-700 py-2.5 px-4 text-xs">
+                            {selectedMonthName} {otYear} — Sites Breakdown
+                          </TableHead>
+                          <TableHead className="text-left font-semibold text-white border-l border-slate-700 py-2.5 px-4 text-xs">
+                            Overtime Dates ({selectedMonthName})
+                          </TableHead>
+                          <TableHead className="text-center font-semibold text-white bg-amber-600 align-middle py-2.5 px-4 whitespace-nowrap w-32">
+                            {selectedMonthObj?.label.substring(0, 3)} Total OT
+                          </TableHead>
                         </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                      </TableHeader>
+                      <TableBody>
+                        {otFilteredStaff.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                              No staff found for the selected filter.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          <>
+                            {otFilteredStaff.map((emp, idx) => {
+                              const data = monthlyOvertimeDetail[emp.id];
+                              const monthData = data?.months[mIdx] || { sites: {} as Record<string, number>, dates: [] as string[] };
+                              const monthSites: Record<string, number> = monthData.sites;
+                              const monthTotal = Object.values(monthSites).reduce((a: number, b: number) => a + b, 0);
+
+                              return (
+                                <TableRow
+                                  key={emp.id}
+                                  className={`hover:bg-amber-50/40 transition-colors ${
+                                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
+                                  }`}
+                                >
+                                  <TableCell
+                                    className={`font-medium text-slate-800 sticky left-0 py-2 px-4 text-sm whitespace-nowrap ${
+                                      idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                                    }`}
+                                  >
+                                    <div>{data?.name || `${emp.surname} ${emp.firstname}`}</div>
+                                    {emp.position && (
+                                      <div className="text-[11px] text-slate-400 font-normal">{emp.position}</div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="py-2 px-4 border-l border-slate-100">
+                                    {monthTotal > 0 ? (
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {Object.entries(monthSites).map(([site, count]) => (
+                                          <span
+                                            key={site}
+                                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80"
+                                          >
+                                            <span>{site}</span>
+                                            <span className="px-1.5 py-0.2 rounded-full bg-amber-200/70 text-amber-900 font-bold text-[10px]">
+                                              {Number(count)}
+                                            </span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-300 text-xs">—</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="py-2 px-4 border-l border-slate-100">
+                                    {monthData.dates.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {monthData.dates.map((dStr: string, dIdx: number) => (
+                                          <span
+                                            key={dIdx}
+                                            className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200/60"
+                                          >
+                                            {dStr}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span className="text-slate-300 text-xs">—</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-center py-2 px-4 font-bold text-amber-700 bg-amber-50/70 text-sm">
+                                    {monthTotal}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                            <TableRow className="bg-slate-900 hover:bg-slate-900 font-semibold sticky bottom-0 z-10">
+                              <TableCell
+                                colSpan={3}
+                                className="text-white py-2.5 px-4 text-xs uppercase tracking-wider"
+                              >
+                                Total Overtime Days ({selectedMonthName} {otYear})
+                              </TableCell>
+                              <TableCell className="text-center text-amber-300 py-2.5 px-4 text-sm font-extrabold">
+                                {grandMonthTotalOT}
+                              </TableCell>
+                            </TableRow>
+                          </>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })()
+            )
           ) : otChartView === 'heatmap' ? (
              /* Heatmap for OT */
              (() => {
+                const visibleMonths = otMonth === 'All' ? months : months.filter((m) => m.value === otMonth);
                 let maxOt = 1;
                 otFilteredStaff.forEach(emp => {
-                  months.forEach(m => {
+                  visibleMonths.forEach(m => {
                     const monthData = monthlyOvertimeDetail[emp.id]?.months[m.value] || { sites: {}, dates: [] };
                     const ot = Object.values(monthData.sites).reduce((a, b) => a + b, 0);
                     if (ot > maxOt) maxOt = ot;
@@ -2715,33 +2906,33 @@ export function Reports() {
                   <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                     <div className={`overflow-x-auto ${fullScreenTable === 'overtime-detail' ? 'flex-1' : ''}`}>
                       <div className="overflow-y-auto" style={{ maxHeight: fullScreenTable === 'overtime-detail' ? 'none' : '480px' }}>
-                        <div style={{ minWidth: '720px' }}>
+                        <div style={{ minWidth: otMonth === 'All' ? '720px' : '420px' }}>
                           <div className="flex sticky top-0 z-20 bg-slate-800">
                             <div className="flex-shrink-0 w-44 px-3 py-2.5 border-r border-slate-700">
                               <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide">Employee</span>
                             </div>
-                            {months.map(m => (
+                            {visibleMonths.map(m => (
                               <div key={m.value} className="flex-1 min-w-[52px] text-center py-2.5 border-r border-slate-700 last:border-0">
-                                <div className="text-xs font-bold text-slate-200">{m.label.substring(0, 3)}</div>
+                                <div className="text-xs font-bold text-slate-200">{otMonth === 'All' ? m.label.substring(0, 3) : m.label}</div>
                               </div>
                             ))}
                             <div className="flex-shrink-0 w-28 text-center py-2.5 bg-amber-600 border-l border-slate-700">
-                              <span className="text-xs font-semibold text-white">Annual Total</span>
+                              <span className="text-xs font-semibold text-white">{otMonth === 'All' ? 'Annual Total' : 'Month Total'}</span>
                             </div>
                           </div>
                           {otFilteredStaff.map((emp, idx) => {
                             const data = monthlyOvertimeDetail[emp.id];
-                            let annualTotalOT = 0;
+                            let rowTotalOT = 0;
                             return (
                               <div key={emp.id} className={`flex border-b border-slate-100 last:border-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}>
                                 <div className={`flex-shrink-0 w-44 px-3 py-2 border-r border-slate-200 flex flex-col justify-center ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                                   <div className="text-xs font-semibold text-slate-800 leading-tight truncate">{data?.name}</div>
                                 </div>
-                                {months.map(m => {
+                                {visibleMonths.map(m => {
                                   const monthData = data?.months[m.value] || { sites: {}, dates: [] };
                                   const monthSites = monthData.sites;
                                   const ot = Object.values(monthSites).reduce((a, b) => a + b, 0);
-                                  annualTotalOT += ot;
+                                  rowTotalOT += ot;
                                   const intensity = ot > 0 ? Math.min(0.2 + (ot / maxOt) * 0.8, 1) : 0;
                                   const tooltip = ot > 0 
                                     ? `Dates:\n${monthData.dates.join('\n')}\n\nSites:\n${Object.entries(monthSites).map(([site, count]) => `${site}: ${count}`).join('\n')}` 
@@ -2758,7 +2949,7 @@ export function Reports() {
                                   );
                                 })}
                                 <div className="flex-shrink-0 w-28 py-2 px-2 flex items-center justify-center bg-amber-50 border-l border-amber-100">
-                                  <span className="font-bold text-amber-700 text-sm">{annualTotalOT}</span>
+                                  <span className="font-bold text-amber-700 text-sm">{rowTotalOT}</span>
                                 </div>
                               </div>
                             );
@@ -2772,22 +2963,39 @@ export function Reports() {
           ) : (
             /* Bar Chart for OT */
             (() => {
-              const barData = months.map(m => {
-                let totalOT = 0;
-                otFilteredStaff.forEach(emp => {
-                  const monthData = monthlyOvertimeDetail[emp.id]?.months[m.value] || { sites: {}, dates: [] };
-                  totalOT += Object.values(monthData.sites).reduce((a, b) => a + b, 0);
-                });
-                return {
-                  month: m.label.substring(0, 3),
-                  'Overtime': totalOT
-                };
-              });
+              const barData =
+                otMonth === 'All'
+                  ? months.map(m => {
+                      let totalOT = 0;
+                      otFilteredStaff.forEach(emp => {
+                        const monthData = monthlyOvertimeDetail[emp.id]?.months[m.value] || { sites: {}, dates: [] };
+                        totalOT += Object.values(monthData.sites).reduce((a, b) => a + b, 0);
+                      });
+                      return {
+                        label: m.label.substring(0, 3),
+                        Overtime: totalOT,
+                      };
+                    })
+                  : otFilteredStaff
+                      .map((emp) => {
+                        const mIdx = Number(otMonth);
+                        const monthData = monthlyOvertimeDetail[emp.id]?.months[mIdx] || { sites: {} as Record<string, number>, dates: [] as string[] };
+                        const totalOT = Object.values(monthData.sites).reduce((a: number, b: number) => a + b, 0);
+                        return {
+                          label: monthlyOvertimeDetail[emp.id]?.name || `${emp.surname} ${emp.firstname}`,
+                          Overtime: totalOT,
+                        };
+                      })
+                      .filter((r) => r.Overtime > 0);
 
               return (
                 <div className={`rounded-md border border-slate-200  overflow-hidden ${fullScreenTable === 'overtime-detail' ? 'flex-1 flex flex-col min-h-0' : ''}`}>
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-6">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Team Monthly Overtime</span>
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      {otMonth === 'All'
+                        ? 'Team Monthly Overtime'
+                        : `${months.find((m) => m.value === otMonth)?.label || ''} ${otYear} Overtime Breakdown`}
+                    </span>
                     <span className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
                       <span className="inline-block w-3 h-3 rounded-sm bg-amber-400"></span> Total Overtime
                     </span>
@@ -2797,7 +3005,7 @@ export function Reports() {
                       <ResponsiveContainer minWidth={1} minHeight={1} width="100%" height="100%">
                         <BarChart data={barData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }} barSize={30}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                          <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                          <XAxis dataKey="label" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                           <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
                           <RechartsTooltip
                             contentStyle={{ borderRadius: '10px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.12)', fontSize: 12 }}

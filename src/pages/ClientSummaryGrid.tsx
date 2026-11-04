@@ -11,6 +11,7 @@ import { ClientContactsPanel } from './ClientContactsPanel';
 import { toast, showConfirm } from '../components/ui/toast';
 import { useUserStore } from '../store/userStore';
 import { normalizeDate } from '../lib/dateUtils';
+import { resolveEffectivePumpStartDate } from '../lib/invoicePumpUtils';
 import { useOperations } from '../contexts/OperationsContext';
 
 function StatAmount({ 
@@ -64,7 +65,7 @@ export function ClientSummaryGrid() {
   const deleteClientProfile = useAppStore(s => s.deleteClientProfile);
   const deleteClientContact = useAppStore(s => s.deleteClientContact);
   const deletePendingSite = useAppStore(s => s.deletePendingSite);
-  const { dailyMachineLogs } = useOperations();
+  const { dailyMachineLogs, sitePumpDates = [] } = useOperations();
 
   const availableYears = useMemo(() => {
     const yearSet = new Set<string>();
@@ -290,7 +291,8 @@ export function ClientSummaryGrid() {
       const clientKey = inv.client.trim().toLowerCase();
       const clientName = canonicalNameMap.get(clientKey) || inv.client.trim();
 
-      const startDateStr = normalizeDate((inv as any).startDate || inv.date || (inv as any).issueDate || (inv as any).created_at || (inv as any).createdAt);
+      const effectivePump = resolveEffectivePumpStartDate(inv as any, sites, sitePumpDates);
+      const startDateStr = normalizeDate(effectivePump || (inv as any).startDate || inv.date || (inv as any).issueDate || (inv as any).created_at || (inv as any).createdAt);
       if (selectedYear !== 'all' && startDateStr && !startDateStr.startsWith(selectedYear)) {
         return;
       }

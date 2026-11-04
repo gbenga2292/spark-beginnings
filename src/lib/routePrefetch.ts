@@ -32,6 +32,7 @@ const routeImportMap: Record<string, () => Promise<any>> = {
   '/evaluations': () => import('@/src/pages/Evaluations'),
   '/interviews': () => import('@/src/pages/InterviewManager'),
   '/ledger': () => import('@/src/pages/Ledger'),
+  '/petty-cash': () => import('@/src/pages/PettyCash'),
   '/bank-import': () => import('@/src/pages/BankImport'),
   '/vendor-invoices': () => import('@/src/pages/VendorInvoices'),
   '/tasks': () => import('@/src/pages/Tasks'),

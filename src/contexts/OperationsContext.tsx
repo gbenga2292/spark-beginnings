@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
-  Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType, 
+  Asset, Waybill, AssetCategory, AssetType, AssetStatus, WaybillStatus, WaybillType,
   Checkout, MaintenanceAsset, MaintenanceSession, MaintenanceLogType, ServiceStatus,
   OperationalStatus,
   Vehicle, VehicleTripLeg, VehicleDocumentType, DailyMachineLog, AssetPumpDate,
@@ -15,6 +15,7 @@ import { useAuth } from '../hooks/useAuth';
 import { isInternalSite } from '@/src/lib/siteUtils';
 import { cacheSet, cacheGet } from '@/src/lib/offlineCache';
 import { useNetworkStore } from '@/src/store/networkStore';
+import { formatDisplayDate } from '@/src/lib/dateUtils';
 
 export function parseLedgerLinks(rawIds?: string[] | null): { ids: string[]; amounts?: Record<string, number> } {
   if (!rawIds || rawIds.length === 0) return { ids: [] };
@@ -64,7 +65,7 @@ interface OperationsContextType {
   maintenanceSessions: MaintenanceSession[];
   dailyMachineLogs: DailyMachineLog[];
   assetMovements: AssetMovement[];
-  
+
   // Asset methods
   addAsset: (asset: Omit<Asset, 'id' | 'availableQuantity'>) => void;
   bulkAddAssets: (assets: Omit<Asset, 'id' | 'availableQuantity'>[]) => void;
@@ -74,18 +75,18 @@ interface OperationsContextType {
   logAssetMovement: (movement: Omit<AssetMovement, 'id' | 'createdAt'>) => Promise<void>;
   backfillHistoricalMovements: () => Promise<number>;
   consumeAssetStockFIFO: (
-    assetId: string, 
-    quantityToConsume: number, 
-    options?: { 
-      reason?: string; 
-      referenceId?: string; 
-      referenceType?: string; 
-      siteId?: string; 
-      siteName?: string; 
+    assetId: string,
+    quantityToConsume: number,
+    options?: {
+      reason?: string;
+      referenceId?: string;
+      referenceType?: string;
+      siteId?: string;
+      siteName?: string;
       notes?: string;
     }
   ) => Promise<{ success: boolean; depletedBatches: { batchId: string; batchNumber: string; qty: number; unitCost: number }[]; totalCost: number; message?: string }>;
-  
+
   // Waybill methods
   createWaybill: (waybill: Omit<Waybill, 'id' | 'status'> & { id?: string; status?: WaybillStatus }) => void;
   updateWaybill: (id: string, updates: Partial<Omit<Waybill, 'id' | 'status'>>) => void;
@@ -101,7 +102,7 @@ interface OperationsContextType {
   logMaintenance: (session: Omit<MaintenanceSession, 'id'>) => void;
   updateMaintenance: (id: string, updates: Partial<Omit<MaintenanceSession, 'id'>>) => void;
   updateAssetOperationalStatus: (id: string, status: OperationalStatus) => Promise<void>;
-  
+
   // Analytics
   getAssetAnalytics: () => any;
   getSiteAnalytics: (siteId: string) => any;
@@ -123,7 +124,7 @@ interface OperationsContextType {
   addVehicleDocumentType: (name: string) => void;
   deleteVehicleDocumentType: (id: string) => void;
   updateVehicleDocument: (vehicleId: string, docTypeName: string, date: string) => void;
-  
+
   // Daily Machine Logs
   logDailyActivity: (log: Omit<DailyMachineLog, 'id' | 'created_at'>) => Promise<void>;
   logDailyActivitiesBulk: (logs: Omit<DailyMachineLog, 'id' | 'created_at'>[]) => Promise<void>;
@@ -166,7 +167,7 @@ interface OperationsContextType {
   addBatchDieselRefills: (refills: Array<Omit<DieselRefill, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
   updateDieselRefill: (id: string, updates: Partial<Omit<DieselRefill, 'id' | 'created_at'>>) => Promise<void>;
   deleteDieselRefill: (id: string) => Promise<void>;
-  
+
   // Backup Import
   importOperationsBackupData: (data: any) => void;
 
@@ -219,16 +220,16 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const [assetMovements, setAssetMovements] = useState<AssetMovement[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const { 
+  const {
     sites,
-    vehicles, 
-    vehicleTrips, 
+    vehicles,
+    vehicleTrips,
     vehicleDocumentTypes,
-    addVehicle: storeAddVehicle, 
+    addVehicle: storeAddVehicle,
     insertVehicles: storeInsertVehicles,
     setVehicles: storeSetVehicles,
-    updateVehicle: storeUpdateVehicle, 
-    deleteVehicle: storeDeleteVehicle, 
+    updateVehicle: storeUpdateVehicle,
+    deleteVehicle: storeDeleteVehicle,
     addVehicleTripRecords: storeAddVehicleTripRecords,
     setVehicleTripRecords: storeSetVehicleTripRecords,
     updateVehicleTripRecord: storeUpdateVehicleTripRecord,
@@ -245,18 +246,18 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       .map(a => {
         const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === a.id));
         const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
-        
+
         const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
         const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
-        
+
         const lastRoutineDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (a.created_at ? new Date(a.created_at) : new Date());
-        
-        const logsSinceLastMaintenance = dailyMachineLogs.filter(log => 
-          log.assetId === a.id && 
+
+        const logsSinceLastMaintenance = dailyMachineLogs.filter(log =>
+          log.assetId === a.id &&
           new Date(log.date).getTime() > lastRoutineDate.getTime() &&
           log.isActive
         );
-        
+
         let activeDaysCount = 0;
         logsSinceLastMaintenance.forEach(log => {
           if (log.operationalDay === 'full') activeDaysCount += 1;
@@ -268,12 +269,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         const intervalMonths = a.serviceIntervalMonths || 2;
         const OPERATIONAL_DAYS_LIMIT = intervalMonths * 30;
         const OPERATIONAL_DAYS_WARNING = OPERATIONAL_DAYS_LIMIT - 10;
-        
+
         // Smart Estimate: Push the date forward dynamically based on remaining days
         const daysLeft = Math.max(0, OPERATIONAL_DAYS_LIMIT - activeDaysCount);
         const nextDate = new Date();
         nextDate.setDate(nextDate.getDate() + daysLeft);
-        
+
         let status: ServiceStatus = 'ok';
         if (activeDaysCount >= OPERATIONAL_DAYS_LIMIT) {
           status = 'overdue';
@@ -386,13 +387,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       .map(v => {
         const sessions = maintenanceSessions.filter(s => s.assets.some(sa => sa.assetId === v.id));
         const routineSessions = sessions.filter(s => s.type === 'routine' || s.type === 'scheduled');
-        
+
         const lastSession = sessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
         const lastRoutineSession = routineSessions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())[0];
-        
+
         const nextDate = lastRoutineSession ? new Date(lastRoutineSession.date) : (v.created_at ? new Date(v.created_at) : new Date());
         nextDate.setMonth(nextDate.getMonth() + 3); // Default 3 months
-        
+
         const now = new Date();
         let status: ServiceStatus = 'ok';
         if (now > nextDate) status = 'overdue';
@@ -471,9 +472,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         };
 
         const [
-          { data: dbAssets }, 
-          { data: dbWaybills }, 
-          { data: dbCheckouts }, 
+          { data: dbAssets },
+          { data: dbWaybills },
+          { data: dbCheckouts },
           { data: dbMaintenance },
           dbDailyLogs,
           { data: dbPumpDates },
@@ -801,7 +802,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
               dailyMachineLogs: mappedLogs,
               sitePumpDates: mappedPumps,
               siteHoldPeriods: mappedHolds,
-            }).catch(() => {});
+            }).catch(() => { });
           } catch (err) {
             console.error('[OperationsContext] Re-fetch on reconnect failed:', err);
           } finally {
@@ -861,7 +862,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       // Fallback: load from localStorage if Supabase fails
       const cachedCerts = localStorage.getItem('dcel-maintenance-certificates');
       if (cachedCerts) {
-        try { setMaintenanceCertificates(JSON.parse(cachedCerts)); } catch (e) {}
+        try { setMaintenanceCertificates(JSON.parse(cachedCerts)); } catch (e) { }
       }
     };
 
@@ -1541,14 +1542,14 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const consumeAssetStockFIFO = async (
-    assetId: string, 
-    quantityToConsume: number, 
-    options?: { 
-      reason?: string; 
-      referenceId?: string; 
-      referenceType?: string; 
-      siteId?: string; 
-      siteName?: string; 
+    assetId: string,
+    quantityToConsume: number,
+    options?: {
+      reason?: string;
+      referenceId?: string;
+      referenceType?: string;
+      siteId?: string;
+      siteName?: string;
       notes?: string;
     }
   ) => {
@@ -1564,7 +1565,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
     let remainingToDeduct = qtyToDeduct;
     const existingBatches: AssetBatch[] = (asset.batches || []).map(b => ({ ...b }));
-    
+
     // Sort active batches: earliest expiry date first; if no expiry, earliest received date first
     const activeBatches = existingBatches
       .filter(b => b.status === 'active' && b.remainingQuantity > 0)
@@ -1735,7 +1736,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     const initialBatch: AssetBatch | undefined = asset.quantity > 0 ? {
       id: crypto.randomUUID(),
       assetId,
-      batchNumber: `INIT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`,
+      batchNumber: `INIT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
       receivedDate: new Date().toISOString().split('T')[0],
       initialQuantity: asset.quantity,
       remainingQuantity: asset.quantity,
@@ -1753,9 +1754,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       damagedQuantity: 0,
       batches: initialBatch ? [initialBatch] : (asset.batches || [])
     };
-    
+
     setAssets(prev => [...prev, newAsset]);
-    
+
     try {
       await persistAsset(newAsset);
       if (newAsset.quantity > 0) {
@@ -1785,7 +1786,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       const initialBatch: AssetBatch | undefined = asset.quantity > 0 ? {
         id: crypto.randomUUID(),
         assetId,
-        batchNumber: `INIT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`,
+        batchNumber: `INIT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
         receivedDate: new Date().toISOString().split('T')[0],
         initialQuantity: asset.quantity,
         remainingQuantity: asset.quantity,
@@ -1805,7 +1806,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       };
     });
     setAssets(prev => [...prev, ...newAssets]);
-    
+
     supabase.from('operations_assets').upsert(newAssets.map(asset => ({
       id: asset.id,
       name: asset.name,
@@ -1904,9 +1905,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     supabase.from('operations_assets').delete().eq('id', id).then();
   };
 
-  const restockAssets = (items: { 
-    assetId: string; 
-    quantity: number; 
+  const restockAssets = (items: {
+    assetId: string;
+    quantity: number;
     totalCost: number;
     batchNumber?: string;
     expiryDate?: string | null;
@@ -1932,7 +1933,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       const newBatch: AssetBatch = {
         id: crypto.randomUUID(),
         assetId: asset.id,
-        batchNumber: restockItem.batchNumber || `BATCH-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random()*1000)}`,
+        batchNumber: restockItem.batchNumber || `BATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000)}`,
         supplier: restockItem.supplier,
         receivedDate: new Date().toISOString().split('T')[0],
         expiryDate: restockItem.expiryDate || null,
@@ -2046,12 +2047,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           const item = waybill.items.find(i => i.assetId === asset.id);
           if (item) {
             const cond = returnConditions?.[item.assetId] || { good: item.quantity, damaged: 0, missing: 0 };
-            
+
             const reservedQuantity = Math.max(0, asset.reservedQuantity - item.quantity);
             const damagedQuantity = (asset.damagedQuantity || 0) + cond.damaged;
             const missingQuantity = (asset.missingQuantity || 0) + cond.missing;
             const usedQuantity = asset.usedQuantity || 0;
-            
+
             const updated: Asset = {
               ...asset,
               reservedQuantity,
@@ -2113,10 +2114,10 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }));
       }
 
-      const updatedWaybill = { 
-        ...waybill, 
-        status, 
-        ...(sentToSiteDate ? { 
+      const updatedWaybill = {
+        ...waybill,
+        status,
+        ...(sentToSiteDate ? {
           sentToSiteDate,
           issueDate: sentToSiteDate
         } : {}),
@@ -2125,7 +2126,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
             const { returnedGood, returnedDamaged, returnedMissing, ...rest } = item;
             return rest;
           })
-        } : (returnConditions ? { 
+        } : (returnConditions ? {
           items: waybill.items.map(item => ({
             ...item,
             returnedGood: returnConditions[item.assetId]?.good || item.quantity,
@@ -2134,7 +2135,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           }))
         } : {}))
       };
-      
+
       persistWaybill(updatedWaybill);
 
       return prev.map(w => w.id === id ? updatedWaybill : w);
@@ -2148,7 +2149,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
       if (waybill.type === 'waybill' && waybill.status === 'outstanding') {
         const newItems = updates.items || waybill.items;
-        
+
         // Find all unique asset IDs from old and new items
         const oldItemIds = waybill.items.map(i => i.assetId);
         const newItemIds = newItems.map(i => i.assetId);
@@ -2158,7 +2159,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           if (allAffectedIds.includes(asset.id)) {
             const oldItem = waybill.items.find(i => i.assetId === asset.id);
             const newItem = newItems.find(i => i.assetId === asset.id);
-            
+
             const oldQty = oldItem ? oldItem.quantity : 0;
             const newQty = newItem ? newItem.quantity : 0;
             const delta = newQty - oldQty;
@@ -2224,7 +2225,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     };
     setCheckouts(prev => [newCheckout, ...prev]);
     persistCheckout(newCheckout);
-    
+
     setAssets(assetsPrev => assetsPrev.map(asset => {
       if (asset.id === checkout.assetId) {
         const reservedQuantity = (asset.reservedQuantity || 0) + checkout.quantity;
@@ -2262,7 +2263,7 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     setCheckouts(prev => {
       const checkout = prev.find(c => c.id === id);
       if (!checkout) return prev;
-      
+
       const isStatusChange = updates.status && ['partial_returned', 'returned', 'outstanding', 'consumed'].includes(updates.status);
       const isReturnedChange = updates.returnedQuantity !== undefined;
 
@@ -2304,13 +2305,13 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
 
               if (delta > 0) {
                 const movType: MovementType = isConsumed ? 'consumed' : isDamaged ? 'damage' : isLost ? 'loss' : 'checkout_return';
-                const reason = isConsumed 
+                const reason = isConsumed
                   ? `Checkout Item Consumed by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
                   : isDamaged
-                  ? `Checkout Item Returned Damaged by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
-                  : isLost
-                  ? `Checkout Item Lost/Missing by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
-                  : `Quick Checkout Return from ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`;
+                    ? `Checkout Item Returned Damaged by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
+                    : isLost
+                      ? `Checkout Item Lost/Missing by ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`
+                      : `Quick Checkout Return from ${checkout.employeeName || 'Staff'}${updates.notes ? ` - ${updates.notes}` : ''}`;
 
                 logAssetMovement({
                   assetId: asset.id,
@@ -2335,17 +2336,17 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
           }));
         }
       }
-      
+
       const computedStatus = (updates.condition?.toLowerCase().includes('consumed') || updates.status === 'consumed')
-        ? 'consumed' 
+        ? 'consumed'
         : updates.status || checkout.status;
 
-      const updatedCheckout = { 
-        ...checkout, 
-        ...updates, 
+      const updatedCheckout = {
+        ...checkout,
+        ...updates,
         status: computedStatus,
         condition: updates.condition || checkout.condition,
-        notes: updates.notes || checkout.notes 
+        notes: updates.notes || checkout.notes
       } as Checkout;
 
       persistCheckout(updatedCheckout);
@@ -2410,35 +2411,35 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(() => {
       const appStore = useAppStore.getState();
       const existingJournal = appStore.dailyJournals.find(j => j.date === newSession.date);
-      
+
       const narrationText = `Maintenance Logged - Tech: ${newSession.technician} | Type: ${newSession.type}\n` +
-        `Remark: ${newSession.generalRemark || 'N/A'}\n` + 
+        `Remark: ${newSession.generalRemark || 'N/A'}\n` +
         newSession.assets.map(a => `- ${a.assetName}: ${a.workDone || a.remark || 'Maintained'}`).join('\n');
-      
+
       const newEntry = {
-          id: `maint-${newSession.id}`,
-          journalId: existingJournal ? existingJournal.id : `DJ-${newSession.date.replace(/-/g, '')}`,
-          siteId: 'dcel-office',
-          siteName: 'DCEL OFFICE',
-          clientName: 'DCEL',
-          narration: narrationText,
-          createdAt: new Date().toISOString(),
-          loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User'
+        id: `maint-${newSession.id}`,
+        journalId: existingJournal ? existingJournal.id : `DJ-${newSession.date.replace(/-/g, '')}`,
+        siteId: 'dcel-office',
+        siteName: 'DCEL OFFICE',
+        clientName: 'DCEL',
+        narration: narrationText,
+        createdAt: new Date().toISOString(),
+        loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User'
       };
-      
+
       if (existingJournal) {
-          let currentEntries = appStore.siteJournalEntries.filter(e => e.journalId === existingJournal.id);
-          currentEntries = currentEntries.filter(e => e.id !== newEntry.id);
-          currentEntries.push(newEntry);
-          appStore.updateDailyJournal(existingJournal.id, existingJournal, currentEntries);
+        let currentEntries = appStore.siteJournalEntries.filter(e => e.journalId === existingJournal.id);
+        currentEntries = currentEntries.filter(e => e.id !== newEntry.id);
+        currentEntries.push(newEntry);
+        appStore.updateDailyJournal(existingJournal.id, existingJournal, currentEntries);
       } else {
-          appStore.addDailyJournal({
-              id: `DJ-${newSession.date.replace(/-/g, '')}`,
-              date: newSession.date,
-              generalNotes: 'Maintenance recorded.',
-              loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User',
-              createdAt: new Date().toISOString()
-          }, [newEntry]);
+        appStore.addDailyJournal({
+          id: `DJ-${newSession.date.replace(/-/g, '')}`,
+          date: newSession.date,
+          generalNotes: 'Maintenance recorded.',
+          loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User',
+          createdAt: new Date().toISOString()
+        }, [newEntry]);
       }
     }, 0);
   };
@@ -2470,12 +2471,12 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         });
 
         const allPartIds = new Set([...oldParts.keys(), ...newParts.keys()]);
-        
+
         allPartIds.forEach(partId => {
           const oldQty = oldParts.get(partId) || 0;
           const newQty = newParts.get(partId) || 0;
           const diff = oldQty - newQty;
-          
+
           if (diff !== 0) {
             setAssets(assetsPrev => assetsPrev.map(a => {
               if (a.id === partId) {
@@ -2501,35 +2502,35 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
       setTimeout(() => {
         const appStore = useAppStore.getState();
         const existingJournal = appStore.dailyJournals.find(j => j.date === updatedSession.date);
-        
+
         const narrationText = `Maintenance Updated - Tech: ${updatedSession.technician} | Type: ${updatedSession.type}\n` +
-          `Remark: ${updatedSession.generalRemark || 'N/A'}\n` + 
+          `Remark: ${updatedSession.generalRemark || 'N/A'}\n` +
           updatedSession.assets.map(a => `- ${a.assetName}: ${a.workDone || a.remark || 'Maintained'}`).join('\n');
-        
+
         const newEntry = {
-            id: `maint-${updatedSession.id}`,
-            journalId: existingJournal ? existingJournal.id : `DJ-${updatedSession.date.replace(/-/g, '')}`,
-            siteId: 'dcel-office',
-            siteName: 'DCEL OFFICE',
-            clientName: 'DCEL',
-            narration: narrationText,
-            createdAt: new Date().toISOString(),
-            loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User'
+          id: `maint-${updatedSession.id}`,
+          journalId: existingJournal ? existingJournal.id : `DJ-${updatedSession.date.replace(/-/g, '')}`,
+          siteId: 'dcel-office',
+          siteName: 'DCEL OFFICE',
+          clientName: 'DCEL',
+          narration: narrationText,
+          createdAt: new Date().toISOString(),
+          loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User'
         };
-        
+
         if (existingJournal) {
-            let currentEntries = appStore.siteJournalEntries.filter(e => e.journalId === existingJournal.id);
-            currentEntries = currentEntries.filter(e => e.id !== newEntry.id);
-            currentEntries.push(newEntry);
-            appStore.updateDailyJournal(existingJournal.id, existingJournal, currentEntries);
+          let currentEntries = appStore.siteJournalEntries.filter(e => e.journalId === existingJournal.id);
+          currentEntries = currentEntries.filter(e => e.id !== newEntry.id);
+          currentEntries.push(newEntry);
+          appStore.updateDailyJournal(existingJournal.id, existingJournal, currentEntries);
         } else {
-            appStore.addDailyJournal({
-                id: `DJ-${updatedSession.date.replace(/-/g, '')}`,
-                date: updatedSession.date,
-                generalNotes: 'Maintenance updated.',
-                loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User',
-                createdAt: new Date().toISOString()
-            }, [newEntry]);
+          appStore.addDailyJournal({
+            id: `DJ-${updatedSession.date.replace(/-/g, '')}`,
+            date: updatedSession.date,
+            generalNotes: 'Maintenance updated.',
+            loggedBy: (user as any)?.user_metadata?.name || user?.email || 'Unknown User',
+            createdAt: new Date().toISOString()
+          }, [newEntry]);
         }
       }, 0);
 
@@ -2551,26 +2552,26 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
     const totalVehicles = maintenanceAssets.filter(a => a.category === 'vehicle').length;
     const dueSoon = maintenanceAssets.filter(a => a.status === 'due_soon').length;
     const overdue = maintenanceAssets.filter(a => a.status === 'overdue').length;
-    
+
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
+
     let monthlyCost = 0;
     let totalDowntime = 0;
-    
+
     maintenanceSessions.forEach(session => {
       const sessionDate = new Date(session.date);
       if (sessionDate.getMonth() === currentMonth && sessionDate.getFullYear() === currentYear) {
         session.assets.forEach(assetLog => {
           monthlyCost += (assetLog.cost || 0);
           if (assetLog.shutdown) {
-            totalDowntime += 8; 
+            totalDowntime += 8;
           }
         });
       }
     });
-    
+
     return {
       totalMachines,
       totalVehicles,
@@ -2590,9 +2591,9 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
   const getSiteAnalytics = (siteId: string) => {
     const siteWaybills = waybills.filter(w => w.siteId === siteId && w.type === 'waybill' && w.status !== 'outstanding');
     const returnWaybills = waybills.filter(w => w.siteId === siteId && w.type === 'return' && w.status !== 'outstanding');
-    
+
     const inventoryMap = new Map<string, { assetId: string, assetName: string, quantity: number }>();
-    
+
     siteWaybills.forEach(w => {
       w.items.forEach(item => {
         const existing = inventoryMap.get(item.assetId);
@@ -2710,6 +2711,52 @@ export const OperationsProvider = ({ children }: { children: ReactNode }) => {
         }
         return [...prev, newDateRecord];
       });
+
+      // Auto-sync any active initial invoice for this site to match pump startup date
+      try {
+        const siteObj = sites.find(s => s.id === siteId);
+        const siteName = siteObj?.name?.trim().toLowerCase();
+        const currentInvoices = useAppStore.getState().invoices || [];
+        const matchingInvoices = currentInvoices.filter(
+          inv => inv.status !== 'Paid' && (
+            (inv.siteId && inv.siteId === siteId) ||
+            (inv.siteName && inv.siteName.trim().toLowerCase() === siteName) ||
+            ((inv as any).site && (inv as any).site.trim().toLowerCase() === siteName)
+          )
+        );
+        const pumpTime = new Date(pumpStartDate).getTime();
+        const matchingInvoice = matchingInvoices.sort((a, b) => {
+          const tA = new Date(a.startDate || a.date || '').getTime();
+          const tB = new Date(b.startDate || b.date || '').getTime();
+          const diffA = isNaN(tA) ? Infinity : Math.abs(tA - pumpTime);
+          const diffB = isNaN(tB) ? Infinity : Math.abs(tB - pumpTime);
+          return diffA - diffB;
+        })[0];
+
+        if (matchingInvoice && (!matchingInvoice.pumpStartDate || matchingInvoice.pumpStartDate !== pumpStartDate)) {
+          const dur = Number(matchingInvoice.duration) || 30;
+          const sDate = new Date(pumpStartDate);
+          if (!isNaN(sDate.getTime())) {
+            sDate.setDate(sDate.getDate() + dur - 1);
+            const newDueDate = sDate.toISOString().split('T')[0];
+
+            await supabase.from('invoices').update({
+              site_id: siteId,
+              pump_start_date: pumpStartDate,
+              due_date: newDueDate
+            }).eq('id', matchingInvoice.id);
+
+            useAppStore.getState().updateInvoice(matchingInvoice.id, {
+              siteId,
+              pumpStartDate,
+              dueDate: newDueDate
+            });
+            toast.success(`Synced Invoice #${matchingInvoice.invoiceNumber} Day 1 to ${formatDisplayDate(pumpStartDate)}`);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Could not auto-sync invoice with pump start date:', syncErr);
+      }
 
       toast.success('Pump dates saved successfully');
     } catch (error: any) {
@@ -3287,57 +3334,57 @@ export const useOperations = () => {
       customFields: [],
       maintenanceCertificates: [],
       isLoaded: false,
-      addAsset: async () => {},
-      updateAsset: () => {},
-      deleteAsset: () => {},
-      restockAsset: () => {},
-      addBatch: () => {},
-      depleteBatch: () => {},
-      logAssetMovement: () => {},
-      addWaybill: () => {},
-      updateWaybill: () => {},
-      updateWaybillStatus: () => {},
-      deleteWaybill: () => {},
-      addCheckout: () => {},
-      updateCheckoutStatus: () => {},
-      deleteCheckout: () => {},
-      logMaintenance: () => {},
-      updateMaintenance: () => {},
-      updateAssetOperationalStatus: async () => {},
+      addAsset: async () => { },
+      updateAsset: () => { },
+      deleteAsset: () => { },
+      restockAsset: () => { },
+      addBatch: () => { },
+      depleteBatch: () => { },
+      logAssetMovement: () => { },
+      addWaybill: () => { },
+      updateWaybill: () => { },
+      updateWaybillStatus: () => { },
+      deleteWaybill: () => { },
+      addCheckout: () => { },
+      updateCheckoutStatus: () => { },
+      deleteCheckout: () => { },
+      logMaintenance: () => { },
+      updateMaintenance: () => { },
+      updateAssetOperationalStatus: async () => { },
       getAssetAnalytics: () => ({}),
       getSiteAnalytics: () => ({}),
-      addDailyMachineLog: () => {},
-      updateDailyMachineLog: () => {},
-      deleteDailyMachineLog: () => {},
-      bulkAddDailyMachineLogs: () => {},
-      logDailyActivitiesBulk: async () => {},
-      addDieselRefill: () => {},
-      addBatchDieselRefills: async () => {},
-      updateDieselRefill: () => {},
-      deleteDieselRefill: () => {},
-      addVehicle: () => {},
-      updateVehicle: () => {},
-      deleteVehicle: () => {},
-      logVehicleService: () => {},
-      updateVehicleService: () => {},
-      deleteVehicleService: () => {},
-      logVehicleIncident: () => {},
-      updateVehicleIncident: () => {},
-      deleteVehicleIncident: () => {},
-      updateVehicleOdometer: () => {},
-      addSitePumpDate: () => {},
-      updateSitePumpDate: () => {},
-      deleteSitePumpDate: () => {},
-      addSiteHoldPeriod: async () => {},
-      updateSiteHoldPeriod: async () => {},
-      deleteSiteHoldPeriod: async () => {},
-      addCustomField: () => {},
-      deleteCustomField: () => {},
-      addMaintenanceCertificate: () => {},
-      updateMaintenanceCertificate: () => {},
-      deleteMaintenanceCertificate: () => {},
+      addDailyMachineLog: () => { },
+      updateDailyMachineLog: () => { },
+      deleteDailyMachineLog: () => { },
+      bulkAddDailyMachineLogs: () => { },
+      logDailyActivitiesBulk: async () => { },
+      addDieselRefill: () => { },
+      addBatchDieselRefills: async () => { },
+      updateDieselRefill: () => { },
+      deleteDieselRefill: () => { },
+      addVehicle: () => { },
+      updateVehicle: () => { },
+      deleteVehicle: () => { },
+      logVehicleService: () => { },
+      updateVehicleService: () => { },
+      deleteVehicleService: () => { },
+      logVehicleIncident: () => { },
+      updateVehicleIncident: () => { },
+      deleteVehicleIncident: () => { },
+      updateVehicleOdometer: () => { },
+      addSitePumpDate: () => { },
+      updateSitePumpDate: () => { },
+      deleteSitePumpDate: () => { },
+      addSiteHoldPeriod: async () => { },
+      updateSiteHoldPeriod: async () => { },
+      deleteSiteHoldPeriod: async () => { },
+      addCustomField: () => { },
+      deleteCustomField: () => { },
+      addMaintenanceCertificate: () => { },
+      updateMaintenanceCertificate: () => { },
+      deleteMaintenanceCertificate: () => { },
       exportOperationsData: () => '',
-      importOperationsData: () => {}
+      importOperationsData: () => { }
     } as unknown as OperationsContextType;
   }
   return context;

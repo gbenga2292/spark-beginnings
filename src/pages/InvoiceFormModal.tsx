@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { formatDisplayDate, normalizeDate } from '@/src/lib/dateUtils';
+import { resolveEffectivePumpStartDate } from '@/src/lib/invoicePumpUtils';
 import { useAppStore, PendingInvoice, Invoice, InvoiceVatableSections, AuxiliaryEquipmentItem, InvoiceNoteLineItem } from '@/src/store/appStore';
 import { toast, showConfirm } from '@/src/components/ui/toast';
 import {
@@ -50,6 +51,7 @@ export const defaultVatableSectionsDefault: InvoiceVatableSections = {
 export const initialInvoiceForm = {
   destination: 'Active' as 'Pending' | 'Active',
   startDate: '',
+  pumpStartDate: '',
   duration: '',
   invoiceNo: '',
   client: '',
@@ -116,7 +118,7 @@ export function InvoiceFormModal({
   const defaultVatableSections = useAppStore((state) => state.payrollVariables?.defaultVatableSections);
   const { addReminder, updateReminder, reminders } = useAppData();
   const { user: currentUser } = useAuth();
-  const { dailyMachineLogs } = useOperations();
+  const { dailyMachineLogs, sitePumpDates = [] } = useOperations();
   const priv = usePriv('billing');
 
   const [form, setForm] = useState(initialInvoiceForm);
@@ -155,6 +157,7 @@ export function InvoiceFormModal({
       setForm({
         destination: activeTab === 'quotations' ? 'Pending' : (inv as any).destination || defaultDestination,
         startDate: 'startDate' in inv ? inv.startDate : (inv as any).date || '',
+        pumpStartDate: ('pumpStartDate' in inv && inv.pumpStartDate) ? inv.pumpStartDate : (resolveEffectivePumpStartDate(inv as any, sites, sitePumpDates) || ''),
         duration: 'duration' in inv ? String(inv.duration ?? 0) : '0',
         invoiceNo: 'invoiceNo' in inv ? inv.invoiceNo : (inv as any).invoiceNumber || '',
         client: (inv.client || '').trim(),
@@ -397,7 +400,29 @@ export function InvoiceFormModal({
     };
   }, [form.client, form.site, invoices, pendingInvoices, selectedId]);
 
+  const operationalPumpStartDate = useMemo(() => {
+    if (!form.site) return null;
+    return resolveEffectivePumpStartDate({ site: form.site, startDate: form.startDate, date: form.startDate }, sites, sitePumpDates) || null;
+  }, [form.site, form.startDate, sites, sitePumpDates]);
+
   const handleChange = (field: string, value: any) => {
+    if (field === 'site' && value) {
+      const normSite = String(value).trim().toLowerCase();
+      const sObj = sites.find(s => s.name?.trim().toLowerCase() === normSite);
+      if (sObj) {
+        const matching = (sitePumpDates || []).filter(p => p.siteId === sObj.id && p.pumpStartDate);
+        if (matching.length > 0) {
+          const earliest = [...matching].sort((a, b) => (a.pumpStartDate || '').localeCompare(b.pumpStartDate || ''))[0].pumpStartDate;
+          setForm(prev => {
+            if (!prev.pumpStartDate) {
+              return { ...prev, site: value, pumpStartDate: earliest };
+            }
+            return { ...prev, site: value };
+          });
+          return;
+        }
+      }
+    }
     setForm((prev) => {
       let nextAux = prev.auxiliaryEquipment;
       if (field === 'duration') {
@@ -845,9 +870,11 @@ export function InvoiceFormModal({
     const siteId = realSite?.id;
 
     let startDate = normalizeDate(input.startDate || input.date);
+    let pumpStartDate = normalizeDate(input.pumpStartDate);
+    const cycleStartDate = pumpStartDate || startDate;
     let endDate = '';
-    if (startDate && maxDuration > 0) {
-      const start = new Date(startDate);
+    if (cycleStartDate && maxDuration > 0) {
+      const start = new Date(cycleStartDate);
       if (!isNaN(start.getTime())) {
         if (input.countOffDays === false && siteId) {
           const logsByDate = new Map<string, typeof dailyMachineLogs>();
@@ -1035,7 +1062,7 @@ export function InvoiceFormModal({
       dailyRentalCost: parseFloat(input.dailyRentalCost) || 0,
       noOfTechnician, techniciansDailyRate,
       dieselCostPerLtr, dailyUsage, mobDemob, installation, damages, discount,
-      startDate, endDate, rentalCost, auxiliaryCost, auxiliaryEquipment, dieselCost, techniciansCost,
+      startDate, pumpStartDate, endDate, rentalCost, auxiliaryCost, auxiliaryEquipment, dieselCost, techniciansCost,
       subtotalCost, totalCost, vat, totalCharge, vatInc,
       vatScope, vatableSections, vatableAmount, nonVatableAmount,
       totalExclusiveOfVat: totalCharge - vat,
@@ -1101,6 +1128,8 @@ export function InvoiceFormModal({
         siteName: data.site,
         amount: data.totalCharge,
         date: data.startDate,
+        startDate: data.startDate,
+        pumpStartDate: data.pumpStartDate,
         dueDate: data.endDate || data.startDate,
         billingCycle: 'Custom',
         reminderDate: '',
@@ -1478,7 +1507,7 @@ export function InvoiceFormModal({
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Start Date</label>
+                      <label className="text-xs font-bold text-slate-500 dark:text-slate-450 uppercase tracking-wider">Invoice Date (Issue Date)</label>
                       {lastInvoiceForSelectedSite?.endDate && (
                         <span className="text-[10px] text-slate-400">
                           Prev Ended:{' '}
@@ -1506,6 +1535,57 @@ export function InvoiceFormModal({
                         </button>
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* ── Operational Pump Start Date (Day 1 of Pumping) ── */}
+                <div className="p-3.5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/50 rounded-xl space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider">
+                        Pump Start Date (Day 1 of Pumping)
+                      </label>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-semibold">
+                        Inclusive Count
+                      </span>
+                    </div>
+                    {operationalPumpStartDate && form.pumpStartDate !== operationalPumpStartDate && (
+                      <button
+                        type="button"
+                        onClick={() => handleChange('pumpStartDate', operationalPumpStartDate)}
+                        className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Use Site Startup Date ({formatDisplayDate(operationalPumpStartDate)})</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    <div>
+                      <Input
+                        type="date"
+                        value={form.pumpStartDate}
+                        onChange={(e) => handleChange('pumpStartDate', e.target.value)}
+                        className="bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 h-10 font-semibold text-slate-800 dark:text-white"
+                      />
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-300">
+                      {form.pumpStartDate ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <span>
+                            Counts from <strong>Day 1</strong> ({formatDisplayDate(form.pumpStartDate)}) for {form.duration || 30} days
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                          <span>
+                            <strong>Pending Startup (Advance Invoice):</strong> Will start counting once pump is commissioned.
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

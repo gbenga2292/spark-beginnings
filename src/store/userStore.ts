@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { db } from '@/src/lib/supabaseService';
 
@@ -97,6 +97,7 @@ export interface PaymentsPriv { canView: boolean; canAdd: boolean; canEdit: bool
 export interface PayrollPriv  {
   canView: boolean; canGenerate: boolean; canViewAmounts: boolean;
   canViewPayeSchedule: boolean; canViewPensionSchedule: boolean; canViewNsitfSchedule: boolean; canViewWithholdingSchedule: boolean;
+  canEmailPayslips?: boolean;
 }
 export interface FinancialReportsPriv {
   canView: boolean; canExport: boolean; canViewAmounts: boolean;
@@ -118,6 +119,19 @@ export interface VendorInvoicesPriv {
   canDelete: boolean;
   canRecordPayment?: boolean;
   canDirectApprove?: boolean;
+}
+
+export interface PettyCashPriv {
+  canView: boolean;
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canExport?: boolean;
+}
+
+export interface ProfitAndLossPriv {
+  canView: boolean;
+  canExport?: boolean;
 }
 
 // ─── Budget ──────────────────────────────────────────────────
@@ -262,6 +276,8 @@ export interface UserPrivileges {
   vatCalculator:        VatCalculatorPriv;
   estimator:            EstimatorPriv;
   vendorInvoices?:   VendorInvoicesPriv;
+  pettyCash?:        PettyCashPriv;
+  profitAndLoss?:    ProfitAndLossPriv;
   phonebook?:        PhonebookPriv;
   budget:            BudgetPriv;
   aiCopilot?:        AiCopilotPriv;
@@ -308,7 +324,7 @@ export const FULL_ACCESS: UserPrivileges = {
   sites:            { canView: true, canAddSite: true, canEditSite: true, canDeleteSite: true, canAddClient: true, canEditClient: true, canDeleteClient: true, canViewClientSummary: true, canImport: true, canExport: true, canViewDecisionIntelligence: true },
   billing:          { canView: true, canCreate: true, canEdit: true, canDelete: true, canViewAmounts: true, canImport: true, canExport: true },
   payments:         { canView: true, canAdd: true, canEdit: true, canDelete: true, canViewAmounts: true, canViewVat: true, canManageVat: true, canImport: true, canExport: true },
-  payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
+  payroll:          { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true, canEmailPayslips: true },
   financialReports: { canView: true, canExport: true, canViewAmounts: true, canViewPayrollSummary: true, canViewLoansAndAdvances: true },
   ledger:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canImport: true, canExport: true, canDirectApprove: true },
   bankImport:       { canView: true, canUpload: true, canReconcile: true, canSave: true, canDelete: true },
@@ -345,6 +361,8 @@ export const FULL_ACCESS: UserPrivileges = {
   vatCalculator:    { canView: true, canExport: true },
   estimator:        { canView: true },
   vendorInvoices:   { canView: true, canAdd: true, canEdit: true, canDelete: true, canRecordPayment: true, canDirectApprove: true },
+  pettyCash:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
+  profitAndLoss:    { canView: true, canExport: true },
   phonebook:        { canView: true, canAdd: true, canEdit: true, canDelete: true, canExport: true },
   budget:           { canView: true, canAdd: true, canEdit: true, canDelete: true, canSetBudgeted: true, canLinkLedger: true },
   aiCopilot:        { canAccess: true },
@@ -393,7 +411,7 @@ export const NO_ACCESS: UserPrivileges = {
   sites:            { canView: false, canAddSite: false, canEditSite: false, canDeleteSite: false, canAddClient: false, canEditClient: false, canDeleteClient: false, canViewClientSummary: false, canImport: false, canExport: false, canViewDecisionIntelligence: false },
   billing:          { canView: false, canCreate: false, canEdit: false, canDelete: false, canViewAmounts: false, canImport: false, canExport: false },
   payments:         { canView: false, canAdd: false, canEdit: false, canDelete: false, canViewAmounts: false, canViewVat: false, canManageVat: false, canImport: false, canExport: false },
-  payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false },
+  payroll:          { canView: false, canGenerate: false, canViewAmounts: false, canViewPayeSchedule: false, canViewPensionSchedule: false, canViewNsitfSchedule: false, canViewWithholdingSchedule: false, canEmailPayslips: false },
   financialReports: { canView: false, canExport: false, canViewAmounts: false, canViewPayrollSummary: false, canViewLoansAndAdvances: false },
   ledger:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canImport: false, canExport: false },
   bankImport:       { canView: false, canUpload: false, canReconcile: false, canSave: false, canDelete: false },
@@ -430,6 +448,8 @@ export const NO_ACCESS: UserPrivileges = {
   vatCalculator:    { canView: false, canExport: false },
   estimator:        { canView: false },
   vendorInvoices:   { canView: false, canAdd: false, canEdit: false, canDelete: false, canRecordPayment: false, canDirectApprove: false },
+  pettyCash:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
+  profitAndLoss:    { canView: false, canExport: false },
   phonebook:        { canView: false, canAdd: false, canEdit: false, canDelete: false, canExport: false },
   budget:           { canView: false, canAdd: false, canEdit: false, canDelete: false, canSetBudgeted: false, canLinkLedger: false },
   aiCopilot:        { canAccess: false },
@@ -479,7 +499,7 @@ const DEFAULT_PRESETS: PrivilegePreset[] = [
       hmo:         { canView: true, canAdd: true, canEdit: true, canExport: true },
       reports:     { canView: true, canExport: true },
       interviews:  { canView: true, canAdd: true, canEdit: true, canDelete: false, canConductInterview: true, canRecordVerdict: true, canForwardToOnboarding: true },
-      payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true },
+      payroll:     { canView: true, canGenerate: true, canViewAmounts: true, canViewPayeSchedule: true, canViewPensionSchedule: true, canViewNsitfSchedule: true, canViewWithholdingSchedule: true, canEmailPayslips: true },
       tasks:       { canView: true, canViewMyTasks: true, canViewDashboard: true, canViewReminders: true, canViewReports: true, canCreateTasks: true, canEditTasks: true, canDeleteTasks: false, isExternalHr: false },
       beneficiaries:{ canView: true, canAdd: true, canEdit: true, canDelete: false, canImport: true, canExport: true },
       weeklyReport: { canView: true, canViewHr: true, canViewOps: true, canViewComm: true, canViewFinance: true },

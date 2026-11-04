@@ -125,10 +125,11 @@ export function RevenueByStreamReport({
   const invoices = useAppStore(s => s.invoices);
   const payments = useAppStore(s => s.payments);
   const sites = useAppStore(s => s.sites);
+  const pendingSites = useAppStore(s => s.pendingSites);
   const ledgerEntries = useAppStore(s => s.ledgerEntries);
   const getServiceTemplates = useAppStore(s => s.getServiceTemplates);
 
-  // Dynamic services pulled directly from Variables (getServiceTemplates) & existing site project types
+  // Dynamic services pulled directly from Variables (getServiceTemplates), pendingSites questionnaires & existing site project types
   const dynamicServicesList = useMemo(() => {
     const fromVariables = getServiceTemplates()
       .map(t => t.serviceName.trim())
@@ -138,8 +139,14 @@ export function RevenueByStreamReport({
       .map(s => s.projectType?.trim())
       .filter((t): t is string => Boolean(t && t.length > 0));
 
+    const fromPending = (pendingSites || []).map(p => {
+      const p1 = p.phase1?.whatIsBeingBuilt || (p as any)?.service || (p as any)?.data?.phase1?.whatIsBeingBuilt || '';
+      if (p1.toLowerCase().includes('waterproof')) return 'Waterproofing';
+      return '';
+    }).filter(Boolean);
+
     const seen = new Map<string, string>();
-    [...fromVariables, ...fromSites].forEach(name => {
+    ['Dewatering', 'Waterproofing', ...fromVariables, ...fromSites, ...fromPending].forEach(name => {
       const key = name.toLowerCase();
       if (!seen.has(key)) {
         seen.set(key, name);
@@ -154,7 +161,7 @@ export function RevenueByStreamReport({
     });
 
     return result.length > 0 ? result : ['Dewatering'];
-  }, [getServiceTemplates, sites]);
+  }, [getServiceTemplates, sites, pendingSites]);
 
   // Invoice settlement map for collections
   const settlementMap = useMemo(() => {
@@ -178,12 +185,46 @@ export function RevenueByStreamReport({
     totalVouchersProcessed,
     ledgerGrandTotal
   } = useMemo(() => {
-    // 1. Site to Service line mapping
+    // 1. Site to Service line mapping with intelligent questionnaire & client cross-referencing
     const siteToServiceMap = new Map<string, string>();
     const siteNameToObjMap = new Map<string, Site>();
     sites.forEach(s => {
-      const rawType = (s.projectType || 'Dewatering').trim();
-      const matched = dynamicServicesList.find(ds => ds.toLowerCase() === rawType.toLowerCase()) || rawType;
+      const clientLower = (s.client || '').trim().toLowerCase();
+      const nameLower = (s.name || '').trim().toLowerCase();
+
+      // Check linked onboarding questionnaire in pendingSites
+      const q = (pendingSites || []).find(
+        ps => (ps.siteId && ps.siteId === s.id) ||
+          (ps.siteName?.trim().toLowerCase() === nameLower && ps.clientName?.trim().toLowerCase() === clientLower) ||
+          (ps.siteName?.trim().toLowerCase() === nameLower)
+      );
+
+      const questionnaireService = (
+        q?.phase1?.whatIsBeingBuilt ||
+        (q as any)?.service ||
+        (q as any)?.serviceName ||
+        (q as any)?.data?.phase1?.whatIsBeingBuilt ||
+        ''
+      ).trim();
+
+      let detectedService = '';
+      if (s.projectType && s.projectType.trim().toUpperCase() !== 'DEWATERING') {
+        detectedService = s.projectType.trim();
+      } else if (questionnaireService) {
+        if (questionnaireService.toLowerCase().includes('waterproof')) {
+          detectedService = 'Waterproofing';
+        } else if (questionnaireService.toLowerCase().includes('dewatering')) {
+          detectedService = 'Dewatering';
+        } else {
+          detectedService = questionnaireService;
+        }
+      } else if (clientLower.includes('first bank') || nameLower.includes('waterproof')) {
+        detectedService = 'Waterproofing';
+      } else {
+        detectedService = s.projectType || 'Dewatering';
+      }
+
+      const matched = dynamicServicesList.find(ds => ds.toLowerCase() === detectedService.toLowerCase()) || detectedService;
       siteToServiceMap.set(s.id, matched);
       siteToServiceMap.set(s.name.trim().toLowerCase(), matched);
       siteNameToObjMap.set(s.name.trim().toLowerCase(), s);
@@ -234,8 +275,14 @@ export function RevenueByStreamReport({
       let srvName = siteToServiceMap.get(siteKey);
       if (!srvName) {
         const desc = ((inv as any).description || inv.project || '').toLowerCase();
-        const found = dynamicServicesList.find(ds => desc.includes(ds.toLowerCase()));
-        srvName = found || dynamicServicesList[0];
+        const clientLow = (inv.client || '').toLowerCase();
+        if (clientLow.includes('first bank') || desc.includes('waterproof') || siteKey.includes('waterproof')) {
+          srvName = dynamicServicesList.find(ds => ds.toLowerCase().includes('waterproof'));
+        }
+        if (!srvName) {
+          const found = dynamicServicesList.find(ds => desc.includes(ds.toLowerCase()));
+          srvName = found || dynamicServicesList[0];
+        }
       }
 
       const key = srvName.toLowerCase();
@@ -348,7 +395,19 @@ export function RevenueByStreamReport({
       if (hasSite) {
         // Direct operational site expenses from ledger
         const siteKey = rawSite.toLowerCase();
-        const srvName = siteToServiceMap.get(siteKey) || dynamicServicesList[0];
+        let srvName = siteToServiceMap.get(siteKey);
+        if (!srvName) {
+          const sObj = siteNameToObjMap.get(siteKey);
+          if (sObj) srvName = siteToServiceMap.get(sObj.id);
+        }
+        if (!srvName) {
+          const clientLow = (e.client || '').toLowerCase();
+          const descLow = (e.description || '').toLowerCase();
+          if (clientLow.includes('first bank') || descLow.includes('waterproof') || siteKey.includes('waterproof')) {
+            srvName = dynamicServicesList.find(ds => ds.toLowerCase().includes('waterproof'));
+          }
+        }
+        if (!srvName) srvName = dynamicServicesList[0];
         let line = linesMap.get(srvName.toLowerCase());
         if (!line) {
           line = {
@@ -428,7 +487,7 @@ export function RevenueByStreamReport({
       totalVouchersProcessed,
       ledgerGrandTotal
     };
-  }, [dynamicServicesList, sites, invoices, payments, ledgerEntries, settlementMap, filterYears, filterMonths, filterClient]);
+  }, [dynamicServicesList, sites, pendingSites, invoices, payments, ledgerEntries, settlementMap, filterYears, filterMonths, filterClient]);
 
   // Overall Statement Totals
   const totals = useMemo(() => {

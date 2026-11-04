@@ -7,8 +7,8 @@ import type {
   Site, Employee, AttendanceRecord, Invoice, PendingInvoice,
   SalaryAdvance, Loan, Payment, VatPayment, LeaveRecord, DepartmentTasks,
   DisciplinaryRecord, EvaluationRecord, Department, Position,
-  LedgerCategory, LedgerVendor, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog, CommLogRead,
-  CompanyExpense, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem,
+  LedgerCategory, LedgerVendor, LedgerVendorBankAccount, LedgerBank, LedgerBeneficiaryBank, LedgerEntry, CommLog, CommLogRead,
+  CompanyExpense, PettyCashEntry, StaffMeritRecord, LeaveType, DailyJournal, SiteJournalEntry, ClientContact, BudgetItem,
   PayrollSnapshot, VendorInvoice, VendorInvoicePayment
 } from '@/src/store/appStore';
 import { useUserStore, type AppUser, type PrivilegePreset } from '@/src/store/userStore';
@@ -51,7 +51,12 @@ export function dbToSite(r: any): Site {
     currentDewateringStage: (r.end_date && r.end_date.trim() !== '') ? 'demobilisation' : (r.current_dewatering_stage ?? undefined),
     // Explicitly map false → false, null/undefined/true → true (null means default enabled)
     trackDiesel: r.track_diesel === false ? false : true,
-    projectType: r.project_type || 'DEWATERING',
+    projectType: r.project_type || (
+      (r.client && String(r.client).toLowerCase().includes('first bank')) ||
+      (r.name && String(r.name).toLowerCase().includes('waterproof'))
+        ? 'WATERPROOFING'
+        : 'DEWATERING'
+    ),
     contractValue: r.contract_value ? Number(r.contract_value) : 0,
     billedAmount: r.billed_amount ? Number(r.billed_amount) : 0,
     retentionPercentage: r.retention_percentage ? Number(r.retention_percentage) : 5.0,
@@ -118,6 +123,7 @@ export function dbToInvoice(r: any): Invoice {
     id: r.id, invoiceNumber: r.invoice_number, client: r.client,
     project: r.project, siteId: r.site_id, siteName: r.site_name,
     amount: Number(r.amount), date: r.date, dueDate: r.due_date,
+    pumpStartDate: r.pump_start_date || undefined,
     billingCycle: r.billing_cycle, reminderDate: r.reminder_date,
     status: r.status, vatInc: r.vat_inc,
     vatScope: r.vat_scope || 'overall',
@@ -176,7 +182,9 @@ export function dbToPendingInvoice(r: any): PendingInvoice {
     dailyUsage: Number(r.daily_usage), noOfTechnician: r.no_of_technician,
     techniciansDailyRate: Number(r.technicians_daily_rate),
     mobDemob: Number(r.mob_demob), installation: Number(r.installation),
-    damages: Number(r.damages), startDate: r.start_date, duration: r.duration,
+    damages: Number(r.damages), startDate: r.start_date,
+    pumpStartDate: r.pump_start_date || undefined,
+    duration: r.duration,
     endDate: r.end_date, rentalCost: Number(r.rental_cost),
     auxiliaryCost: r.auxiliary_cost != null ? Number(r.auxiliary_cost) : 0,
     auxiliaryEquipment: r.auxiliary_equipment || [],
@@ -332,15 +340,66 @@ export function dbToLedgerCategory(r: any): LedgerCategory {
 }
 
 export function dbToLedgerVendor(r: any): LedgerVendor {
+  let emails: string[] = [];
+  if (Array.isArray(r.emails)) {
+    emails = r.emails;
+  } else if (typeof r.emails === 'string' && r.emails.trim()) {
+    try {
+      const parsed = JSON.parse(r.emails);
+      if (Array.isArray(parsed)) emails = parsed;
+    } catch {
+      emails = r.emails.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+
+  let phones: string[] = [];
+  if (Array.isArray(r.phones)) {
+    phones = r.phones;
+  } else if (typeof r.phones === 'string' && r.phones.trim()) {
+    try {
+      const parsed = JSON.parse(r.phones);
+      if (Array.isArray(parsed)) phones = parsed;
+    } catch {
+      phones = r.phones.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+  }
+  if (phones.length === 0 && r.phone) {
+    phones = [r.phone];
+  }
+
+  let bankAccounts: LedgerVendorBankAccount[] = [];
+  if (Array.isArray(r.bank_accounts)) {
+    bankAccounts = r.bank_accounts;
+  } else if (typeof r.bank_accounts === 'string' && r.bank_accounts.trim()) {
+    try {
+      const parsed = JSON.parse(r.bank_accounts);
+      if (Array.isArray(parsed)) bankAccounts = parsed;
+    } catch {
+      bankAccounts = [];
+    }
+  }
+  if (bankAccounts.length === 0 && (r.bank_name || r.account_number)) {
+    bankAccounts = [{
+      bankName: r.bank_name || '',
+      accountNumber: r.account_number || '',
+      isPrimary: true,
+    }];
+  }
+
+  const primaryBank = bankAccounts.find(b => b.isPrimary) || bankAccounts[0];
+
   return {
     id: r.id,
     name: r.name,
     tinNumber: r.tin_number || undefined,
     address: r.address || undefined,
-    phone: r.phone || undefined,
+    phone: phones[0] || r.phone || undefined,
+    phones: phones.length > 0 ? phones : undefined,
+    emails: emails.length > 0 ? emails : undefined,
+    bankAccounts: bankAccounts.length > 0 ? bankAccounts : undefined,
     servicesRendered: r.services_rendered || undefined,
-    accountNumber: r.account_number || undefined,
-    bankName: r.bank_name || undefined,
+    accountNumber: primaryBank?.accountNumber || r.account_number || undefined,
+    bankName: primaryBank?.bankName || r.bank_name || undefined,
     notes: r.notes || undefined,
   };
 }
@@ -392,6 +451,20 @@ export function dbToCompanyExpense(r: any): CompanyExpense {
     enteredBy: r.entered_by,
     createdAt: r.created_at,
     status: r.status || 'Pending'
+  };
+}
+
+export function dbToPettyCashEntry(r: any): PettyCashEntry {
+  return {
+    id: r.id,
+    date: r.date,
+    description: r.description || '',
+    amount: Number(r.amount) || 0,
+    paidFrom: r.paid_from || '',
+    paidTo: r.paid_to || '',
+    enteredBy: r.entered_by || '',
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 }
 
@@ -868,6 +941,7 @@ function invoiceToDb(i: Invoice) {
     id: i.id, invoice_number: i.invoiceNumber, client: i.client,
     project: i.project, site_id: i.siteId, site_name: i.siteName,
     amount: i.amount, date: i.date, due_date: i.dueDate,
+    pump_start_date: i.pumpStartDate || null,
     billing_cycle: i.billingCycle, reminder_date: i.reminderDate,
     status: i.status, vat_inc: i.vatInc,
     vat_scope: i.vatScope || 'overall',
@@ -927,6 +1001,7 @@ function pendingInvoiceToDb(p: PendingInvoice) {
     daily_usage: p.dailyUsage, no_of_technician: p.noOfTechnician,
     technicians_daily_rate: p.techniciansDailyRate, mob_demob: p.mobDemob,
     installation: p.installation, damages: p.damages, start_date: p.startDate,
+    pump_start_date: p.pumpStartDate || null,
     duration: p.duration, end_date: p.endDate,
     rental_cost: p.rentalCost,
     auxiliary_cost: p.auxiliaryCost ?? 0,
@@ -1126,6 +1201,19 @@ function companyExpenseToDb(e: CompanyExpense) {
   };
 }
 
+function pettyCashEntryToDb(e: PettyCashEntry) {
+  const safeDate = e.date && e.date.trim() !== '' ? e.date : new Date().toISOString().split('T')[0];
+  return {
+    id: e.id,
+    date: safeDate,
+    description: e.description,
+    amount: Number(e.amount) || 0,
+    paid_from: e.paidFrom || '',
+    paid_to: e.paidTo || '',
+    entered_by: e.enteredBy || '',
+  };
+}
+
 function staffMeritToDb(r: StaffMeritRecord) {
   return {
     id: r.id,
@@ -1284,7 +1372,7 @@ export async function fetchAllAppData(privs?: any) {
     clientContactsRes,
     employeesRes, attendanceRes,
     invoicesRes, pendingInvoicesRes,
-    ledgerCategoriesRes, ledgerVendorsRes, ledgerBanksRes, ledgerBeneficiaryBanksRes, ledgerEntriesRes, companyExpensesRes,
+    ledgerCategoriesRes, ledgerVendorsRes, ledgerBanksRes, ledgerBeneficiaryBanksRes, ledgerEntriesRes, companyExpensesRes, pettyCashRes,
     vehiclesRes, vehicleTripsRes, dailyJournalsRes, siteJournalEntriesRes,
     budgetItemsRes,
     vendorInvoicesRes, vendorInvoicePaymentsRes,
@@ -1321,6 +1409,7 @@ export async function fetchAllAppData(privs?: any) {
     canView('ledger') ? supabase.from('ledger_beneficiary_banks').select('*').order('name').limit(50000) : Promise.resolve({ data: [] }),
     canView('ledger') ? fetchLedgerByYearRaw(new Date().getFullYear()) : Promise.resolve({ entries: [], count: 0 }),
     canView('ledger') ? supabase.from('company_expenses').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
+    canView('ledger') ? supabase.from('petty_cash_entries').select('*').order('date', { ascending: false }).limit(50000) : Promise.resolve({ data: [] }),
     supabase.from('vehicles').select('*').order('name').limit(50000),
     supabase.from('vehicle_movement_log').select('*').order('departure_time', { ascending: false }).limit(50000),
     supabase.from('daily_journals').select('*').order('date', { ascending: false }).limit(10000),
@@ -1375,6 +1464,7 @@ export async function fetchAllAppData(privs?: any) {
     hrVariables: settings?.hr_variables || undefined,
     onboardingTemplates: settings?.onboarding_templates || [],
     expenseVatRemittances: settings?.expense_vat_remittances || [],
+    pettyCashBanks: Array.isArray(settings?.petty_cash_banks) ? settings.petty_cash_banks : ['Petty Cash'],
     superAdminCreated: settings?.super_admin_created ?? false,
     superAdminSignupEnabled: settings?.super_admin_signup_enabled ?? true,
     settingsId: settings?.id,
@@ -1392,6 +1482,7 @@ export async function fetchAllAppData(privs?: any) {
     loadedLedgerYears: [new Date().getFullYear()],
     dbLedgerCount: (ledgerEntriesRes as any).count ?? ((ledgerEntriesRes as any).data ? (ledgerEntriesRes as any).data.length : null),
     companyExpenses: (companyExpensesRes.data || []).map(dbToCompanyExpense),
+    pettyCashEntries: ((pettyCashRes as any)?.data || []).map(dbToPettyCashEntry),
     vehicles: (vehiclesRes.data || []).map(dbToVehicle),
     vehicleTrips: (vehicleTripsRes.data || []).map(dbToVehicleMovement),
     dailyJournals: (dailyJournalsRes.data || []).map(dbToDailyJournal),
@@ -1780,6 +1871,10 @@ export const db = {
       update.current_dewatering_stage = s.currentDewateringStage ?? null;
     }
     if (s.trackDiesel !== undefined) update.track_diesel = s.trackDiesel;
+    if (s.projectType !== undefined) update.project_type = s.projectType;
+    if (s.contractValue !== undefined) update.contract_value = s.contractValue;
+    if (s.billedAmount !== undefined) update.billed_amount = s.billedAmount;
+    if (s.retentionPercentage !== undefined) update.retention_percentage = s.retentionPercentage;
     const { error } = await supabase.from('sites').update(update).eq('id', id);
     if (error) { console.error('updateSite:', error); throw error; }
   },
@@ -2047,6 +2142,7 @@ export const db = {
       siteName: 'site_name',
       amount: 'amount',
       date: 'date',
+      pumpStartDate: 'pump_start_date',
       dueDate: 'due_date',
       billingCycle: 'billing_cycle',
       reminderDate: 'reminder_date',
@@ -2144,6 +2240,7 @@ export const db = {
       installation: 'installation',
       damages: 'damages',
       startDate: 'start_date',
+      pumpStartDate: 'pump_start_date',
       duration: 'duration',
       endDate: 'end_date',
       rentalCost: 'rental_cost',
@@ -2461,6 +2558,7 @@ export const db = {
     hrVariables?: any;
     onboardingTemplates?: any;
     expenseVatRemittances?: any;
+    pettyCashBanks?: string[];
     superAdminCreated?: boolean;
     superAdminSignupEnabled?: boolean;
   }) {
@@ -2471,6 +2569,7 @@ export const db = {
     if (data.hrVariables !== undefined) update.hr_variables = data.hrVariables;
     if (data.onboardingTemplates !== undefined) update.onboarding_templates = data.onboardingTemplates;
     if (data.expenseVatRemittances !== undefined) update.expense_vat_remittances = data.expenseVatRemittances;
+    if (data.pettyCashBanks !== undefined) update.petty_cash_banks = data.pettyCashBanks;
     if (data.superAdminCreated !== undefined) update.super_admin_created = data.superAdminCreated;
     if (data.superAdminSignupEnabled !== undefined) update.super_admin_signup_enabled = data.superAdminSignupEnabled;
     update.updated_at = new Date().toISOString();
@@ -2524,15 +2623,20 @@ export const db = {
   },
 
   async insertLedgerVendor(v: LedgerVendor) {
+    const primaryBank = v.bankAccounts?.find(b => b.isPrimary) || v.bankAccounts?.[0];
+    const primaryPhone = v.phones?.[0] || v.phone;
     const { error } = await supabase.from('ledger_vendors').insert({
       id: v.id,
       name: v.name,
       tin_number: v.tinNumber,
       address: v.address,
-      phone: v.phone,
+      phone: primaryPhone,
+      phones: v.phones || (primaryPhone ? [primaryPhone] : []),
+      emails: v.emails || [],
+      bank_accounts: v.bankAccounts || (primaryBank ? [primaryBank] : []),
       services_rendered: v.servicesRendered,
-      account_number: v.accountNumber,
-      bank_name: v.bankName,
+      account_number: primaryBank?.accountNumber || v.accountNumber,
+      bank_name: primaryBank?.bankName || v.bankName,
       notes: v.notes,
     });
     if (error) { console.error('Database error:', error); throw error; }
@@ -2543,6 +2647,21 @@ export const db = {
     if (v.tinNumber !== undefined) update.tin_number = v.tinNumber;
     if (v.address !== undefined) update.address = v.address;
     if (v.phone !== undefined) update.phone = v.phone;
+    if (v.phones !== undefined) {
+      update.phones = v.phones;
+      if (v.phone === undefined && v.phones.length > 0) {
+        update.phone = v.phones[0];
+      }
+    }
+    if (v.emails !== undefined) update.emails = v.emails;
+    if (v.bankAccounts !== undefined) {
+      update.bank_accounts = v.bankAccounts;
+      const primaryBank = v.bankAccounts.find(b => b.isPrimary) || v.bankAccounts[0];
+      if (primaryBank) {
+        if (v.bankName === undefined) update.bank_name = primaryBank.bankName;
+        if (v.accountNumber === undefined) update.account_number = primaryBank.accountNumber;
+      }
+    }
     if (v.servicesRendered !== undefined) update.services_rendered = v.servicesRendered;
     if (v.accountNumber !== undefined) update.account_number = v.accountNumber;
     if (v.bankName !== undefined) update.bank_name = v.bankName;
@@ -2666,6 +2785,27 @@ export const db = {
   },
   async deleteCompanyExpense(id: string) {
     const { error } = await supabase.from('company_expenses').delete().eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+
+  // Petty Cash Entries
+  async insertPettyCashEntry(e: PettyCashEntry) {
+    const { error } = await supabase.from('petty_cash_entries').insert(pettyCashEntryToDb(e));
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async updatePettyCashEntry(id: string, e: Partial<PettyCashEntry>) {
+    const update: any = { updated_at: new Date().toISOString() };
+    if (e.date !== undefined) update.date = e.date;
+    if (e.description !== undefined) update.description = e.description;
+    if (e.amount !== undefined) update.amount = Number(e.amount) || 0;
+    if (e.paidFrom !== undefined) update.paid_from = e.paidFrom;
+    if (e.paidTo !== undefined) update.paid_to = e.paidTo;
+    if (e.enteredBy !== undefined) update.entered_by = e.enteredBy;
+    const { error } = await supabase.from('petty_cash_entries').update(update).eq('id', id);
+    if (error) { console.error('Database error:', error); throw error; }
+  },
+  async deletePettyCashEntry(id: string) {
+    const { error } = await supabase.from('petty_cash_entries').delete().eq('id', id);
     if (error) { console.error('Database error:', error); throw error; }
   },
 

@@ -9,6 +9,7 @@ import { formatDisplayDate } from '@/src/lib/dateUtils';
 import { useOperations } from '@/src/contexts/OperationsContext';
 import { useAppStore } from '@/src/store/appStore';
 import { getInvoiceSettlement } from '@/src/lib/settlementUtils';
+import { resolveEffectivePumpStartDate } from '@/src/lib/invoicePumpUtils';
 
 interface InvoiceDetailDialogProps {
   invoice: Invoice | null;
@@ -60,6 +61,10 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
   const inv = invoice as any;
   const [notesCollapsed, setNotesCollapsed] = useState(false);
 
+  const resolvedPumpStartDate = useMemo(() => {
+    return resolveEffectivePumpStartDate(inv, sites, sitePumpDates);
+  }, [inv, sites, sitePumpDates]);
+
   const settlement = useMemo(() => {
     if (!invoice) return null;
     return getInvoiceSettlement(invoice, invoices, payments);
@@ -67,7 +72,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
 
   const liveEndDate = useMemo(() => {
     if (!invoice) return '';
-    const startDateStr = inv.startDate || invoice.date;
+    const startDateStr = resolvedPumpStartDate || inv.startDate || invoice.date;
     const duration = invoice.duration ?? 0;
     const linkedAssets = inv.linkedAssetIds || [];
 
@@ -139,7 +144,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
   const invoiceSiteName = (invoice?.siteName || inv?.site || '').trim().toLowerCase();
   const invoiceSiteId = (invoice?.siteId || '').trim().toLowerCase();
   const invoiceDuration = invoice?.duration ?? 0;
-  const invoiceStartDate = inv?.startDate || invoice?.date || '';
+  const invoiceStartDate = resolvedPumpStartDate || inv?.startDate || invoice?.date || '';
 
   const isAuxOnly = (Number(invoice?.noOfMachine || 0) === 0) && (invoice?.auxiliaryEquipment?.length || 0) > 0;
   const auxNames = useMemo(() => 
@@ -408,8 +413,13 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
           {/* Period & Summary */}
           <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800">
             <SectionTitle icon={<Calendar className="h-4 w-4" />} title="Period & Summary" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-              <StatCard label="Start Date" value={formatDisplayDate(inv.startDate || invoice.date)} />
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
+              <StatCard label="Invoice Date" value={formatDisplayDate(inv.startDate || invoice.date)} />
+              <StatCard 
+                label="Pump Start (Day 1)" 
+                value={resolvedPumpStartDate ? formatDisplayDate(resolvedPumpStartDate) : 'Pending Startup'} 
+                highlight={!!resolvedPumpStartDate} 
+              />
               
               <div className="bg-slate-50 border border-slate-200 dark:border-slate-800 rounded-sm px-3 py-2.5 flex flex-col justify-center">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">End Date</p>
@@ -417,7 +427,7 @@ export function InvoiceDetailDialog({ invoice, invoiceList = [], open, onClose, 
                   <p className="font-bold text-sm text-slate-700 truncate">
                     {formatDisplayDate(
                       (() => {
-                        const startDateStr = inv.startDate || invoice.date;
+                        const startDateStr = resolvedPumpStartDate || inv.startDate || invoice.date;
                         const duration = invoice.duration ?? 0;
                         if (!startDateStr || duration <= 0) return inv.endDate || invoice.dueDate || '';
                         const start = new Date(startDateStr);
